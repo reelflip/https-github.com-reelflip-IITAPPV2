@@ -1,23 +1,35 @@
 
-import React, { useState, useEffect } from 'react';
-import { TestAttempt, Test, QuestionResult } from '../lib/types';
+import React, { useState, useEffect, useMemo } from 'react';
+import { TestAttempt, Test, QuestionResult, User } from '../lib/types';
 import { Button } from '../components/Button';
 import { PageHeader } from '../components/PageHeader';
-import { Clock, Check, AlertCircle, PlayCircle, RotateCcw } from 'lucide-react';
+import { Clock, Check, AlertCircle, PlayCircle, RotateCcw, Filter } from 'lucide-react';
 
 interface Props {
+  user?: User;
   addTestAttempt: (attempt: TestAttempt) => void;
   history: TestAttempt[];
   availableTests: Test[];
 }
 
-export const TestScreen: React.FC<Props> = ({ addTestAttempt, history, availableTests = [] }) => {
+export const TestScreen: React.FC<Props> = ({ user, addTestAttempt, history, availableTests = [] }) => {
   const [activeTab, setActiveTab] = useState<'practice' | 'history'>('practice');
   const [activeTest, setActiveTest] = useState<Test | null>(null);
   
+  // Filter Toggle
+  const [showAllTests, setShowAllTests] = useState(false);
+
   // Manual Entry State
   const [isManualEntry, setIsManualEntry] = useState(false);
   const [manualForm, setManualForm] = useState({ title: '', score: '', totalMarks: '300' });
+
+  // Intelligent Default Tab
+  useEffect(() => {
+      // If history is empty, guide to practice
+      if (history.length === 0) {
+          setActiveTab('practice');
+      }
+  }, [history.length]);
 
   // Handle Manual Submit
   const handleManualSubmit = (e: React.FormEvent) => {
@@ -47,6 +59,26 @@ export const TestScreen: React.FC<Props> = ({ addTestAttempt, history, available
     setActiveTab('history');
   };
 
+  // Filter Logic
+  const filteredTests = useMemo(() => {
+      if (showAllTests || !user) return availableTests;
+
+      const target = user.targetExam || 'JEE Main & Advanced';
+      
+      return availableTests.filter(test => {
+          if (target.includes('JEE') && test.examType === 'JEE') return true;
+          if (target.includes('BITSAT') && test.examType === 'BITSAT') return true;
+          if (target.includes('VITEEE') && test.examType === 'VITEEE') return true;
+          if (target.includes('MHT-CET') && test.examType === 'OTHER') return true; // Mapping assumption
+          
+          // Fallback: If test has no type or target is vague, maybe include? 
+          // Stricter for now:
+          return false;
+      });
+  }, [availableTests, user, showAllTests]);
+
+  const displayTests = filteredTests.length > 0 ? filteredTests : (showAllTests ? [] : availableTests); // Fallback to all if filter returns empty (UX choice)
+
   if (activeTest) {
       return (
           <ActiveTestSession 
@@ -62,42 +94,73 @@ export const TestScreen: React.FC<Props> = ({ addTestAttempt, history, available
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
       <PageHeader 
         title="Test Center" 
         subtitle="Attempt new mock tests or analyze your past performance."
         action={
             <div className="flex bg-slate-100 p-1 rounded-lg">
-                <button onClick={() => setActiveTab('practice')} className={`px-4 py-2 rounded-md text-sm font-bold ${activeTab === 'practice' ? 'bg-white text-blue-600 shadow' : 'text-slate-500'}`}>Practice Zone</button>
-                <button onClick={() => setActiveTab('history')} className={`px-4 py-2 rounded-md text-sm font-bold ${activeTab === 'history' ? 'bg-white text-blue-600 shadow' : 'text-slate-500'}`}>History</button>
+                <button onClick={() => setActiveTab('practice')} className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${activeTab === 'practice' ? 'bg-white text-blue-600 shadow' : 'text-slate-500'}`}>Practice Zone</button>
+                <button onClick={() => setActiveTab('history')} className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${activeTab === 'history' ? 'bg-white text-blue-600 shadow' : 'text-slate-500'}`}>History</button>
             </div>
         }
       />
 
       {activeTab === 'practice' && (
           <div className="space-y-6">
-              {availableTests.length === 0 ? (
+              
+              {/* Filter Controls */}
+              <div className="flex justify-between items-center bg-blue-50/50 p-3 rounded-xl border border-blue-100">
+                  <div className="flex items-center gap-2">
+                      <Filter className="w-4 h-4 text-blue-500" />
+                      <span className="text-xs font-bold text-blue-800 uppercase tracking-wide">
+                          Showing: {showAllTests ? 'All Available Tests' : `Recommended for ${user?.targetExam || 'You'}`}
+                      </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                      <span className={`text-xs font-bold ${!showAllTests ? 'text-slate-400' : 'text-blue-600'}`}>All</span>
+                      <button 
+                          onClick={() => setShowAllTests(!showAllTests)}
+                          className={`w-10 h-5 rounded-full p-1 transition-colors ${!showAllTests ? 'bg-blue-600' : 'bg-slate-300'}`}
+                      >
+                          <div className={`w-3 h-3 bg-white rounded-full shadow-md transform transition-transform ${!showAllTests ? 'translate-x-5' : 'translate-x-0'}`}></div>
+                      </button>
+                      <span className={`text-xs font-bold ${!showAllTests ? 'text-blue-600' : 'text-slate-400'}`}>Recommended</span>
+                  </div>
+              </div>
+
+              {displayTests.length === 0 ? (
                   <div className="text-center py-12 bg-slate-50 rounded-xl border border-dashed border-slate-300">
-                      <p className="text-slate-500 font-medium">No active tests available right now.</p>
-                      <p className="text-xs text-slate-400 mt-1">Check back later or log a manual test in History.</p>
+                      <p className="text-slate-500 font-medium">No matching tests found for your target exam.</p>
+                      <button onClick={() => setShowAllTests(true)} className="text-xs text-blue-600 font-bold mt-2 hover:underline">
+                          Show all available tests
+                      </button>
                   </div>
               ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {availableTests.map(test => (
-                          <div key={test.id} className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all">
+                      {displayTests.map(test => (
+                          <div key={test.id} className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all group">
                               <div className="flex justify-between items-start mb-4">
                                   <div>
-                                      <span className="text-[10px] uppercase font-bold bg-blue-50 text-blue-600 px-2 py-1 rounded border border-blue-100">{test.category}</span>
-                                      <h3 className="font-bold text-lg text-slate-800 mt-2">{test.title}</h3>
+                                      <div className="flex gap-2 mb-2">
+                                          <span className="text-[10px] uppercase font-bold bg-slate-100 text-slate-600 px-2 py-1 rounded border border-slate-200">{test.examType || 'GENERIC'}</span>
+                                          <span className={`text-[10px] uppercase font-bold px-2 py-1 rounded border ${
+                                              test.difficulty === 'ADVANCED' ? 'bg-red-50 text-red-700 border-red-100' : 
+                                              test.difficulty === 'MAINS' ? 'bg-blue-50 text-blue-700 border-blue-100' : 'bg-slate-50 text-slate-700 border-slate-100'
+                                          }`}>
+                                              {test.difficulty}
+                                          </span>
+                                      </div>
+                                      <h3 className="font-bold text-lg text-slate-800 leading-tight">{test.title}</h3>
                                   </div>
                               </div>
-                              <div className="flex items-center gap-4 text-xs text-slate-500 mb-6">
+                              <div className="flex items-center gap-4 text-xs text-slate-500 mb-6 font-medium">
                                   <span className="flex items-center"><Clock size={14} className="mr-1"/> {test.durationMinutes} mins</span>
                                   <span>•</span>
                                   <span>{test.questions.length} Questions</span>
                               </div>
-                              <Button onClick={() => setActiveTest(test)} className="w-full">
-                                  Start Test <PlayCircle size={16} className="ml-2"/>
+                              <Button onClick={() => setActiveTest(test)} className="w-full group-hover:bg-blue-700">
+                                  Start Test <PlayCircle size={16} className="ml-2 group-hover:translate-x-1 transition-transform"/>
                               </Button>
                           </div>
                       ))}
@@ -139,7 +202,7 @@ export const TestScreen: React.FC<Props> = ({ addTestAttempt, history, available
               <div className="space-y-3">
                   {history.length === 0 && <p className="text-center text-slate-400 py-10">No test history found.</p>}
                   {[...history].reverse().map(attempt => (
-                      <div key={attempt.id} className="bg-white p-4 rounded-xl border border-slate-200 flex justify-between items-center">
+                      <div key={attempt.id} className="bg-white p-4 rounded-xl border border-slate-200 flex justify-between items-center hover:shadow-sm transition-all">
                           <div>
                               <h4 className="font-bold text-slate-800">{attempt.title}</h4>
                               <p className="text-xs text-slate-500">{new Date(attempt.date).toLocaleDateString()}</p>

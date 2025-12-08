@@ -211,10 +211,10 @@ export interface ContactMessage {
 
 export interface BacklogItem {
     id: string;
-    title: string;
-    subjectId: string;
-    priority: 'HIGH' | 'MEDIUM' | 'LOW';
-    status: 'PENDING' | 'CLEARED';
+    topic: string;
+    subject: Subject;
+    priority: 'High' | 'Medium' | 'Low';
+    status: 'PENDING' | 'COMPLETED';
     deadline: string;
 }
 

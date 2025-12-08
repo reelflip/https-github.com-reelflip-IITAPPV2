@@ -29,9 +29,10 @@ import { ExamGuideScreen } from './screens/ExamGuideScreen';
 import { PrivacyPolicyScreen } from './screens/PrivacyPolicyScreen';
 import { FocusScreen } from './screens/FocusScreen';
 import { AnalyticsScreen } from './screens/AnalyticsScreen';
-import { WellnessScreen } from './screens/WellnessScreen'; // Import WellnessScreen
+import { WellnessScreen } from './screens/WellnessScreen';
+import { BacklogScreen } from './screens/BacklogScreen'; // Import new screen
 import { PublicLayout } from './components/PublicLayout';
-import { User, UserProgress, TopicStatus, TestAttempt, Screen, Goal, MistakeLog, Flashcard, MemoryHack, BlogPost, VideoLesson, Question, Test, TimetableConfig, Topic, ContactMessage } from './lib/types';
+import { User, UserProgress, TopicStatus, TestAttempt, Screen, Goal, MistakeLog, Flashcard, MemoryHack, BlogPost, VideoLesson, Question, Test, TimetableConfig, Topic, ContactMessage, BacklogItem } from './lib/types';
 import { calculateNextRevision } from './lib/utils';
 import { SYLLABUS_DATA } from './lib/syllabusData';
 import { TrendingUp, Bell } from 'lucide-react';
@@ -46,30 +47,6 @@ const ComingSoonScreen = ({ title, icon }: { title: string, icon: string }) => (
     </p>
   </div>
 );
-
-// Backlog Screen reused logic
-const BacklogScreen = ({ progress }: { progress: Record<string, UserProgress> }) => {
-  const backlogs = Object.values(progress).filter(p => p.status === 'BACKLOG');
-  return (
-     <div className="space-y-6">
-       <h2 className="text-2xl font-bold text-slate-900">Backlog Manager</h2>
-       {backlogs.length === 0 ? (
-         <div className="p-12 bg-green-50 text-green-700 rounded-xl text-center">
-           No backlogs! You are on track.
-         </div>
-       ) : (
-         <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-            {backlogs.map(b => (
-              <div key={b.topicId} className="p-4 border-b last:border-0 flex justify-between items-center">
-                 <span className="font-medium text-slate-700">{b.topicId}</span>
-                 <span className="px-3 py-1 bg-red-100 text-red-700 rounded-full text-xs font-bold">Backlog</span>
-              </div>
-            ))}
-         </div>
-       )}
-     </div>
-  );
-};
 
 // --- DEMO DATA SEEDING ---
 const DEMO_TESTS: Test[] = [
@@ -150,6 +127,7 @@ export default function App() {
   const [testAttempts, setTestAttempts] = useState<TestAttempt[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [mistakes, setMistakes] = useState<MistakeLog[]>([]);
+  const [backlogs, setBacklogs] = useState<BacklogItem[]>([]); // Backlog State
   const [timetableData, setTimetableData] = useState<{config: TimetableConfig, slots: any[]} | null>(null);
   
   // Dynamic Syllabus State
@@ -189,12 +167,14 @@ export default function App() {
     const savedTests = localStorage.getItem(`iitjee_tests_${userId}`);
     const savedGoals = localStorage.getItem(`iitjee_goals_${userId}`);
     const savedMistakes = localStorage.getItem(`iitjee_mistakes_${userId}`);
+    const savedBacklogs = localStorage.getItem(`iitjee_backlogs_${userId}`);
     const savedTimetable = localStorage.getItem(`iitjee_timetable_${userId}`);
 
     if (savedProgress) setProgress(JSON.parse(savedProgress)); else setProgress({});
     if (savedTests) setTestAttempts(JSON.parse(savedTests)); else setTestAttempts([]);
     if (savedGoals) setGoals(JSON.parse(savedGoals)); else setGoals([]);
     if (savedMistakes) setMistakes(JSON.parse(savedMistakes)); else setMistakes([]);
+    if (savedBacklogs) setBacklogs(JSON.parse(savedBacklogs)); else setBacklogs([]);
     if (savedTimetable) setTimetableData(JSON.parse(savedTimetable)); else setTimetableData(null);
   };
 
@@ -229,6 +209,7 @@ export default function App() {
 
           if (data.attempts) setTestAttempts(data.attempts);
           if (data.goals) setGoals(data.goals);
+          // if (data.backlogs) setBacklogs(data.backlogs); // Assuming backend support
           
           if (data.timetable) {
               setTimetableData({
@@ -287,6 +268,7 @@ export default function App() {
         localStorage.setItem(`iitjee_tests_${user.id}`, JSON.stringify(testAttempts));
         localStorage.setItem(`iitjee_goals_${user.id}`, JSON.stringify(goals));
         localStorage.setItem(`iitjee_mistakes_${user.id}`, JSON.stringify(mistakes));
+        localStorage.setItem(`iitjee_backlogs_${user.id}`, JSON.stringify(backlogs));
         if (timetableData) {
             localStorage.setItem(`iitjee_timetable_${user.id}`, JSON.stringify(timetableData));
         }
@@ -299,7 +281,7 @@ export default function App() {
     localStorage.setItem('iitjee_admin_tests', JSON.stringify(adminTests));
     localStorage.setItem('iitjee_syllabus', JSON.stringify(syllabus));
     localStorage.setItem('iitjee_enable_google', String(enableGoogleLogin));
-  }, [user, progress, testAttempts, goals, mistakes, timetableData, flashcards, hacks, blogs, videoMap, questionBank, adminTests, syllabus, enableGoogleLogin]);
+  }, [user, progress, testAttempts, goals, mistakes, backlogs, timetableData, flashcards, hacks, blogs, videoMap, questionBank, adminTests, syllabus, enableGoogleLogin]);
 
   const loadLinkedStudent = (studentId: string) => {
       const sProgress = localStorage.getItem(`iitjee_progress_${studentId}`);
@@ -453,6 +435,17 @@ export default function App() {
       setSyllabus(prev => prev.filter(t => t.id !== id));
   };
 
+  // Backlog Handlers
+  const addBacklog = (item: Omit<BacklogItem, 'id' | 'status'>) => {
+      setBacklogs(prev => [...prev, { ...item, id: `bl_${Date.now()}`, status: 'PENDING' }]);
+  };
+  const toggleBacklog = (id: string) => {
+      setBacklogs(prev => prev.map(b => b.id === id ? { ...b, status: b.status === 'PENDING' ? 'COMPLETED' : 'PENDING' } : b));
+  };
+  const deleteBacklog = (id: string) => {
+      setBacklogs(prev => prev.filter(b => b.id !== id));
+  };
+
   // Public Routes
   if (currentScreen === 'public-blog') return <PublicBlogScreen blogs={blogs} onBack={() => user ? setCurrentScreen('dashboard') : setCurrentScreen('dashboard')} />;
   if (currentScreen === 'about') return <PublicLayout onNavigate={handleNavigation} currentScreen="about"><AboutUsScreen /></PublicLayout>;
@@ -503,7 +496,7 @@ export default function App() {
                 {currentScreen === 'family' && <ParentFamilyScreen user={user} onSendRequest={sendConnectionRequest} linkedData={linkedStudentData} />}
                 {currentScreen === 'analytics' && <AnalyticsScreen user={user} progress={linkedStudentData?.progress || {}} testAttempts={linkedStudentData?.tests || []} />}
                 {currentScreen === 'timetable' && <div className="p-8 text-center text-slate-500 bg-white rounded-xl border border-slate-200">Timetable viewing is available in Student account.</div>}
-                {currentScreen === 'tests' && <TestScreen history={linkedStudentData?.tests || []} addTestAttempt={()=>{}} availableTests={adminTests} />}
+                {currentScreen === 'tests' && <TestScreen user={user} history={linkedStudentData?.tests || []} addTestAttempt={()=>{}} availableTests={adminTests} />}
                 {currentScreen === 'syllabus' && <SyllabusScreen user={user} subjects={syllabus} progress={linkedStudentData?.progress || {}} onUpdateProgress={()=>{}} readOnly={true} videoMap={videoMap} />}
                 {currentScreen === 'profile' && <ProfileScreen user={user} onAcceptRequest={()=>{}} onUpdateUser={(u) => { const updated = { ...user, ...u }; setUser(updated); saveUserToDB(updated); }} linkedStudentName={linkedStudentData?.studentName} />} 
              </>
@@ -514,12 +507,12 @@ export default function App() {
                 {currentScreen === 'dashboard' && <DashboardScreen user={user} progress={progress} testAttempts={testAttempts} goals={goals} addGoal={addGoal} toggleGoal={toggleGoal} setScreen={setCurrentScreen} />}
                 {currentScreen === 'syllabus' && <SyllabusScreen user={user} subjects={syllabus} progress={progress} onUpdateProgress={updateTopicProgress} videoMap={videoMap} />}
                 {currentScreen === 'revision' && <RevisionScreen progress={progress} handleRevisionComplete={handleRevisionComplete} />}
-                {currentScreen === 'tests' && <TestScreen history={testAttempts} addTestAttempt={addTestAttempt} availableTests={adminTests} />}
+                {currentScreen === 'tests' && <TestScreen user={user} history={testAttempts} addTestAttempt={addTestAttempt} availableTests={adminTests} />}
                 {currentScreen === 'timetable' && <TimetableScreen user={user} savedConfig={timetableData?.config} savedSlots={timetableData?.slots} onSave={saveTimetable} progress={progress} />}
                 {currentScreen === 'focus' && <FocusScreen />}
                 {currentScreen === 'flashcards' && <FlashcardScreen flashcards={flashcards} />}
                 {currentScreen === 'mistakes' && <MistakesScreen mistakes={mistakes} addMistake={addMistake} />}
-                {currentScreen === 'backlogs' && <BacklogScreen progress={progress} />}
+                {currentScreen === 'backlogs' && <BacklogScreen backlogs={backlogs} onAddBacklog={addBacklog} onToggleBacklog={toggleBacklog} onDeleteBacklog={deleteBacklog} />}
                 {currentScreen === 'hacks' && <HacksScreen hacks={hacks} />}
                 {currentScreen === 'analytics' && <AnalyticsScreen user={user} progress={progress} testAttempts={testAttempts} />}
                 {currentScreen === 'wellness' && <WellnessScreen />}

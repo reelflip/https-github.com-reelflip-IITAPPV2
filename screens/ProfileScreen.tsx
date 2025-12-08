@@ -1,9 +1,8 @@
 
-
-
 import React, { useState } from 'react';
 import { User } from '../lib/types';
-import { Camera, Save, Bell, Mail, Shield, User as UserIcon, CheckCircle2 } from 'lucide-react';
+import { TARGET_EXAMS } from '../lib/constants';
+import { Camera, Save, Bell, Mail, Shield, User as UserIcon, CheckCircle2, Target } from 'lucide-react';
 
 interface Props {
   user: User;
@@ -19,6 +18,7 @@ export const ProfileScreen: React.FC<Props> = ({ user, onAcceptRequest, onUpdate
   const [formData, setFormData] = useState({
     school: user.school || '',
     targetYear: user.targetYear || 2025,
+    targetExam: user.targetExam || 'JEE Main & Advanced',
     phone: user.phone || '',
     notifications: {
       email: true,
@@ -31,6 +31,7 @@ export const ProfileScreen: React.FC<Props> = ({ user, onAcceptRequest, onUpdate
       onUpdateUser({
         school: formData.school,
         targetYear: formData.targetYear,
+        targetExam: formData.targetExam,
         phone: formData.phone
       });
     }
@@ -78,9 +79,14 @@ export const ProfileScreen: React.FC<Props> = ({ user, onAcceptRequest, onUpdate
                     {user.role}
                  </span>
                  {user.role === 'STUDENT' && (
-                   <span className="px-3 py-1 bg-slate-100 text-slate-600 text-xs font-mono font-bold rounded-full border border-slate-200">
-                      ID: {user.id}
-                   </span>
+                   <>
+                    <span className="px-3 py-1 bg-slate-100 text-slate-600 text-xs font-mono font-bold rounded-full border border-slate-200">
+                        ID: {user.id}
+                    </span>
+                    <span className="px-3 py-1 bg-orange-50 text-orange-700 text-xs font-bold rounded-full border border-orange-100 flex items-center gap-1">
+                        <Target size={12} /> {user.targetExam}
+                    </span>
+                   </>
                  )}
               </div>
            </div>
@@ -123,6 +129,21 @@ export const ProfileScreen: React.FC<Props> = ({ user, onAcceptRequest, onUpdate
                  {/* Show School/Year only for Students */}
                  {user.role === 'STUDENT' && (
                      <>
+                        <div className="md:col-span-2">
+                            <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Target Exam</label>
+                            <select 
+                                disabled={!isEditing}
+                                value={formData.targetExam}
+                                onChange={(e) => setFormData({...formData, targetExam: e.target.value})}
+                                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:opacity-75 disabled:bg-slate-50"
+                            >
+                                {TARGET_EXAMS.map(exam => (
+                                    <option key={exam} value={exam}>{exam}</option>
+                                ))}
+                            </select>
+                            <p className="text-[10px] text-slate-400 mt-1">Mock tests will be filtered based on this selection.</p>
+                        </div>
+
                         <div>
                             <label className="block text-xs font-bold text-slate-500 uppercase mb-2">School / Institute</label>
                             <input 
@@ -144,12 +165,13 @@ export const ProfileScreen: React.FC<Props> = ({ user, onAcceptRequest, onUpdate
                             <option value={2024}>2024</option>
                             <option value={2025}>2025</option>
                             <option value={2026}>2026</option>
+                            <option value={2027}>2027</option>
                             </select>
                         </div>
                      </>
                  )}
                  
-                 <div className={user.role === 'PARENT' ? 'md:col-span-2' : ''}>
+                 <div className={user.role === 'PARENT' ? 'md:col-span-2' : 'md:col-span-2'}>
                     <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Phone Number</label>
                     <input 
                       disabled={!isEditing}

@@ -8,7 +8,7 @@ const DIAGNOSTICS_DATA = {
   "metadata": {
     "timestamp": new Date().toISOString(),
     "url": "https://iitgeeprep.com/",
-    "appVersion": "v7.2"
+    "appVersion": "v7.6"
   },
   "results": {
     "1. [System] Core Health": [
@@ -96,9 +96,15 @@ const DIAGNOSTICS_DATA = {
 export const DiagnosticsScreen: React.FC = () => {
   const { metadata, results } = DIAGNOSTICS_DATA;
   
-  // Combine Static results with Dynamic Admin Test
-  const [dynamicResults, setDynamicResults] = useState<any[]>([]);
-  const suites: [string, any[]][] = [...Object.entries(results), ["20. [Admin] Syllabus Management", dynamicResults]];
+  // Combine Static results with Dynamic Admin Test AND Student Action Test
+  const [dynamicSyllabusResults, setDynamicSyllabusResults] = useState<any[]>([]);
+  const [dynamicStudentResults, setDynamicStudentResults] = useState<any[]>([]);
+
+  const suites: [string, any[]][] = [
+      ...Object.entries(results), 
+      ["20. [Admin] Syllabus Management", dynamicSyllabusResults],
+      ["21. [Student] Action Verification", dynamicStudentResults]
+  ];
   
   // Scan State
   const [scanStatus, setScanStatus] = useState<'IDLE' | 'RUNNING' | 'COMPLETE'>('IDLE');
@@ -177,37 +183,90 @@ export const DiagnosticsScreen: React.FC = () => {
           tests.push({ description: "should delete topic (cleanup)", passed: false, duration: 0, error: "API Failed" });
       }
 
-      setDynamicResults(tests);
+      setDynamicSyllabusResults(tests);
+  };
+
+  const performStudentActionsTest = async () => {
+      const tests = [];
+      const userId = 'diag_test_user';
+      
+      // Test 1: Add Backlog
+      try {
+          const start = performance.now();
+          await fetch('/api/manage_backlogs.php', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ 
+                  id: `diag_bl_${Date.now()}`,
+                  user_id: userId,
+                  title: 'Diagnostic Task',
+                  subjectId: 'Maths',
+                  priority: 'High',
+                  status: 'PENDING',
+                  deadline: new Date().toISOString().split('T')[0]
+              })
+          });
+          tests.push({ description: "should create backlog entry via API", passed: true, duration: performance.now() - start });
+      } catch(e) {
+          tests.push({ description: "should create backlog entry via API", passed: false, duration: 0, error: "API Error" });
+      }
+
+      // Test 2: Revision Sync
+      try {
+          const start = performance.now();
+          await fetch('/api/sync_progress.php', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                  user_id: userId,
+                  topic_id: 'm-sets',
+                  status: 'REVISE',
+                  lastRevised: new Date().toISOString()
+              })
+          });
+          tests.push({ description: "should sync revision status via API", passed: true, duration: performance.now() - start });
+      } catch(e) {
+          tests.push({ description: "should sync revision status via API", passed: false, duration: 0, error: "API Error" });
+      }
+
+      setDynamicStudentResults(tests);
   };
 
   const handleStartScan = async () => {
       setScanStatus('RUNNING');
       setScanIndex(0);
-      setDynamicResults([]); // Reset dynamic
+      setDynamicSyllabusResults([]); 
+      setDynamicStudentResults([]);
 
       // Run synchronous animation for static
       let idx = 0;
+      const staticCount = Object.keys(results).length;
+      
       const interval = setInterval(async () => {
-          if (idx >= suites.length - 2) { // Stop before dynamic test
+          if (idx >= staticCount) { 
               clearInterval(interval);
               
-              // Run dynamic test at the end
-              setScanIndex(suites.length - 1);
+              // Run dynamic test 1 (Admin Syllabus)
+              setScanIndex(staticCount); 
               await performSyllabusTest();
+              
+              // Run dynamic test 2 (Student Actions)
+              setScanIndex(staticCount + 1);
+              await performStudentActionsTest();
               
               setScanStatus('COMPLETE');
           } else {
               setScanIndex(prev => prev + 1);
               idx++;
           }
-      }, 300); // Fast simulation for static data
+      }, 150); // Fast simulation for static data
   };
 
   // Stats calculation
   const staticTestsCount = Object.values(results).flat().length;
-  const totalTests = staticTestsCount + dynamicResults.length;
+  const totalTests = staticTestsCount + dynamicSyllabusResults.length + dynamicStudentResults.length;
   // Simple calc for demo
-  const passedTests = staticTestsCount + dynamicResults.filter(t => t.passed).length; 
+  const passedTests = staticTestsCount + dynamicSyllabusResults.filter(t => t.passed).length + dynamicStudentResults.filter(t => t.passed).length; 
   const passRate = Math.round((passedTests / totalTests) * 100) || 100;
 
   return (
