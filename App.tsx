@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { Navigation } from './components/Navigation';
 import { AuthScreen } from './screens/AuthScreen';
@@ -477,10 +478,11 @@ export default function App() {
               <>
                 {currentScreen === 'overview' && <AdminDashboardScreen user={user} />}
                 {currentScreen === 'users' && <AdminUserManagementScreen />}
-                {currentScreen === 'content' && (
+                {(currentScreen === 'content' || currentScreen === 'blog_admin') && (
                     <ContentManagerScreen 
                     flashcards={flashcards} hacks={hacks} blogs={blogs}
                     onAddFlashcard={addFlashcard} onAddHack={addHack} onAddBlog={addBlog} onDelete={deleteContent}
+                    initialTab={currentScreen === 'blog_admin' ? 'blog' : 'flashcards'}
                     />
                 )}
                 {(currentScreen === 'videos' || currentScreen === 'video_admin') && (

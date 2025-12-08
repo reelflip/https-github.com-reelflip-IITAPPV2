@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { User, Role } from '../lib/types';
 import { COACHING_INSTITUTES, TARGET_YEARS, TARGET_EXAMS } from '../lib/constants';
@@ -101,8 +100,6 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate }) =
             data = JSON.parse(text);
         } catch (err) {
             console.error("Non-JSON response:", text);
-            // Fallback for simulation/demo if API fails
-            // throw new Error(`Server error (${response.status}). Expected JSON but got HTML/Text. Check API URL or PHP errors.`);
         }
 
         if (data && !response.ok) {
@@ -169,8 +166,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate }) =
 
     } catch (err: any) {
         // Fallback Simulation for Demo if API not present
-        if(err.message.includes('Server error') || err.message.includes('Unexpected token')) {
-             console.warn("API Failed, using simulation login");
+        if(err.message.includes('Server error') || err.message.includes('Unexpected token') || !window.location.host.includes('iitgeeprep')) {
+             console.warn("API Failed or Localhost, using simulation login");
              const simUser: User = {
                 id: Math.floor(100000 + Math.random() * 900000).toString(),
                 name: formData.name || (isRegistering ? 'New User' : 'Demo User'),
@@ -181,7 +178,14 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate }) =
                 targetYear: parseInt(formData.targetYear) || 2025,
                 gender: formData.gender as User['gender']
             };
-            onLogin(simUser);
+            
+            if (isRegistering) {
+                setIsRegistering(false);
+                setSuccessMessage("Registration simulated! Please log in.");
+                setFormData(prev => ({ ...prev, password: '', confirmPassword: '' }));
+            } else {
+                onLogin(simUser);
+            }
         } else {
             setError(err.message || "An unexpected error occurred.");
         }
@@ -572,7 +576,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate }) =
                 <button onClick={() => onNavigate('contact')} className="hover:text-blue-600 transition-colors">Contact</button>
             </div>
             <div className="text-center text-[10px] text-slate-300 mt-4">
-                v6.0
+                v7.1
             </div>
         </div>
       </div>

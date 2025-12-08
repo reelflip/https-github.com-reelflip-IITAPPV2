@@ -1,4 +1,5 @@
 
+
 import React, { useState } from 'react';
 import { Flashcard, MemoryHack, BlogPost } from '../lib/types';
 
@@ -10,13 +11,15 @@ interface Props {
   onAddHack: (hack: Omit<MemoryHack, 'id'>) => void;
   onAddBlog: (blog: Omit<BlogPost, 'id' | 'date'>) => void;
   onDelete: (type: 'flashcard' | 'hack' | 'blog', id: number) => void;
+  initialTab?: 'flashcards' | 'hacks' | 'blog';
 }
 
 export const ContentManagerScreen: React.FC<Props> = ({ 
   flashcards, hacks, blogs, 
-  onAddFlashcard, onAddHack, onAddBlog, onDelete 
+  onAddFlashcard, onAddHack, onAddBlog, onDelete,
+  initialTab = 'flashcards'
 }) => {
-  const [activeTab, setActiveTab] = useState<'flashcards' | 'hacks' | 'blog'>('flashcards');
+  const [activeTab, setActiveTab] = useState<'flashcards' | 'hacks' | 'blog'>(initialTab);
 
   return (
     <div className="space-y-6">

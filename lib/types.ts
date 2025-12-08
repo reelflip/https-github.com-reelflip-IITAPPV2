@@ -1,4 +1,5 @@
 
+
 // Add global window type definition
 declare global {
   interface Window {
@@ -238,4 +239,5 @@ export type Screen =
   | 'revision' | 'mistakes' | 'flashcards' | 'backlogs' | 'hacks' | 'wellness' | 'profile'
   | 'overview' | 'users' | 'videos' | 'content' | 'diagnostics' | 'system' | 'deployment' 
   | 'tests_admin' | 'content_admin' | 'video_admin' | 'admin_analytics'
-  | 'family' | 'public-blog' | 'about' | 'blog' | 'exams' | 'privacy' | 'contact';
+  | 'family' | 'public-blog' | 'about' | 'blog' | 'exams' | 'privacy' | 'contact'
+  | 'blog_admin';

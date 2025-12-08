@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Database, RefreshCw, Server, Table, CheckCircle2, AlertTriangle, XCircle, Activity, Globe, Play, Loader2, Clock, Terminal } from 'lucide-react';
 
@@ -7,7 +6,7 @@ const DIAGNOSTICS_DATA = {
   "metadata": {
     "timestamp": new Date().toISOString(),
     "url": "https://iitgeeprep.com/",
-    "appVersion": "v6.0"
+    "appVersion": "v7.1"
   },
   "results": {
     "1. [System] Core Health": [

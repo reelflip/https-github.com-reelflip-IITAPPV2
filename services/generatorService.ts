@@ -1,4 +1,3 @@
-
 import { Subject, TopicStatus, Role } from '../lib/types';
 
 export const getDeploymentPhases = () => [
@@ -25,7 +24,7 @@ export const generateHtaccess = () => `
 `;
 
 export const generateSQLSchema = () => `
--- IITGEEPrep Database Schema v6.0
+-- IITGEEPrep Database Schema v7.1
 -- Target: MySQL / MariaDB (Hostinger)
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
@@ -93,6 +92,8 @@ CREATE TABLE IF NOT EXISTS \`questions\` (
   \`text\` text NOT NULL,
   \`options_json\` text NOT NULL, -- JSON array
   \`correct_option\` int(11) NOT NULL,
+  \`source_tag\` varchar(50) DEFAULT NULL,
+  \`year\` int(4) DEFAULT NULL,
   PRIMARY KEY (\`id\`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -308,7 +309,7 @@ try {
         folder: 'api',
         desc: 'API Root Health Check',
         content: `${phpHeader}
-echo json_encode(["status" => "active", "message" => "IITGEEPrep API v6.0 Operational", "timestamp" => date('c')]);
+echo json_encode(["status" => "active", "message" => "IITGEEPrep API v7.1 Operational", "timestamp" => date('c')]);
 ?>`
     },
     {
@@ -508,9 +509,9 @@ elseif ($method === 'POST') {
     
     // Add Questions
     foreach($test->questions as $q) {
-        $qStmt = $conn->prepare("INSERT INTO questions (id, test_id, subject_id, topic_id, text, options_json, correct_option) VALUES (?, ?, ?, ?, ?, ?, ?)");
+        $qStmt = $conn->prepare("INSERT INTO questions (id, test_id, subject_id, topic_id, text, options_json, correct_option, source_tag, year) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
         $qStmt->execute([
-            $q->id, $test->id, $q->subjectId, $q->topicId, $q->text, json_encode($q->options), $q->correctOptionIndex
+            $q->id, $test->id, $q->subjectId, $q->topicId, $q->text, json_encode($q->options), $q->correctOptionIndex, $q->source, $q->year
         ]);
     }
     echo json_encode(["message" => "Test Created"]);

@@ -28,3 +28,16 @@ body {
 .rotate-y-180 {
   transform: rotateY(180deg);
 }
+
+/* Custom Typography for Blog Content (Rich Text Editor) */
+.blog-content h1 { @apply text-3xl font-bold text-slate-800 mb-4 mt-8; }
+.blog-content h2 { @apply text-2xl font-bold text-slate-800 mb-3 mt-6; }
+.blog-content h3 { @apply text-xl font-bold text-slate-800 mb-2 mt-4; }
+.blog-content p { @apply mb-4 leading-relaxed text-slate-600 text-lg; }
+.blog-content ul { @apply list-disc list-inside mb-6 ml-4 text-slate-600 space-y-1; }
+.blog-content ol { @apply list-decimal list-inside mb-6 ml-4 text-slate-600 space-y-1; }
+.blog-content blockquote { @apply border-l-4 border-blue-500 pl-4 py-2 italic bg-slate-50 text-slate-700 rounded-r-lg mb-6 my-6; }
+.blog-content img { @apply rounded-xl shadow-md max-w-full h-auto my-8 border border-slate-100; }
+.blog-content a { @apply text-blue-600 underline hover:text-blue-800 transition-colors; }
+.blog-content pre { @apply bg-slate-900 text-slate-100 p-6 rounded-xl overflow-x-auto mb-6 font-mono text-sm shadow-inner; }
+.blog-content strong { @apply text-slate-900 font-bold; }
