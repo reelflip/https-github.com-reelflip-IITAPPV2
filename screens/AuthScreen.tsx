@@ -1,6 +1,4 @@
 
-
-
 import React, { useState, useEffect, useRef } from 'react';
 import { User, Role } from '../lib/types';
 import { COACHING_INSTITUTES, TARGET_YEARS, TARGET_EXAMS } from '../lib/constants';
@@ -20,7 +18,10 @@ import {
   CheckCircle2,
   Zap,
   Users,
-  Target
+  Target,
+  Key,
+  Search,
+  ArrowLeft
 } from 'lucide-react';
 
 interface AuthScreenProps {
@@ -29,13 +30,19 @@ interface AuthScreenProps {
   enableGoogleLogin?: boolean;
 }
 
+type AuthView = 'LOGIN' | 'REGISTER' | 'RECOVERY';
+
 export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate, enableGoogleLogin }) => {
-  const [isRegistering, setIsRegistering] = useState(false); // Default to login
+  const [view, setView] = useState<AuthView>('LOGIN');
   const [role, setRole] = useState<Role>('STUDENT');
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   
+  // Recovery State
+  const [recoveryStep, setRecoveryStep] = useState<1 | 2 | 3>(1); // 1: Email, 2: Question, 3: New Pass
+  const [recoveryData, setRecoveryData] = useState({ email: '', question: '', answer: '', newPassword: '', confirmPassword: '' });
+
   // Google Sign In Ref
   const googleBtnRef = useRef<HTMLDivElement>(null);
 
@@ -56,10 +63,10 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate, ena
 
   // Init Google Login
   useEffect(() => {
-    if (enableGoogleLogin && window.google && googleBtnRef.current) {
+    if (enableGoogleLogin && window.google && googleBtnRef.current && view === 'LOGIN') {
       try {
         window.google.accounts.id.initialize({
-          client_id: "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com", // Placeholder
+          client_id: "686002394464-k4i6akgd1es0doqg6bsbskvinisvj1jk.apps.googleusercontent.com",
           callback: handleGoogleCallback,
           auto_select: false,
         });
@@ -71,7 +78,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate, ena
         console.error("Google Sign-In Error:", e);
       }
     }
-  }, [enableGoogleLogin, isRegistering]);
+  }, [enableGoogleLogin, view]);
 
   const handleGoogleCallback = async (response: any) => {
       setIsLoading(true);
@@ -94,7 +101,6 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate, ena
               throw new Error(data.message || 'Google Login failed');
           }
       } catch (err: any) {
-          // Simulation for development
           console.warn("Google Login failed (likely invalid client ID). Simulating success.");
           const mockUser: User = {
               id: `google_${Date.now()}`,
@@ -118,17 +124,17 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate, ena
     setIsLoading(true);
     
     // Client-side Validation
-    if (isRegistering && formData.password !== formData.confirmPassword) {
+    if (view === 'REGISTER' && formData.password !== formData.confirmPassword) {
         setError("Passwords do not match.");
         setIsLoading(false);
         return;
     }
 
     try {
-        const endpoint = isRegistering ? '/api/register.php' : '/api/login.php';
+        const endpoint = view === 'REGISTER' ? '/api/register.php' : '/api/login.php';
         
         // Prepare payload
-        const payload = isRegistering ? {
+        const payload = view === 'REGISTER' ? {
             name: formData.name,
             email: formData.email,
             password: formData.password,
@@ -137,7 +143,9 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate, ena
             targetYear: parseInt(formData.targetYear) || 2025,
             targetExam: formData.targetExam,
             dob: formData.dob,
-            gender: formData.gender
+            gender: formData.gender,
+            securityQuestion: formData.securityQuestion,
+            securityAnswer: formData.securityAnswer
         } : {
             email: overrideCreds ? overrideCreds.email : formData.email,
             password: overrideCreds ? overrideCreds.pass : formData.password
@@ -154,9 +162,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate, ena
 
         const text = await response.text();
         
-        // Handle 403 Forbidden specifically (Common Hostinger Issue)
         if (response.status === 403) {
-            throw new Error(`Access Denied (403). Please check File Permissions (chmod 644) or ModSecurity in Hostinger.`);
+            throw new Error(`Access Denied (403). Please check File Permissions.`);
         }
 
         let data;
@@ -167,43 +174,36 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate, ena
         }
 
         if (data && !response.ok) {
-            // Prioritize specific error messages from the backend
-            throw new Error(data.error || data.message || (isRegistering ? 'Registration failed' : 'Login failed'));
+            throw new Error(data.error || data.message || (view === 'REGISTER' ? 'Registration failed' : 'Login failed'));
         }
 
-        if (isRegistering) {
-            // Registration Successful: Don't login automatically
-            setIsRegistering(false); // Switch to Login view
+        if (view === 'REGISTER') {
+            setView('LOGIN');
             setSuccessMessage("Registration successful! Please log in with your credentials.");
-            setFormData(prev => ({ ...prev, password: '', confirmPassword: '' })); // Clear password for security
-            window.scrollTo({ top: 0, behavior: 'smooth' }); // Ensure user sees message
+            setFormData(prev => ({ ...prev, password: '', confirmPassword: '' }));
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         } else {
-            // Login Successful
             const rawUser = data?.user;
             
-            // SIMULATION FALLBACK if API fails
+            // SIMULATION FALLBACK
             const simUser: User = {
                 id: Math.floor(100000 + Math.random() * 900000).toString(),
                 name: formData.name || 'Simulated User',
                 email: formData.email,
-                role: role, // Use selected role or fallback
+                role: role,
                 targetExam: 'JEE Main & Advanced',
                 ...formData,
                 targetYear: parseInt(formData.targetYear) || 2025,
                 gender: formData.gender as User['gender']
             }
 
-            // Generate Gender-Aware Avatar URL
             const finalUser = rawUser || simUser;
             let avatarUrl = finalUser.avatarUrl;
             if (!avatarUrl) {
                 const seed = finalUser.email;
                 avatarUrl = `https://api.dicebear.com/7.x/avataaars/svg?seed=${seed}`;
-                if (finalUser.gender === 'MALE') {
-                    avatarUrl += '&top[]=shortHair&top[]=shortHairTheCaesar&top[]=shortHairShortFlat&top[]=shortHairFrizzle&facialHairProbability=20';
-                } else if (finalUser.gender === 'FEMALE') {
-                    avatarUrl += '&top[]=longHair&top[]=longHairBob&top[]=longHairCurly&top[]=longHairStraight&facialHairProbability=0';
-                }
+                if (finalUser.gender === 'MALE') avatarUrl += '&top[]=shortHair&top[]=shortHairTheCaesar';
+                if (finalUser.gender === 'FEMALE') avatarUrl += '&top[]=longHair&top[]=longHairBob';
             }
 
             const normalizedUser: User = {
@@ -229,12 +229,11 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate, ena
         }
 
     } catch (err: any) {
-        // Fallback Simulation for Demo if API not present
         if(err.message.includes('Server error') || err.message.includes('Unexpected token') || !window.location.host.includes('iitgeeprep')) {
-             console.warn("API Failed or Localhost, using simulation login");
+             console.warn("API Failed, using simulation login");
              const simUser: User = {
                 id: Math.floor(100000 + Math.random() * 900000).toString(),
-                name: formData.name || (isRegistering ? 'New User' : 'Demo User'),
+                name: formData.name || (view === 'REGISTER' ? 'New User' : 'Demo User'),
                 email: formData.email,
                 role: role,
                 targetExam: 'JEE Main & Advanced',
@@ -243,8 +242,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate, ena
                 gender: formData.gender as User['gender']
             };
             
-            if (isRegistering) {
-                setIsRegistering(false);
+            if (view === 'REGISTER') {
+                setView('LOGIN');
                 setSuccessMessage("Registration simulated! Please log in.");
                 setFormData(prev => ({ ...prev, password: '', confirmPassword: '' }));
             } else {
@@ -256,6 +255,69 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate, ena
     } finally {
         setIsLoading(false);
     }
+  };
+
+  const handleRecovery = async (e: React.FormEvent) => {
+      e.preventDefault();
+      setError('');
+      setIsLoading(true);
+
+      try {
+          if (recoveryStep === 1) {
+              const res = await fetch('/api/recover.php', {
+                  method: 'POST',
+                  body: JSON.stringify({ action: 'get_question', email: recoveryData.email })
+              });
+              const data = await res.json();
+              if (res.ok && data.question) {
+                  setRecoveryData(prev => ({ ...prev, question: data.question }));
+                  setRecoveryStep(2);
+              } else {
+                  // Fallback simulation
+                  if (!window.location.host.includes('iitgeeprep')) {
+                      setRecoveryData(prev => ({ ...prev, question: 'What is the name of your first pet?' }));
+                      setRecoveryStep(2);
+                  } else {
+                      throw new Error(data.message || 'User not found.');
+                  }
+              }
+          } else if (recoveryStep === 2) {
+              if (!recoveryData.answer) throw new Error("Please provide an answer.");
+              setRecoveryStep(3);
+          } else if (recoveryStep === 3) {
+              if (recoveryData.newPassword !== recoveryData.confirmPassword) throw new Error("Passwords do not match.");
+              
+              const res = await fetch('/api/recover.php', {
+                  method: 'POST',
+                  body: JSON.stringify({ 
+                      action: 'verify_reset', 
+                      email: recoveryData.email, 
+                      answer: recoveryData.answer,
+                      newPassword: recoveryData.newPassword 
+                  })
+              });
+              const data = await res.json();
+              if (res.ok) {
+                  setSuccessMessage("Password reset successful! Please log in.");
+                  setView('LOGIN');
+                  setRecoveryStep(1);
+                  setRecoveryData({ email: '', question: '', answer: '', newPassword: '', confirmPassword: '' });
+              } else {
+                  // Fallback simulation
+                  if (!window.location.host.includes('iitgeeprep')) {
+                      setSuccessMessage("Simulation: Password reset successful!");
+                      setView('LOGIN');
+                      setRecoveryStep(1);
+                  } else {
+                      throw new Error(data.message || 'Incorrect security answer.');
+                  }
+              }
+          }
+      } catch (err: any) {
+          setError(err.message || 'Recovery failed.');
+      } finally {
+          setIsLoading(false);
+      }
   };
 
   const handleQuickLogin = (role: Role) => {
@@ -306,26 +368,29 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate, ena
             {/* View Toggle Header */}
             <div className="flex justify-between items-baseline mb-6 mt-4">
                 <h2 className="text-xl font-bold text-slate-800">
-                    {isRegistering ? 'Create Account' : 'Welcome Back'}
+                    {view === 'REGISTER' ? 'Create Account' : view === 'RECOVERY' ? 'Account Recovery' : 'Welcome Back'}
                 </h2>
-                <button 
-                    type="button"
-                    onClick={() => {
-                        setIsRegistering(!isRegistering);
-                        setError('');
-                        setSuccessMessage('');
-                        setFormData(prev => ({ ...prev, password: '', confirmPassword: '' })); 
-                    }}
-                    className="text-sm font-medium text-blue-600 hover:text-blue-800 transition-colors"
-                >
-                    {isRegistering ? 'Back to Login' : 'Create Account'}
-                </button>
+                
+                {view !== 'RECOVERY' && (
+                    <button 
+                        type="button"
+                        onClick={() => {
+                            setView(view === 'LOGIN' ? 'REGISTER' : 'LOGIN');
+                            setError('');
+                            setSuccessMessage('');
+                            setFormData(prev => ({ ...prev, password: '', confirmPassword: '' })); 
+                        }}
+                        className="text-sm font-medium text-blue-600 hover:text-blue-800 transition-colors"
+                    >
+                        {view === 'REGISTER' ? 'Back to Login' : 'Create Account'}
+                    </button>
+                )}
             </div>
 
             <div className="space-y-5">
                 
                 {/* Role Selector (Register Only) */}
-                {isRegistering && (
+                {view === 'REGISTER' && (
                     <div className="flex p-1 bg-slate-50 rounded-lg border border-slate-200 mb-6" role="group" aria-label="Select Role">
                         <button
                             type="button"
@@ -349,7 +414,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate, ena
                 )}
 
                 {/* Google Login (Login Only) */}
-                {!isRegistering && enableGoogleLogin && (
+                {view === 'LOGIN' && enableGoogleLogin && (
                     <div className="mb-6">
                         <div ref={googleBtnRef} className="w-full"></div>
                         <div className="relative mt-4 mb-2">
@@ -363,257 +428,374 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate, ena
                     </div>
                 )}
 
-                <form onSubmit={handleAuth} className="space-y-5">
-                    {/* --- Fields --- */}
-
-                    {/* Full Name (Register Only) */}
-                    {isRegistering && (
-                        <div className="space-y-1">
-                            <label htmlFor="fullName" className="text-[10px] font-bold text-slate-400 uppercase tracking-wide ml-1">Full Name</label>
-                            <div className="relative group">
-                                <UserIcon className="absolute left-4 top-3.5 text-slate-400 w-5 h-5" />
-                                <input 
-                                    id="fullName"
-                                    type="text" 
-                                    placeholder={role === 'PARENT' ? "Parent Name" : "Student Name"}
-                                    className="w-full pl-12 pr-4 py-3 border border-slate-200 rounded-xl text-sm text-slate-700 focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all placeholder:text-slate-400"
-                                    value={formData.name}
-                                    onChange={(e) => setFormData({...formData, name: e.target.value})}
-                                    required
-                                />
+                {/* ================= RECOVERY FORM ================= */}
+                {view === 'RECOVERY' ? (
+                    <form onSubmit={handleRecovery} className="space-y-5 animate-in fade-in slide-in-from-right-4">
+                        
+                        {/* Step 1: Identify */}
+                        {recoveryStep === 1 && (
+                            <div className="space-y-4">
+                                <p className="text-sm text-slate-600 bg-blue-50 p-3 rounded-lg border border-blue-100">
+                                    Enter your registered email address to retrieve your security question.
+                                </p>
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide ml-1">Email Address</label>
+                                    <div className="relative group">
+                                        <Mail className="absolute left-4 top-3.5 text-slate-400 w-5 h-5" />
+                                        <input 
+                                            type="email" 
+                                            className="w-full pl-12 pr-4 py-3 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all"
+                                            value={recoveryData.email}
+                                            onChange={(e) => setRecoveryData({...recoveryData, email: e.target.value})}
+                                            required
+                                            placeholder="you@example.com"
+                                        />
+                                    </div>
+                                </div>
+                                <button type="submit" disabled={isLoading} className="w-full bg-blue-600 text-white font-bold py-3 rounded-xl hover:bg-blue-700 flex items-center justify-center gap-2">
+                                    {isLoading ? <Loader2 className="w-4 h-4 animate-spin"/> : <Search className="w-4 h-4" />}
+                                    Find Account
+                                </button>
                             </div>
-                        </div>
-                    )}
+                        )}
 
-                    {/* Institute, Exam & Year (Register & Student Only) */}
-                    {isRegistering && role === 'STUDENT' && (
-                        <>
+                        {/* Step 2: Verify */}
+                        {recoveryStep === 2 && (
+                            <div className="space-y-4">
+                                <div className="p-4 bg-amber-50 border border-amber-100 rounded-xl text-center">
+                                    <Shield className="w-8 h-8 text-amber-500 mx-auto mb-2" />
+                                    <p className="text-xs font-bold text-amber-800 uppercase tracking-wide">Security Question</p>
+                                    <p className="text-lg font-bold text-slate-800 mt-1">{recoveryData.question}</p>
+                                </div>
+                                
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide ml-1">Your Answer</label>
+                                    <input 
+                                        type="text" 
+                                        className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none"
+                                        value={recoveryData.answer}
+                                        onChange={(e) => setRecoveryData({...recoveryData, answer: e.target.value})}
+                                        required
+                                        placeholder="Type your answer here..."
+                                    />
+                                </div>
+                                <button type="submit" disabled={isLoading} className="w-full bg-blue-600 text-white font-bold py-3 rounded-xl hover:bg-blue-700">
+                                    {isLoading ? 'Verifying...' : 'Verify Answer'}
+                                </button>
+                            </div>
+                        )}
+
+                        {/* Step 3: Reset */}
+                        {recoveryStep === 3 && (
+                            <div className="space-y-4">
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide ml-1">New Password</label>
+                                    <div className="relative">
+                                        <Key className="absolute left-4 top-3.5 text-slate-400 w-5 h-5" />
+                                        <input 
+                                            type="password" 
+                                            className="w-full pl-12 pr-4 py-3 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-100 outline-none"
+                                            value={recoveryData.newPassword}
+                                            onChange={(e) => setRecoveryData({...recoveryData, newPassword: e.target.value})}
+                                            required
+                                            placeholder="Minimum 6 characters"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide ml-1">Confirm Password</label>
+                                    <div className="relative">
+                                        <Key className="absolute left-4 top-3.5 text-slate-400 w-5 h-5" />
+                                        <input 
+                                            type="password" 
+                                            className="w-full pl-12 pr-4 py-3 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-100 outline-none"
+                                            value={recoveryData.confirmPassword}
+                                            onChange={(e) => setRecoveryData({...recoveryData, confirmPassword: e.target.value})}
+                                            required
+                                            placeholder="Re-enter new password"
+                                        />
+                                    </div>
+                                </div>
+                                <button type="submit" disabled={isLoading} className="w-full bg-green-600 text-white font-bold py-3 rounded-xl hover:bg-green-700 flex items-center justify-center gap-2">
+                                    {isLoading ? <Loader2 className="w-4 h-4 animate-spin"/> : <CheckCircle2 className="w-4 h-4" />}
+                                    Reset Password
+                                </button>
+                            </div>
+                        )}
+
+                        <div className="text-center pt-2">
+                            <button 
+                                type="button" 
+                                onClick={() => { setView('LOGIN'); setRecoveryStep(1); setError(''); }}
+                                className="text-sm font-bold text-slate-500 hover:text-slate-800 flex items-center justify-center gap-1 mx-auto"
+                            >
+                                <ArrowLeft className="w-4 h-4" /> Cancel Recovery
+                            </button>
+                        </div>
+                    </form>
+                ) : (
+                    /* ================= LOGIN / REGISTER FORM ================= */
+                    <form onSubmit={handleAuth} className="space-y-5">
+                        {/* Full Name (Register Only) */}
+                        {view === 'REGISTER' && (
                             <div className="space-y-1">
-                                <label htmlFor="institute" className="text-[10px] font-bold text-slate-400 uppercase tracking-wide ml-1">Institute</label>
-                                <div className="relative">
-                                    <Building className="absolute left-4 top-3.5 text-slate-400 w-4 h-4 z-10" />
-                                    <select 
-                                        id="institute"
-                                        className="w-full pl-10 pr-8 py-3 border border-slate-200 rounded-xl text-sm text-slate-700 focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none appearance-none bg-white transition-all"
-                                        value={formData.institute}
-                                        onChange={(e) => setFormData({...formData, institute: e.target.value})}
-                                    >
-                                        <option value="" disabled>Select Institute</option>
-                                        {COACHING_INSTITUTES.map((inst) => (
-                                            <option key={inst} value={inst}>{inst}</option>
-                                        ))}
-                                    </select>
-                                    <ChevronDown className="absolute right-4 top-3.5 text-slate-400 w-4 h-4 pointer-events-none" />
+                                <label htmlFor="fullName" className="text-[10px] font-bold text-slate-400 uppercase tracking-wide ml-1">Full Name</label>
+                                <div className="relative group">
+                                    <UserIcon className="absolute left-4 top-3.5 text-slate-400 w-5 h-5" />
+                                    <input 
+                                        id="fullName"
+                                        type="text" 
+                                        placeholder={role === 'PARENT' ? "Parent Name" : "Student Name"}
+                                        className="w-full pl-12 pr-4 py-3 border border-slate-200 rounded-xl text-sm text-slate-700 focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all placeholder:text-slate-400"
+                                        value={formData.name}
+                                        onChange={(e) => setFormData({...formData, name: e.target.value})}
+                                        required
+                                    />
                                 </div>
                             </div>
+                        )}
 
-                            <div className="grid grid-cols-5 gap-3">
-                                <div className="col-span-3 space-y-1">
-                                    <label htmlFor="targetExam" className="text-[10px] font-bold text-slate-400 uppercase tracking-wide ml-1">Target Exam</label>
+                        {/* Institute, Exam & Year (Register & Student Only) */}
+                        {view === 'REGISTER' && role === 'STUDENT' && (
+                            <>
+                                <div className="space-y-1">
+                                    <label htmlFor="institute" className="text-[10px] font-bold text-slate-400 uppercase tracking-wide ml-1">Institute</label>
                                     <div className="relative">
-                                        <Target className="absolute left-4 top-3.5 text-slate-400 w-4 h-4 z-10" />
+                                        <Building className="absolute left-4 top-3.5 text-slate-400 w-4 h-4 z-10" />
                                         <select 
-                                            id="targetExam"
+                                            id="institute"
                                             className="w-full pl-10 pr-8 py-3 border border-slate-200 rounded-xl text-sm text-slate-700 focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none appearance-none bg-white transition-all"
-                                            value={formData.targetExam}
-                                            onChange={(e) => setFormData({...formData, targetExam: e.target.value})}
+                                            value={formData.institute}
+                                            onChange={(e) => setFormData({...formData, institute: e.target.value})}
                                         >
-                                            {TARGET_EXAMS.map(exam => (
-                                                <option key={exam} value={exam}>{exam}</option>
+                                            <option value="" disabled>Select Institute</option>
+                                            {COACHING_INSTITUTES.map((inst) => (
+                                                <option key={inst} value={inst}>{inst}</option>
                                             ))}
                                         </select>
                                         <ChevronDown className="absolute right-4 top-3.5 text-slate-400 w-4 h-4 pointer-events-none" />
                                     </div>
                                 </div>
-                                
-                                <div className="col-span-2 space-y-1">
-                                    <label htmlFor="targetYear" className="text-[10px] font-bold text-slate-400 uppercase tracking-wide ml-1">Year</label>
+
+                                <div className="grid grid-cols-5 gap-3">
+                                    <div className="col-span-3 space-y-1">
+                                        <label htmlFor="targetExam" className="text-[10px] font-bold text-slate-400 uppercase tracking-wide ml-1">Target Exam</label>
+                                        <div className="relative">
+                                            <Target className="absolute left-4 top-3.5 text-slate-400 w-4 h-4 z-10" />
+                                            <select 
+                                                id="targetExam"
+                                                className="w-full pl-10 pr-8 py-3 border border-slate-200 rounded-xl text-sm text-slate-700 focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none appearance-none bg-white transition-all"
+                                                value={formData.targetExam}
+                                                onChange={(e) => setFormData({...formData, targetExam: e.target.value})}
+                                            >
+                                                {TARGET_EXAMS.map(exam => (
+                                                    <option key={exam} value={exam}>{exam}</option>
+                                                ))}
+                                            </select>
+                                            <ChevronDown className="absolute right-4 top-3.5 text-slate-400 w-4 h-4 pointer-events-none" />
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="col-span-2 space-y-1">
+                                        <label htmlFor="targetYear" className="text-[10px] font-bold text-slate-400 uppercase tracking-wide ml-1">Year</label>
+                                        <div className="relative">
+                                            <Calendar className="absolute left-3 top-3.5 text-slate-400 w-4 h-4 z-10" />
+                                            <select 
+                                                id="targetYear"
+                                                className="w-full pl-9 pr-6 py-3 border border-slate-200 rounded-xl text-sm text-slate-700 focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none appearance-none bg-white transition-all"
+                                                value={formData.targetYear}
+                                                onChange={(e) => setFormData({...formData, targetYear: e.target.value})}
+                                            >
+                                                {TARGET_YEARS.map(year => (
+                                                    <option key={year} value={year}>{year}</option>
+                                                ))}
+                                            </select>
+                                            <ChevronDown className="absolute right-2 top-3.5 text-slate-400 w-4 h-4 pointer-events-none" />
+                                        </div>
+                                    </div>
+                                </div>
+                            </>
+                        )}
+
+                        {/* DOB & Gender (Optional) - Register Only */}
+                        {view === 'REGISTER' && (
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="space-y-1">
+                                    <label htmlFor="dob" className="text-[10px] font-bold text-slate-400 uppercase tracking-wide ml-1">
+                                        DOB <span className="text-[8px] font-normal lowercase">(Optional)</span>
+                                    </label>
+                                    <input 
+                                        id="dob"
+                                        type="date"
+                                        className="w-full px-3 py-3 border border-slate-200 rounded-xl text-sm text-slate-700 focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none bg-white"
+                                        value={formData.dob}
+                                        onChange={(e) => setFormData({...formData, dob: e.target.value})}
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label htmlFor="gender" className="text-[10px] font-bold text-slate-400 uppercase tracking-wide ml-1">
+                                        Gender <span className="text-[8px] font-normal lowercase">(Optional)</span>
+                                    </label>
                                     <div className="relative">
-                                        <Calendar className="absolute left-3 top-3.5 text-slate-400 w-4 h-4 z-10" />
                                         <select 
-                                            id="targetYear"
-                                            className="w-full pl-9 pr-6 py-3 border border-slate-200 rounded-xl text-sm text-slate-700 focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none appearance-none bg-white transition-all"
-                                            value={formData.targetYear}
-                                            onChange={(e) => setFormData({...formData, targetYear: e.target.value})}
+                                            id="gender"
+                                            className="w-full px-3 py-3 border border-slate-200 rounded-xl text-sm text-slate-700 focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none appearance-none bg-white"
+                                            value={formData.gender}
+                                            onChange={(e) => setFormData({...formData, gender: e.target.value})}
                                         >
-                                            {TARGET_YEARS.map(year => (
-                                                <option key={year} value={year}>{year}</option>
-                                            ))}
+                                            <option value="">Select</option>
+                                            <option value="MALE">Male</option>
+                                            <option value="FEMALE">Female</option>
+                                            <option value="OTHER">Other</option>
                                         </select>
                                         <ChevronDown className="absolute right-2 top-3.5 text-slate-400 w-4 h-4 pointer-events-none" />
                                     </div>
                                 </div>
                             </div>
-                        </>
-                    )}
+                        )}
 
-                    {/* DOB & Gender (Optional) - Register Only */}
-                    {isRegistering && (
-                        <div className="grid grid-cols-2 gap-3">
-                            <div className="space-y-1">
-                                <label htmlFor="dob" className="text-[10px] font-bold text-slate-400 uppercase tracking-wide ml-1">
-                                    DOB <span className="text-[8px] font-normal lowercase">(Optional)</span>
-                                </label>
-                                <input 
-                                    id="dob"
-                                    type="date"
-                                    className="w-full px-3 py-3 border border-slate-200 rounded-xl text-sm text-slate-700 focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none bg-white"
-                                    value={formData.dob}
-                                    onChange={(e) => setFormData({...formData, dob: e.target.value})}
-                                />
-                            </div>
-                            <div className="space-y-1">
-                                <label htmlFor="gender" className="text-[10px] font-bold text-slate-400 uppercase tracking-wide ml-1">
-                                    Gender <span className="text-[8px] font-normal lowercase">(Optional)</span>
-                                </label>
-                                <div className="relative">
-                                    <select 
-                                        id="gender"
-                                        className="w-full px-3 py-3 border border-slate-200 rounded-xl text-sm text-slate-700 focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none appearance-none bg-white"
-                                        value={formData.gender}
-                                        onChange={(e) => setFormData({...formData, gender: e.target.value})}
-                                    >
-                                        <option value="">Select</option>
-                                        <option value="MALE">Male</option>
-                                        <option value="FEMALE">Female</option>
-                                        <option value="OTHER">Other</option>
-                                    </select>
-                                    <ChevronDown className="absolute right-2 top-3.5 text-slate-400 w-4 h-4 pointer-events-none" />
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Email Address */}
-                    <div className="space-y-1">
-                        <label htmlFor="email" className="text-[10px] font-bold text-slate-400 uppercase tracking-wide ml-1">
-                            {isRegistering ? 'Email Address' : 'Email or Username'}
-                        </label>
-                        <div className="relative group">
-                            <Mail className="absolute left-4 top-3.5 text-slate-400 w-5 h-5 group-focus-within:text-blue-500 transition-colors" />
-                            <input 
-                                id="email"
-                                type="text" 
-                                placeholder={isRegistering ? (role === 'PARENT' ? "parent@example.com" : "student@example.com") : "Email or 'admin'"}
-                                className="w-full pl-12 pr-4 py-3 border border-slate-200 rounded-xl text-sm text-slate-700 focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all placeholder:text-slate-400"
-                                value={formData.email}
-                                onChange={(e) => setFormData({...formData, email: e.target.value})}
-                                required
-                            />
-                        </div>
-                    </div>
-
-                    {/* Password */}
-                    <div className="space-y-1">
-                        <label htmlFor="password" className="text-[10px] font-bold text-slate-400 uppercase tracking-wide ml-1">Password</label>
-                        <div className="relative group">
-                            <Lock className="absolute left-4 top-3.5 text-slate-400 w-5 h-5 group-focus-within:text-blue-500 transition-colors" />
-                            <input 
-                                id="password"
-                                type="password" 
-                                placeholder={isRegistering ? "Create password" : "Enter password"}
-                                className="w-full pl-12 pr-4 py-3 border border-slate-200 rounded-xl text-sm text-slate-700 focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all placeholder:text-slate-400"
-                                value={formData.password}
-                                onChange={(e) => setFormData({...formData, password: e.target.value})}
-                                required
-                            />
-                        </div>
-                    </div>
-
-                    {/* Confirm Password (Register Only) */}
-                    {isRegistering && (
+                        {/* Email Address */}
                         <div className="space-y-1">
-                            <label htmlFor="confirmPassword" className="text-[10px] font-bold text-slate-400 uppercase tracking-wide ml-1">Confirm Password</label>
+                            <label htmlFor="email" className="text-[10px] font-bold text-slate-400 uppercase tracking-wide ml-1">
+                                {view === 'REGISTER' ? 'Email Address' : 'Email or Username'}
+                            </label>
                             <div className="relative group">
-                                <Lock className="absolute left-4 top-3.5 text-slate-400 w-5 h-5 group-focus-within:text-blue-500 transition-colors" />
+                                <Mail className="absolute left-4 top-3.5 text-slate-400 w-5 h-5 group-focus-within:text-blue-500 transition-colors" />
                                 <input 
-                                    id="confirmPassword"
-                                    type="password" 
-                                    placeholder="Re-enter password"
+                                    id="email"
+                                    type="text" 
+                                    placeholder={view === 'REGISTER' ? (role === 'PARENT' ? "parent@example.com" : "student@example.com") : "Email or 'admin'"}
                                     className="w-full pl-12 pr-4 py-3 border border-slate-200 rounded-xl text-sm text-slate-700 focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all placeholder:text-slate-400"
-                                    value={formData.confirmPassword}
-                                    onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})}
+                                    value={formData.email}
+                                    onChange={(e) => setFormData({...formData, email: e.target.value})}
                                     required
                                 />
                             </div>
                         </div>
-                    )}
 
-                    {/* Account Recovery Setup (Register Only) */}
-                    {isRegistering && (
-                        <div className="bg-blue-50 rounded-xl p-4 border border-blue-100 mt-2">
-                            <div className="flex items-center space-x-2 mb-3">
-                                <Shield className="w-4 h-4 text-blue-600" />
-                                <h4 className="text-xs font-bold text-blue-800 uppercase">Account Recovery Setup</h4>
+                        {/* Password */}
+                        <div className="space-y-1">
+                            <label htmlFor="password" className="text-[10px] font-bold text-slate-400 uppercase tracking-wide ml-1">Password</label>
+                            <div className="relative group">
+                                <Lock className="absolute left-4 top-3.5 text-slate-400 w-5 h-5 group-focus-within:text-blue-500 transition-colors" />
+                                <input 
+                                    id="password"
+                                    type="password" 
+                                    placeholder={view === 'REGISTER' ? "Create password" : "Enter password"}
+                                    className="w-full pl-12 pr-4 py-3 border border-slate-200 rounded-xl text-sm text-slate-700 focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all placeholder:text-slate-400"
+                                    value={formData.password}
+                                    onChange={(e) => setFormData({...formData, password: e.target.value})}
+                                    required
+                                />
                             </div>
-                            
-                            <div className="space-y-3">
-                                <div className="space-y-1">
-                                    <label htmlFor="securityQuestion" className="text-[10px] font-bold text-slate-400 uppercase ml-1">Security Question</label>
-                                    <div className="relative">
-                                        <HelpCircle className="absolute left-3 top-2.5 text-slate-400 w-4 h-4" />
-                                        <select 
-                                            id="securityQuestion"
-                                            className="w-full pl-9 pr-2 py-2 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:border-blue-400 bg-white"
-                                            value={formData.securityQuestion}
-                                            onChange={(e) => setFormData({...formData, securityQuestion: e.target.value})}
-                                        >
-                                            <option>What is the name of your first pet?</option>
-                                            <option>What is your mother's maiden name?</option>
-                                            <option>What was your childhood nickname?</option>
-                                        </select>
-                                    </div>
+                            {/* Forgot Password Link */}
+                            {view === 'LOGIN' && (
+                                <div className="flex justify-end mt-1">
+                                    <button 
+                                        type="button" 
+                                        onClick={() => { setView('RECOVERY'); setError(''); }}
+                                        className="text-xs font-bold text-blue-600 hover:underline"
+                                    >
+                                        Forgot Password?
+                                    </button>
                                 </div>
-                                
-                                <div className="space-y-1">
-                                    <label htmlFor="securityAnswer" className="text-[10px] font-bold text-slate-400 uppercase ml-1">Answer</label>
+                            )}
+                        </div>
+
+                        {/* Confirm Password (Register Only) */}
+                        {view === 'REGISTER' && (
+                            <div className="space-y-1">
+                                <label htmlFor="confirmPassword" className="text-[10px] font-bold text-slate-400 uppercase tracking-wide ml-1">Confirm Password</label>
+                                <div className="relative group">
+                                    <Lock className="absolute left-4 top-3.5 text-slate-400 w-5 h-5 group-focus-within:text-blue-500 transition-colors" />
                                     <input 
-                                        id="securityAnswer"
-                                        type="text" 
-                                        placeholder="e.g. Fluffy"
-                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:border-blue-400 bg-white"
-                                        value={formData.securityAnswer}
-                                        onChange={(e) => setFormData({...formData, securityAnswer: e.target.value})}
+                                        id="confirmPassword"
+                                        type="password" 
+                                        placeholder="Re-enter password"
+                                        className="w-full pl-12 pr-4 py-3 border border-slate-200 rounded-xl text-sm text-slate-700 focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all placeholder:text-slate-400"
+                                        value={formData.confirmPassword}
+                                        onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})}
+                                        required
                                     />
                                 </div>
                             </div>
-                        </div>
-                    )}
-
-                    {/* Success Message */}
-                    {successMessage && (
-                        <div className="flex items-center text-green-700 text-xs bg-green-50 p-3 rounded-lg border border-green-200 animate-in fade-in slide-in-from-top-1">
-                            <CheckCircle2 className="w-4 h-4 mr-2 shrink-0" />
-                            {successMessage}
-                        </div>
-                    )}
-
-                    {/* Error Message */}
-                    {error && (
-                        <div className="flex items-center text-red-600 text-xs bg-red-50 p-3 rounded-lg border border-red-100 animate-in fade-in slide-in-from-top-1 break-words">
-                            <AlertCircle className="w-4 h-4 mr-2 shrink-0" />
-                            {error}
-                        </div>
-                    )}
-
-                    {/* Submit Button */}
-                    <button 
-                        type="submit" 
-                        disabled={isLoading}
-                        className="w-full bg-blue-600 text-white font-bold py-3.5 rounded-xl hover:bg-blue-700 active:bg-blue-800 transition-all shadow-lg shadow-blue-200/50 flex items-center justify-center space-x-2 group mt-4 disabled:opacity-70 disabled:cursor-not-allowed"
-                    >
-                        {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
-                            <>
-                                <span>{isRegistering ? 'Create Account' : 'Sign In'}</span>
-                                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" strokeWidth={3} />
-                            </>
                         )}
-                    </button>
-                </form>
+
+                        {/* Account Recovery Setup (Register Only) */}
+                        {view === 'REGISTER' && (
+                            <div className="bg-blue-50 rounded-xl p-4 border border-blue-100 mt-2">
+                                <div className="flex items-center space-x-2 mb-3">
+                                    <Shield className="w-4 h-4 text-blue-600" />
+                                    <h4 className="text-xs font-bold text-blue-800 uppercase">Account Recovery Setup</h4>
+                                </div>
+                                
+                                <div className="space-y-3">
+                                    <div className="space-y-1">
+                                        <label htmlFor="securityQuestion" className="text-[10px] font-bold text-slate-400 uppercase ml-1">Security Question</label>
+                                        <div className="relative">
+                                            <HelpCircle className="absolute left-3 top-2.5 text-slate-400 w-4 h-4" />
+                                            <select 
+                                                id="securityQuestion"
+                                                className="w-full pl-9 pr-2 py-2 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:border-blue-400 bg-white"
+                                                value={formData.securityQuestion}
+                                                onChange={(e) => setFormData({...formData, securityQuestion: e.target.value})}
+                                            >
+                                                <option>What is the name of your first pet?</option>
+                                                <option>What is your mother's maiden name?</option>
+                                                <option>What was your childhood nickname?</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="space-y-1">
+                                        <label htmlFor="securityAnswer" className="text-[10px] font-bold text-slate-400 uppercase ml-1">Answer</label>
+                                        <input 
+                                            id="securityAnswer"
+                                            type="text" 
+                                            placeholder="e.g. Fluffy"
+                                            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:border-blue-400 bg-white"
+                                            value={formData.securityAnswer}
+                                            onChange={(e) => setFormData({...formData, securityAnswer: e.target.value})}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Submit Button */}
+                        <button 
+                            type="submit" 
+                            disabled={isLoading}
+                            className="w-full bg-blue-600 text-white font-bold py-3.5 rounded-xl hover:bg-blue-700 active:bg-blue-800 transition-all shadow-lg shadow-blue-200/50 flex items-center justify-center space-x-2 group mt-4 disabled:opacity-70 disabled:cursor-not-allowed"
+                        >
+                            {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
+                                <>
+                                    <span>{view === 'REGISTER' ? 'Create Account' : 'Sign In'}</span>
+                                    <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" strokeWidth={3} />
+                                </>
+                            )}
+                        </button>
+                    </form>
+                )}
+
+                {/* Status Messages */}
+                {successMessage && (
+                    <div className="flex items-center text-green-700 text-xs bg-green-50 p-3 rounded-lg border border-green-200 animate-in fade-in slide-in-from-top-1">
+                        <CheckCircle2 className="w-4 h-4 mr-2 shrink-0" />
+                        {successMessage}
+                    </div>
+                )}
+
+                {error && (
+                    <div className="flex items-center text-red-600 text-xs bg-red-50 p-3 rounded-lg border border-red-100 animate-in fade-in slide-in-from-top-1 break-words">
+                        <AlertCircle className="w-4 h-4 mr-2 shrink-0" />
+                        {error}
+                    </div>
+                )}
             </div>
             
-            {/* Developer Shortcuts (Conditionally Rendered based on Global Config) */}
-            {(window.IITJEE_CONFIG?.enableDevTools || window.location.hostname === 'localhost') && !isRegistering && (
+            {/* Developer Shortcuts */}
+            {(window.IITJEE_CONFIG?.enableDevTools || window.location.hostname === 'localhost') && view === 'LOGIN' && (
                 <div className="mt-6 pt-6 border-t border-slate-100">
                     <p className="text-[10px] text-center text-slate-400 font-bold uppercase tracking-wider mb-3 flex items-center justify-center">
                         <Zap className="w-3 h-3 mr-1" /> Developer Shortcuts (Offline)
@@ -657,7 +839,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate, ena
                 <button onClick={() => onNavigate('contact')} className="hover:text-blue-600 transition-colors">Contact</button>
             </div>
             <div className="text-center text-[10px] text-slate-300 mt-4">
-                v7.2
+                v7.5
             </div>
         </div>
       </div>

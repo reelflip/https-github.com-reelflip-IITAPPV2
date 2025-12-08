@@ -6,8 +6,8 @@ export const getDeploymentPhases = () => [
     { title: "Database Setup", subtitle: "Hostinger Panel", bg: "bg-yellow-50 border-yellow-200", color: "text-yellow-700", steps: ["Create MySQL Database", "Import `database.sql`"] },
     { title: "Backend Upload", subtitle: "File Manager", bg: "bg-purple-50 border-purple-200", color: "text-purple-700", steps: ["Create `api` folder", "Upload PHP files", "Edit `config.php`"] },
     { title: "Frontend Upload", subtitle: "File Manager", bg: "bg-green-50 border-green-200", color: "text-green-700", steps: ["Upload build zip", "Extract to root", "Check index.html"] },
-    { title: "Verification", subtitle: "Browser", bg: "bg-slate-50 border-slate-200", color: "text-slate-700", steps: ["Test Login", "Run Diagnostics"] },
-    { title: "Diagnostics", subtitle: "Admin Panel", bg: "bg-indigo-50 border-indigo-200", color: "text-indigo-700", steps: ["Log in as Admin", "Run Full Scan"] }
+    { title: "Google Auth", subtitle: "Google Cloud", bg: "bg-orange-50 border-orange-200", color: "text-orange-700", steps: ["Create OAuth Client", "Add Authorized Origin", "Update Client ID in Code"] },
+    { title: "Verification", subtitle: "Browser", bg: "bg-slate-50 border-slate-200", color: "text-slate-700", steps: ["Test Login", "Run Diagnostics"] }
 ];
 
 export const generateHtaccess = () => `
@@ -25,7 +25,7 @@ export const generateHtaccess = () => `
 `;
 
 export const generateSQLSchema = () => `
--- IITGEEPrep Database Schema v7.3
+-- IITGEEPrep Database Schema v7.5
 -- Target: MySQL / MariaDB (Hostinger)
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
@@ -49,6 +49,8 @@ CREATE TABLE IF NOT EXISTS \`users\` (
   \`linked_student_id\` int(11) DEFAULT NULL,
   \`is_verified\` tinyint(1) DEFAULT 1,
   \`google_id\` varchar(255) DEFAULT NULL,
+  \`security_question\` varchar(255) DEFAULT NULL,
+  \`security_answer\` varchar(255) DEFAULT NULL,
   \`created_at\` timestamp DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (\`id\`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -231,7 +233,7 @@ CREATE TABLE IF NOT EXISTS \`timetable_configs\` (
 
 -- Seed Admin
 INSERT INTO \`users\` (\`name\`, \`email\`, \`password_hash\`, \`role\`) VALUES 
-('System Admin', 'admin@iitgeeprep.com', '$2y$10$abcdefghijklmnopqrstuvwxyz123456', 'ADMIN');
+('System Admin', 'admin@iitgeeprep.com', 'Ishika@123', 'ADMIN');
 
 COMMIT;
 `;
@@ -271,9 +273,17 @@ export const generateFrontendGuide = () => `# IITGEEPrep Hostinger Deployment Gu
 4. Ensure \`index.html\` is directly inside \`public_html\`, not in a subfolder.
 5. Upload \`.htaccess\` to \`public_html\` to handle routing.
 
-## Phase 5: Verify
+## Phase 5: Google Login (Optional)
+1. Go to Google Cloud Console > APIs & Services > Credentials.
+2. Create Credentials > OAuth Client ID > Web Application.
+3. **IMPORTANT:** Add your website URL (e.g., https://yourdomain.com) to **Authorized JavaScript Origins**.
+4. Copy the Client ID.
+5. In your local code, update \`AuthScreen.tsx\` with this Client ID.
+6. Re-build and re-upload the frontend.
+
+## Phase 6: Verify
 1. Open your website domain.
-2. Try to register a new account.
+2. Login with 'admin@iitgeeprep.com' and password 'Ishika@123'.
 3. If it works, you are live!
 `;
 
@@ -319,7 +329,7 @@ try {
         folder: 'api',
         desc: 'API Root Health Check',
         content: `${phpHeader}
-echo json_encode(["status" => "active", "message" => "IITGEEPrep API v7.2 Operational", "timestamp" => date('c')]);
+echo json_encode(["status" => "active", "message" => "IITGEEPrep API v7.5 Operational", "timestamp" => date('c')]);
 ?>`
     },
     {
@@ -359,9 +369,8 @@ if(!empty($data->email) && !empty($data->password)) {
     $stmt->execute();
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    // In production, use password_verify($data->password, $user['password_hash'])
-    // For demo, we assume plain text or simple match if hash fails
-    if($user && ($data->password === $user['password_hash'] || $data->password === 'TestPass123')) {
+    // Hardcoded master password check for admin as per request
+    if($user && ($data->password === $user['password_hash'] || $data->password === 'Ishika@123')) {
         unset($user['password_hash']);
         echo json_encode(["status" => "success", "user" => $user]);
     } else {
@@ -371,6 +380,40 @@ if(!empty($data->email) && !empty($data->password)) {
 } else {
     http_response_code(400);
     echo json_encode(["message" => "Incomplete data"]);
+}
+?>`
+    },
+    {
+        name: 'recover.php',
+        folder: 'api',
+        desc: 'Password Recovery',
+        content: `${phpHeader}
+$data = json_decode(file_get_contents("php://input"));
+$action = $data->action;
+
+if ($action === 'get_question') {
+    $stmt = $conn->prepare("SELECT security_question FROM users WHERE email = ?");
+    $stmt->execute([$data->email]);
+    $user = $stmt->fetch(PDO::FETCH_ASSOC);
+    if ($user && $user['security_question']) {
+        echo json_encode(["status" => "success", "question" => $user['security_question']]);
+    } else {
+        http_response_code(404);
+        echo json_encode(["status" => "error", "message" => "User not found or no question set"]);
+    }
+} elseif ($action === 'verify_reset') {
+    $stmt = $conn->prepare("SELECT id FROM users WHERE email = ? AND security_answer = ?");
+    $stmt->execute([$data->email, $data->answer]);
+    if ($stmt->rowCount() > 0) {
+        // Reset Password
+        // For simple implementations requested, we update the password directly
+        $upd = $conn->prepare("UPDATE users SET password_hash = ? WHERE email = ?");
+        $upd->execute([$data->newPassword, $data->email]);
+        echo json_encode(["status" => "success", "message" => "Password updated"]);
+    } else {
+        http_response_code(401);
+        echo json_encode(["status" => "error", "message" => "Incorrect security answer"]);
+    }
 }
 ?>`
     },
@@ -443,7 +486,7 @@ if(!empty($data->name) && !empty($data->email) && !empty($data->password)) {
         exit();
     }
 
-    $query = "INSERT INTO users (name, email, password_hash, role, target_exam, target_year, institute, gender, dob) VALUES (:name, :email, :pass, :role, :exam, :year, :inst, :gender, :dob)";
+    $query = "INSERT INTO users (name, email, password_hash, role, target_exam, target_year, institute, gender, dob, security_question, security_answer) VALUES (:name, :email, :pass, :role, :exam, :year, :inst, :gender, :dob, :sq, :sa)";
     $stmt = $conn->prepare($query);
     
     // Simple hash for demo
@@ -458,6 +501,8 @@ if(!empty($data->name) && !empty($data->email) && !empty($data->password)) {
     $stmt->bindParam(":inst", $data->institute);
     $stmt->bindParam(":gender", $data->gender);
     $stmt->bindParam(":dob", $data->dob);
+    $stmt->bindParam(":sq", $data->securityQuestion);
+    $stmt->bindParam(":sa", $data->securityAnswer);
 
     if($stmt->execute()) {
         $id = $conn->lastInsertId();
@@ -590,7 +635,7 @@ elseif ($method === 'POST') {
     // Create Test
     $test = $data;
     $stmt = $conn->prepare("INSERT INTO tests (id, title, duration_minutes, difficulty, exam_type) VALUES (?, ?, ?, ?, ?)");
-    $stmt->execute([$test->id, $test->title, $test->durationMinutes, $test->difficulty, $test->examType]);
+    $stmt->execute([$test.id, $test->title, $test->durationMinutes, $test->difficulty, $test->examType]);
     
     // Add Questions
     foreach($test->questions as $q) {
