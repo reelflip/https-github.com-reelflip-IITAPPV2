@@ -1,14 +1,6 @@
 
-
-
-
-
-
-
-
-
 import React, { useState, useEffect } from 'react';
-import { Navigation } from './components/Navigation';
+import { Navigation, MobileNavigation } from './components/Navigation';
 import { AuthScreen } from './screens/AuthScreen';
 import { DashboardScreen } from './screens/DashboardScreen';
 import { AdminDashboardScreen } from './screens/AdminDashboardScreen';
@@ -39,6 +31,7 @@ import { PublicLayout } from './components/PublicLayout';
 import { User, UserProgress, TopicStatus, TestAttempt, Screen, Goal, MistakeLog, Flashcard, MemoryHack, BlogPost, VideoLesson, Question, Test, TimetableConfig, Topic, ContactMessage } from './lib/types';
 import { calculateNextRevision } from './lib/utils';
 import { SYLLABUS_DATA } from './lib/syllabusData';
+import { TrendingUp, Bell } from 'lucide-react';
 
 // Placeholder for screens not yet fully implemented
 const ComingSoonScreen = ({ title, icon }: { title: string, icon: string }) => (
@@ -74,6 +67,55 @@ const BacklogScreen = ({ progress }: { progress: Record<string, UserProgress> })
      </div>
   );
 };
+
+// --- DEMO DATA SEEDING ---
+const DEMO_TESTS: Test[] = [
+    {
+        id: 'demo_jee_main_1',
+        title: 'JEE Main 2024 - Physics Full Mock',
+        durationMinutes: 180,
+        category: 'ADMIN',
+        difficulty: 'MAINS',
+        examType: 'JEE',
+        questions: [
+            { id: 'q1', subjectId: 'phys', topicId: 'p-kin-1d', text: 'A particle moves with velocity v = t^2 - 2t. Find distance traveled in first 3 seconds.', options: ['4m', '6m', '8m', '2m'], correctOptionIndex: 1, source: 'JEE Main', year: 2024 },
+            { id: 'q2', subjectId: 'phys', topicId: 'p-electro', text: 'Two point charges q and 4q are separated by distance r. Where should a third charge be placed for equilibrium?', options: ['r/3 from q', 'r/3 from 4q', 'r/2', '2r/3 from q'], correctOptionIndex: 0, source: 'JEE Main', year: 2023 }
+        ]
+    },
+    {
+        id: 'demo_jee_adv_1',
+        title: 'JEE Advanced 2022 - Paper 1 (Mixed)',
+        durationMinutes: 180,
+        category: 'ADMIN',
+        difficulty: 'ADVANCED',
+        examType: 'JEE',
+        questions: [
+            { id: 'q3', subjectId: 'chem', topicId: 'c-thermo', text: 'For an adiabatic expansion of an ideal gas, the plot of ln P vs ln V is linear with slope:', options: ['-γ', 'γ', '1-γ', 'γ-1'], correctOptionIndex: 0, source: 'JEE Advanced', year: 2022 }
+        ]
+    },
+    {
+        id: 'demo_bitsat_1',
+        title: 'BITSAT English & Logic Speed Test',
+        durationMinutes: 45,
+        category: 'ADMIN',
+        difficulty: 'CUSTOM',
+        examType: 'BITSAT',
+        questions: [
+            { id: 'q4', subjectId: 'math', topicId: 'm-stats', text: 'The mean of 5 observations is 4. If one observation is excluded, new mean is 3. Find excluded value.', options: ['8', '6', '4', '2'], correctOptionIndex: 0, source: 'BITSAT', year: 2023 }
+        ]
+    },
+    {
+        id: 'demo_viteee_1',
+        title: 'VITEEE Science Quickfire',
+        durationMinutes: 90,
+        category: 'ADMIN',
+        difficulty: 'CUSTOM',
+        examType: 'VITEEE',
+        questions: [
+            { id: 'q5', subjectId: 'phys', topicId: 'p-units', text: 'Dimensions of Planck Constant are same as:', options: ['Energy', 'Power', 'Angular Momentum', 'Force'], correctOptionIndex: 2, source: 'VITEEE', year: 2021 }
+        ]
+    }
+];
 
 // --- SIMULATED USER DATABASE HELPERS ---
 const getUserDB = (): User[] => {
@@ -139,10 +181,7 @@ export default function App() {
   const [adminTests, setAdminTests] = useState<Test[]>([]);
 
   // --- Data Loading Logic ---
-  
-  // 1. Load Local Data (Fallback)
   const loadLocalData = (userId: string) => {
-    console.log("Loading local data for user:", userId);
     const savedProgress = localStorage.getItem(`iitjee_progress_${userId}`);
     const savedTests = localStorage.getItem(`iitjee_tests_${userId}`);
     const savedGoals = localStorage.getItem(`iitjee_goals_${userId}`);
@@ -156,7 +195,6 @@ export default function App() {
     if (savedTimetable) setTimetableData(JSON.parse(savedTimetable)); else setTimetableData(null);
   };
 
-  // 2. Fetch Remote Data (Primary)
   const fetchRemoteData = async (userId: string) => {
       try {
           const res = await fetch(`/api/get_dashboard.php?user_id=${userId}`);
@@ -166,9 +204,6 @@ export default function App() {
           if (!text) throw new Error('Empty response');
           
           const data = JSON.parse(text);
-          console.log("Remote data loaded:", data);
-          
-          // Transform Array Progress to Record
           if (Array.isArray(data.progress)) {
               const progMap: Record<string, UserProgress> = {};
               data.progress.forEach((p: any) => {
@@ -192,7 +227,6 @@ export default function App() {
           if (data.attempts) setTestAttempts(data.attempts);
           if (data.goals) setGoals(data.goals);
           
-          // Timetable
           if (data.timetable) {
               setTimetableData({
                   config: data.timetable.config,
@@ -201,14 +235,11 @@ export default function App() {
           } else {
               setTimetableData(null);
           }
-          
       } catch (e) {
-          console.log("Using local storage fallback. API status:", e);
           loadLocalData(userId);
       }
   };
 
-  // Initial Global Load
   useEffect(() => {
     const savedUser = localStorage.getItem('iitjee_user');
     const savedCards = localStorage.getItem('iitjee_flashcards');
@@ -225,15 +256,8 @@ export default function App() {
     if (savedUser) {
         const u = JSON.parse(savedUser);
         setUser(u);
-        // Try remote first, then local
         fetchRemoteData(u.id);
-        
-        if(u.role === 'PARENT' && u.linkedStudentId) {
-            loadLinkedStudent(u.linkedStudentId);
-        }
-        if(u.role === 'ADMIN') {
-            // Fetch messages count roughly or handle it in screen
-        }
+        if(u.role === 'PARENT' && u.linkedStudentId) loadLinkedStudent(u.linkedStudentId);
     }
     
     if (savedCards) setFlashcards(JSON.parse(savedCards));
@@ -241,11 +265,17 @@ export default function App() {
     if (savedBlogs) setBlogs(JSON.parse(savedBlogs));
     if (savedVideos) setVideoMap(JSON.parse(savedVideos));
     if (savedQuestions) setQuestionBank(JSON.parse(savedQuestions));
-    if (savedAdminTests) setAdminTests(JSON.parse(savedAdminTests));
+    
+    if (savedAdminTests) {
+        const parsedTests = JSON.parse(savedAdminTests);
+        setAdminTests(parsedTests.length > 0 ? parsedTests : DEMO_TESTS);
+    } else {
+        setAdminTests(DEMO_TESTS);
+    }
+
     if (savedSyllabus) setSyllabus(JSON.parse(savedSyllabus));
   }, []);
 
-  // Save current user data locally
   useEffect(() => {
     if (user) {
         localStorage.setItem('iitjee_user', JSON.stringify(user));
@@ -268,7 +298,6 @@ export default function App() {
     localStorage.setItem('iitjee_enable_google', String(enableGoogleLogin));
   }, [user, progress, testAttempts, goals, mistakes, timetableData, flashcards, hacks, blogs, videoMap, questionBank, adminTests, syllabus, enableGoogleLogin]);
 
-  // --- Helpers ---
   const loadLinkedStudent = (studentId: string) => {
       const sProgress = localStorage.getItem(`iitjee_progress_${studentId}`);
       const sTests = localStorage.getItem(`iitjee_tests_${studentId}`);
@@ -286,7 +315,6 @@ export default function App() {
   const handleLogin = (userData: User) => {
     const existingDb = getUserDB();
     const existingUser = existingDb.find(u => u.email === userData.email);
-    
     let newUser: User;
     if (existingUser) {
         newUser = { ...existingUser, ...userData, id: existingUser.id }; 
@@ -297,11 +325,8 @@ export default function App() {
             notifications: []
         };
     }
-    
     setUser(newUser);
-    // Fetch data from DB or Local
     fetchRemoteData(newUser.id);
-    
     if (newUser.role === 'ADMIN') setCurrentScreen('overview');
     else if (newUser.role === 'PARENT') {
         setCurrentScreen('dashboard');
@@ -321,7 +346,6 @@ export default function App() {
       setCurrentScreen(page as Screen);
   };
 
-  // --- Connection Logic ---
   const sendConnectionRequest = async (studentId: string): Promise<{success: boolean, message: string}> => {
       if(!user) return { success: false, message: 'Not logged in' };
       const student = findUserById(studentId);
@@ -349,24 +373,20 @@ export default function App() {
       if(!user) return;
       const notification = user.notifications?.find(n => n.id === notificationId);
       if(!notification) return;
-
       const parentId = notification.fromId;
       const parent = findUserById(parentId);
-
       const updatedStudent: User = {
           ...user,
           notifications: user.notifications?.filter(n => n.id !== notificationId),
           parentId: parentId 
       };
       setUser(updatedStudent); 
-
       if(parent) {
           const updatedParent = { ...parent, linkedStudentId: user.id };
           saveUserToDB(updatedParent);
       }
   };
 
-  // --- Update Handlers ---
   const updateTopicProgress = (topicId: string, updates: Partial<UserProgress>) => {
     setProgress(prev => {
       const current = prev[topicId] || { 
@@ -410,7 +430,6 @@ export default function App() {
   const deleteQuestion = (id: string) => setQuestionBank(prev => prev.filter(q => q.id !== id));
   const createTest = (t: Test) => setAdminTests(prev => [...prev, t]);
   const deleteTest = (id: string) => setAdminTests(prev => prev.filter(t => t.id !== id));
-
   const addTestAttempt = (attempt: TestAttempt) => setTestAttempts(prev => [...prev, attempt]);
   const addGoal = (text: string) => setGoals(prev => [...prev, { id: Date.now().toString(), text, completed: false }]);
   const toggleGoal = (id: string) => setGoals(prev => prev.map(g => g.id === id ? { ...g, completed: !g.completed } : g));
@@ -423,58 +442,20 @@ export default function App() {
     if(type === 'hack') setHacks(prev => prev.filter(i => i.id !== id));
     if(type === 'blog') setBlogs(prev => prev.filter(i => i.id !== id));
   };
-
-  // --- Dynamic Syllabus Handlers ---
   const handleAddTopic = (topic: Omit<Topic, 'id'>) => {
       const newTopic: Topic = { ...topic, id: `${topic.subject[0].toLowerCase()}_${Date.now()}` };
       setSyllabus(prev => [...prev, newTopic]);
   };
-
   const handleDeleteTopic = (id: string) => {
       setSyllabus(prev => prev.filter(t => t.id !== id));
   };
 
-  // --- Render ---
-  
-  // Public Routes (Accessible without login)
-  if (currentScreen === 'public-blog') {
-    return <PublicBlogScreen blogs={blogs} onBack={() => {
-        // If logged in, go to dashboard, else go to login
-        user ? setCurrentScreen('dashboard') : setCurrentScreen('dashboard'); 
-    }} />;
-  }
-
-  if (currentScreen === 'about') {
-      return (
-          <PublicLayout onNavigate={handleNavigation} currentScreen="about">
-              <AboutUsScreen />
-          </PublicLayout>
-      );
-  }
-
-  if (currentScreen === 'contact') {
-      return (
-          <PublicLayout onNavigate={handleNavigation} currentScreen="contact">
-              <ContactUsScreen />
-          </PublicLayout>
-      );
-  }
-
-  if (currentScreen === 'exams') {
-      return (
-          <PublicLayout onNavigate={handleNavigation} currentScreen="exams">
-              <ExamGuideScreen />
-          </PublicLayout>
-      );
-  }
-
-  if (currentScreen === 'privacy') {
-      return (
-          <PublicLayout onNavigate={handleNavigation} currentScreen="privacy">
-              <PrivacyPolicyScreen />
-          </PublicLayout>
-      );
-  }
+  // Public Routes
+  if (currentScreen === 'public-blog') return <PublicBlogScreen blogs={blogs} onBack={() => user ? setCurrentScreen('dashboard') : setCurrentScreen('dashboard')} />;
+  if (currentScreen === 'about') return <PublicLayout onNavigate={handleNavigation} currentScreen="about"><AboutUsScreen /></PublicLayout>;
+  if (currentScreen === 'contact') return <PublicLayout onNavigate={handleNavigation} currentScreen="contact"><ContactUsScreen /></PublicLayout>;
+  if (currentScreen === 'exams') return <PublicLayout onNavigate={handleNavigation} currentScreen="exams"><ExamGuideScreen /></PublicLayout>;
+  if (currentScreen === 'privacy') return <PublicLayout onNavigate={handleNavigation} currentScreen="privacy"><PrivacyPolicyScreen /></PublicLayout>;
 
   // Auth Guard
   if (!user) {
@@ -482,7 +463,8 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex font-sans text-slate-900">
+    <div className="min-h-screen bg-slate-50 font-sans text-slate-900 flex">
+      {/* Desktop Sidebar */}
       <Navigation 
         currentScreen={currentScreen} 
         setScreen={setCurrentScreen} 
@@ -490,112 +472,65 @@ export default function App() {
         user={user}
       />
 
-      <main className="flex-1 md:ml-64 p-4 md:p-8 overflow-y-auto h-screen">
-        <div className="max-w-6xl mx-auto">
-          {/* PARENT SCREENS */}
-          {user.role === 'PARENT' && (
-             <>
-                {currentScreen === 'dashboard' && (
-                  <DashboardScreen 
-                    user={user} 
-                    progress={linkedStudentData?.progress || {}} 
-                    testAttempts={linkedStudentData?.tests || []} 
-                    goals={[]} 
-                    addGoal={()=>{}} toggleGoal={()=>{}} 
-                    setScreen={setCurrentScreen}
-                  />
-                )}
-                {currentScreen === 'family' && (
-                    <ParentFamilyScreen user={user} onSendRequest={sendConnectionRequest} linkedData={linkedStudentData} />
-                )}
-                {currentScreen === 'analytics' && <ComingSoonScreen title="Student Analytics" icon="📊" />}
-                {currentScreen === 'timetable' && (
-                    <div className="p-8 text-center text-slate-500 bg-white rounded-xl border border-slate-200">
-                        Timetable viewing is available in Student account.
+      <main className="flex-1 md:ml-64 p-4 md:p-8 overflow-y-auto h-screen pb-24 md:pb-8">
+        
+        {/* Mobile Header */}
+        <div className="md:hidden flex justify-between items-center mb-6 sticky top-0 bg-slate-50 z-30 py-2 border-b border-slate-200">
+            <div className="flex items-center gap-2">
+                <div className="w-8 h-8 bg-slate-900 rounded-full flex items-center justify-center text-blue-400">
+                    <TrendingUp className="w-5 h-5" />
+                </div>
+                <span className="font-bold text-lg text-slate-800">IITGEEPrep</span>
+            </div>
+            <div className="flex items-center gap-3">
+                {user.notifications && user.notifications.length > 0 && (
+                    <div className="relative p-2">
+                        <Bell className="w-6 h-6 text-slate-600" />
+                        <span className="absolute top-1 right-2 w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse border border-white"></span>
                     </div>
                 )}
+                {user.avatarUrl && <img src={user.avatarUrl} className="w-8 h-8 rounded-full border border-slate-300" alt="Avatar" />}
+            </div>
+        </div>
+
+        <div className="max-w-6xl mx-auto">
+          {user.role === 'PARENT' && (
+             <>
+                {currentScreen === 'dashboard' && <DashboardScreen user={user} progress={linkedStudentData?.progress || {}} testAttempts={linkedStudentData?.tests || []} goals={[]} addGoal={()=>{}} toggleGoal={()=>{}} setScreen={setCurrentScreen} />}
+                {currentScreen === 'family' && <ParentFamilyScreen user={user} onSendRequest={sendConnectionRequest} linkedData={linkedStudentData} />}
+                {currentScreen === 'analytics' && <ComingSoonScreen title="Student Analytics" icon="📊" />}
+                {currentScreen === 'timetable' && <div className="p-8 text-center text-slate-500 bg-white rounded-xl border border-slate-200">Timetable viewing is available in Student account.</div>}
                 {currentScreen === 'tests' && <TestScreen history={linkedStudentData?.tests || []} addTestAttempt={()=>{}} availableTests={adminTests} />}
                 {currentScreen === 'syllabus' && <SyllabusScreen user={user} subjects={syllabus} progress={linkedStudentData?.progress || {}} onUpdateProgress={()=>{}} readOnly={true} videoMap={videoMap} />}
-                {currentScreen === 'profile' && (
-                    <ProfileScreen 
-                        user={user} 
-                        onAcceptRequest={()=>{}} 
-                        onUpdateUser={(u) => {
-                            const updated = { ...user, ...u };
-                            setUser(updated);
-                            saveUserToDB(updated);
-                        }} 
-                        linkedStudentName={linkedStudentData?.studentName}
-                    />
-                )} 
+                {currentScreen === 'profile' && <ProfileScreen user={user} onAcceptRequest={()=>{}} onUpdateUser={(u) => { const updated = { ...user, ...u }; setUser(updated); saveUserToDB(updated); }} linkedStudentName={linkedStudentData?.studentName} />} 
              </>
           )}
 
-          {/* STUDENT SCREENS */}
           {user.role === 'STUDENT' && (
               <>
-                {currentScreen === 'dashboard' && (
-                    <DashboardScreen 
-                    user={user} progress={progress} testAttempts={testAttempts} goals={goals}
-                    addGoal={addGoal} toggleGoal={toggleGoal} setScreen={setCurrentScreen}
-                    />
-                )}
+                {currentScreen === 'dashboard' && <DashboardScreen user={user} progress={progress} testAttempts={testAttempts} goals={goals} addGoal={addGoal} toggleGoal={toggleGoal} setScreen={setCurrentScreen} />}
                 {currentScreen === 'syllabus' && <SyllabusScreen user={user} subjects={syllabus} progress={progress} onUpdateProgress={updateTopicProgress} videoMap={videoMap} />}
                 {currentScreen === 'revision' && <RevisionScreen progress={progress} handleRevisionComplete={handleRevisionComplete} />}
                 {currentScreen === 'tests' && <TestScreen history={testAttempts} addTestAttempt={addTestAttempt} availableTests={adminTests} />}
-                {currentScreen === 'timetable' && (
-                    <TimetableScreen 
-                        user={user} 
-                        savedConfig={timetableData?.config} 
-                        savedSlots={timetableData?.slots}
-                        onSave={saveTimetable}
-                        progress={progress}
-                    />
-                )}
+                {currentScreen === 'timetable' && <TimetableScreen user={user} savedConfig={timetableData?.config} savedSlots={timetableData?.slots} onSave={saveTimetable} progress={progress} />}
                 {currentScreen === 'flashcards' && <FlashcardScreen flashcards={flashcards} />}
                 {currentScreen === 'mistakes' && <MistakesScreen mistakes={mistakes} addMistake={addMistake} />}
                 {currentScreen === 'backlogs' && <BacklogScreen progress={progress} />}
                 {currentScreen === 'hacks' && <HacksScreen hacks={hacks} />}
-                {currentScreen === 'profile' && <ProfileScreen user={user} onAcceptRequest={acceptConnectionRequest} />}
+                {currentScreen === 'profile' && <ProfileScreen user={user} onAcceptRequest={acceptConnectionRequest} onUpdateUser={(u) => { const updated = { ...user, ...u }; setUser(updated); saveUserToDB(updated); }} />}
               </>
           )}
 
-          {/* ADMIN SCREENS */}
           {user.role === 'ADMIN' && (
               <>
                 {currentScreen === 'overview' && <AdminDashboardScreen user={user} onNavigate={setCurrentScreen} enableGoogleLogin={enableGoogleLogin} onToggleGoogle={() => setEnableGoogleLogin(!enableGoogleLogin)} />}
                 {currentScreen === 'users' && <AdminUserManagementScreen />}
-                {currentScreen === 'syllabus_admin' && (
-                    <AdminSyllabusScreen 
-                        syllabus={syllabus} 
-                        onAddTopic={handleAddTopic} 
-                        onDeleteTopic={handleDeleteTopic} 
-                    />
-                )}
-                {(currentScreen === 'inbox' || currentScreen === 'content_admin') && (
-                    <AdminInboxScreen />
-                )}
-                {currentScreen === 'content' && (
-                    <ContentManagerScreen 
-                    flashcards={flashcards} hacks={hacks} blogs={blogs}
-                    onAddFlashcard={addFlashcard} onAddHack={addHack} onAddBlog={addBlog} onDelete={deleteContent}
-                    initialTab='flashcards'
-                    />
-                )}
-                {currentScreen === 'blog_admin' && (
-                    <AdminBlogScreen blogs={blogs} onAddBlog={addBlog} onDeleteBlog={(id) => deleteContent('blog', id)} />
-                )}
-                {(currentScreen === 'videos' || currentScreen === 'video_admin') && (
-                    <VideoManagerScreen videoMap={videoMap} onUpdateVideo={updateVideo} />
-                )}
-                {(currentScreen === 'tests' || currentScreen === 'tests_admin') && (
-                    <AdminTestManagerScreen 
-                        questionBank={questionBank} tests={adminTests}
-                        onAddQuestion={addQuestion} onCreateTest={createTest}
-                        onDeleteQuestion={deleteQuestion} onDeleteTest={deleteTest}
-                        syllabus={syllabus}
-                    />
-                )}
+                {currentScreen === 'syllabus_admin' && <AdminSyllabusScreen syllabus={syllabus} onAddTopic={handleAddTopic} onDeleteTopic={handleDeleteTopic} />}
+                {(currentScreen === 'inbox' || currentScreen === 'content_admin') && <AdminInboxScreen />}
+                {currentScreen === 'content' && <ContentManagerScreen flashcards={flashcards} hacks={hacks} blogs={blogs} onAddFlashcard={addFlashcard} onAddHack={addHack} onAddBlog={addBlog} onDelete={deleteContent} initialTab='flashcards' />}
+                {currentScreen === 'blog_admin' && <AdminBlogScreen blogs={blogs} onAddBlog={addBlog} onDeleteBlog={(id) => deleteContent('blog', id)} />}
+                {(currentScreen === 'videos' || currentScreen === 'video_admin') && <VideoManagerScreen videoMap={videoMap} onUpdateVideo={updateVideo} />}
+                {(currentScreen === 'tests' || currentScreen === 'tests_admin') && <AdminTestManagerScreen questionBank={questionBank} tests={adminTests} onAddQuestion={addQuestion} onCreateTest={createTest} onDeleteQuestion={deleteQuestion} onDeleteTest={deleteTest} syllabus={syllabus} />}
                 {currentScreen === 'diagnostics' && <DiagnosticsScreen />}
                 {currentScreen === 'deployment' && <DeploymentScreen />}
               </>
@@ -607,6 +542,9 @@ export default function App() {
           )}
         </div>
       </main>
+
+      {/* Mobile Navigation */}
+      <MobileNavigation currentScreen={currentScreen} setScreen={setCurrentScreen} logout={handleLogout} user={user} />
     </div>
   );
 }

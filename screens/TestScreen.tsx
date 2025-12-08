@@ -115,21 +115,23 @@ export const TestScreen: React.FC<Props> = ({ addTestAttempt, history, available
               ) : (
                   <div className="bg-slate-50 p-6 rounded-xl border border-slate-200">
                       <h4 className="font-bold text-slate-800 mb-4">Log External Test Result</h4>
-                      <form onSubmit={handleManualSubmit} className="flex gap-4 items-end">
-                          <div className="flex-1">
+                      <form onSubmit={handleManualSubmit} className="flex flex-col md:flex-row gap-4 items-end">
+                          <div className="flex-1 w-full">
                               <label className="block text-xs font-bold text-slate-500 mb-1">Title</label>
                               <input required value={manualForm.title} onChange={e => setManualForm({...manualForm, title: e.target.value})} className="w-full p-2 border rounded" placeholder="e.g. Allen Major Test 1"/>
                           </div>
-                          <div className="w-24">
+                          <div className="w-full md:w-24">
                               <label className="block text-xs font-bold text-slate-500 mb-1">Score</label>
                               <input required type="number" value={manualForm.score} onChange={e => setManualForm({...manualForm, score: e.target.value})} className="w-full p-2 border rounded"/>
                           </div>
-                          <div className="w-24">
+                          <div className="w-full md:w-24">
                               <label className="block text-xs font-bold text-slate-500 mb-1">Total</label>
                               <input required type="number" value={manualForm.totalMarks} onChange={e => setManualForm({...manualForm, totalMarks: e.target.value})} className="w-full p-2 border rounded"/>
                           </div>
-                          <Button type="submit">Save</Button>
-                          <Button type="button" variant="ghost" onClick={() => setIsManualEntry(false)}>Cancel</Button>
+                          <div className="flex gap-2 w-full md:w-auto">
+                              <Button type="submit" className="flex-1 md:flex-none">Save</Button>
+                              <Button type="button" variant="ghost" onClick={() => setIsManualEntry(false)} className="flex-1 md:flex-none">Cancel</Button>
+                          </div>
                       </form>
                   </div>
               )}
@@ -240,22 +242,22 @@ const ActiveTestSession = ({ test, onFinish, onCancel }: { test: Test, onFinish:
     const question = test.questions[currentQ];
 
     return (
-        <div className="bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden flex flex-col h-[600px]">
+        <div className="bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden flex flex-col h-[calc(100vh-140px)] md:h-[600px] mt-0 md:mt-4">
             {/* Header */}
-            <div className="bg-slate-900 text-white p-4 flex justify-between items-center">
+            <div className="bg-slate-900 text-white p-4 flex justify-between items-center sticky top-0 z-10">
                 <div>
-                    <h3 className="font-bold">{test.title}</h3>
+                    <h3 className="font-bold text-sm md:text-base">{test.title}</h3>
                     <p className="text-xs text-slate-400">Question {currentQ + 1} / {test.questions.length}</p>
                 </div>
-                <div className={`font-mono text-xl font-bold ${timeLeft < 300 ? 'text-red-400 animate-pulse' : ''}`}>
+                <div className={`font-mono text-lg font-bold ${timeLeft < 300 ? 'text-red-400 animate-pulse' : ''}`}>
                     {formatTime(timeLeft)}
                 </div>
             </div>
 
             {/* Question Area */}
-            <div className="flex-1 p-8 overflow-y-auto">
+            <div className="flex-1 p-6 md:p-8 overflow-y-auto">
                 <span className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 block">{question.subjectId}</span>
-                <p className="text-lg font-medium text-slate-800 mb-8">{question.text}</p>
+                <p className="text-base md:text-lg font-medium text-slate-800 mb-8">{question.text}</p>
                 
                 <div className="space-y-3">
                     {question.options.map((opt, idx) => (
@@ -268,33 +270,34 @@ const ActiveTestSession = ({ test, onFinish, onCancel }: { test: Test, onFinish:
                                     : 'border-slate-100 hover:border-slate-300'
                             }`}
                         >
-                            <div className={`w-6 h-6 rounded-full border-2 mr-4 flex items-center justify-center text-xs ${
+                            <div className={`w-6 h-6 rounded-full border-2 mr-4 flex items-center justify-center text-xs shrink-0 ${
                                 answers[question.id] === idx ? 'border-blue-500 bg-blue-500 text-white' : 'border-slate-300'
                             }`}>
                                 {String.fromCharCode(65 + idx)}
                             </div>
-                            {opt}
+                            <span className="text-sm md:text-base">{opt}</span>
                         </div>
                     ))}
                 </div>
             </div>
 
             {/* Footer */}
-            <div className="p-4 border-t bg-slate-50 flex justify-between items-center">
+            <div className="p-4 border-t bg-slate-50 flex justify-between items-center sticky bottom-0">
                 <Button 
                     variant="secondary" 
                     onClick={() => setCurrentQ(prev => Math.max(0, prev - 1))}
                     disabled={currentQ === 0}
+                    size="sm"
                 >
                     Previous
                 </Button>
                 
                 <div className="flex gap-2">
-                    <Button variant="ghost" onClick={onCancel} className="text-red-500 hover:text-red-600 hover:bg-red-50">Quit</Button>
+                    <Button variant="ghost" onClick={onCancel} className="text-red-500 hover:text-red-600 hover:bg-red-50" size="sm">Quit</Button>
                     {currentQ < test.questions.length - 1 ? (
-                        <Button onClick={() => setCurrentQ(prev => prev + 1)}>Next</Button>
+                        <Button onClick={() => setCurrentQ(prev => prev + 1)} size="sm">Next</Button>
                     ) : (
-                        <Button onClick={handleSubmit} className="bg-green-600 hover:bg-green-700">Submit Test</Button>
+                        <Button onClick={handleSubmit} className="bg-green-600 hover:bg-green-700" size="sm">Submit Test</Button>
                     )}
                 </div>
             </div>

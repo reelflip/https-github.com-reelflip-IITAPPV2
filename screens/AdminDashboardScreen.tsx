@@ -1,10 +1,7 @@
 
-
-
 import React from 'react';
 import { User } from '../lib/types';
 import { StatCard } from '../components/StatCard';
-import { PageHeader } from '../components/PageHeader';
 import { Settings, ToggleLeft, ToggleRight, HelpCircle } from 'lucide-react';
 
 interface Props {
@@ -27,8 +24,8 @@ export const AdminDashboardScreen: React.FC<Props> = ({ user, onNavigate, messag
         </div>
 
         <div className="relative z-10">
-           <h1 className="text-3xl font-bold mb-2">Admin Command Center</h1>
-           <p className="text-slate-400">Welcome back, Administrator. System is operational.</p>
+           <h1 className="text-2xl md:text-3xl font-bold mb-2">Admin Command Center</h1>
+           <p className="text-slate-400 text-sm md:text-base">Welcome back, Administrator. System is operational.</p>
         </div>
       </div>
 
@@ -91,7 +88,7 @@ export const AdminDashboardScreen: React.FC<Props> = ({ user, onNavigate, messag
                     <h3 className="text-lg font-bold text-slate-800">Login Configuration</h3>
                 </div>
                 
-                <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg border border-slate-100">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-slate-50 rounded-lg border border-slate-100 gap-4">
                     <div className="flex items-center gap-3">
                        <span className="text-2xl">G</span>
                        <div>
