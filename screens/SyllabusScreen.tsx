@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { Subject, UserProgress, TopicStatus, Topic, User, VideoLesson } from '../lib/types';
+import { UserProgress, TopicStatus, Topic, User, VideoLesson } from '../lib/types';
 import { 
   Search, 
   ChevronDown, 
@@ -13,7 +13,8 @@ import {
   PlayCircle,
   X,
   Youtube,
-  Filter
+  Filter,
+  Info
 } from 'lucide-react';
 
 interface SyllabusTrackerProps {
@@ -280,7 +281,7 @@ export const SyllabusScreen: React.FC<SyllabusTrackerProps> = ({ user, subjects,
                                                 });
                                             }}
                                             className="flex items-center space-x-1.5 px-2 py-1 bg-red-50 text-red-600 rounded-full hover:bg-red-100 transition-colors border border-red-100 group"
-                                            title="Watch Video Lesson"
+                                            title={videoLesson.description || "Watch Video Lesson"}
                                          >
                                              <PlayCircle className="w-3.5 h-3.5 fill-red-100 group-hover:fill-red-200" />
                                              <span className="text-[10px] font-bold uppercase tracking-wide">Watch</span>
@@ -402,7 +403,10 @@ export const SyllabusScreen: React.FC<SyllabusTrackerProps> = ({ user, subjects,
                   <div className="flex justify-between items-center p-4 bg-slate-900 text-white border-b border-slate-800">
                       <div className="flex items-center space-x-3">
                           <Youtube className="w-6 h-6 text-red-600" />
-                          <h3 className="font-bold text-lg">{activeVideo.title}</h3>
+                          <div>
+                              <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Video Lesson</p>
+                              <h3 className="font-bold text-lg">{activeVideo.title}</h3>
+                          </div>
                       </div>
                       <button 
                         onClick={() => setActiveVideo(null)}
@@ -421,8 +425,11 @@ export const SyllabusScreen: React.FC<SyllabusTrackerProps> = ({ user, subjects,
                         allowFullScreen
                       ></iframe>
                   </div>
-                  <div className="p-4 bg-slate-900 text-slate-300 text-xs border-t border-slate-800">
-                      <p><strong>Description:</strong> {activeVideo.desc || "No description available."}</p>
+                  <div className="p-4 bg-slate-900 text-slate-300 text-xs border-t border-slate-800 flex items-start gap-2">
+                      <Info className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
+                      <p className="leading-relaxed">
+                          <strong>About this lesson:</strong> {activeVideo.desc || "No detailed description available."}
+                      </p>
                   </div>
               </div>
           </div>

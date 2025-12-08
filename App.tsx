@@ -19,6 +19,7 @@ import { ParentFamilyScreen } from './screens/ParentFamilyScreen';
 import { ProfileScreen } from './screens/ProfileScreen';
 import { VideoManagerScreen } from './screens/VideoManagerScreen';
 import { AdminTestManagerScreen } from './screens/AdminTestManagerScreen';
+import { AdminUserManagementScreen } from './screens/AdminUserManagementScreen';
 import { User, UserProgress, TopicStatus, TestAttempt, Screen, Goal, MistakeLog, Flashcard, MemoryHack, BlogPost, VideoLesson, Question, Test, TimetableConfig } from './lib/types';
 import { calculateNextRevision } from './lib/utils';
 import { getTopicsBySubject, SYLLABUS_DATA } from './lib/syllabusData';
@@ -475,6 +476,7 @@ export default function App() {
           {user.role === 'ADMIN' && (
               <>
                 {currentScreen === 'overview' && <AdminDashboardScreen user={user} />}
+                {currentScreen === 'users' && <AdminUserManagementScreen />}
                 {currentScreen === 'content' && (
                     <ContentManagerScreen 
                     flashcards={flashcards} hacks={hacks} blogs={blogs}
@@ -497,7 +499,7 @@ export default function App() {
           )}
 
           {/* Shared/Placeholders */}
-          {['ai-tutor','focus','analytics','wellness','users','system','content_admin','admin_analytics'].includes(currentScreen) && (
+          {['ai-tutor','focus','analytics','wellness','system','content_admin','admin_analytics'].includes(currentScreen) && (
               <ComingSoonScreen title={currentScreen.charAt(0).toUpperCase() + currentScreen.slice(1)} icon="🚧" />
           )}
         </div>

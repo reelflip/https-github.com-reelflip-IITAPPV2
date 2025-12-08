@@ -1,81 +1,264 @@
-import React from 'react';
+
+import React, { useState } from 'react';
 import { User } from '../lib/types';
+import { Camera, Save, Bell, Mail, Shield, User as UserIcon } from 'lucide-react';
 
 interface Props {
   user: User;
   onAcceptRequest: (notificationId: string) => void;
+  onUpdateUser?: (updates: Partial<User>) => void;
 }
 
-export const ProfileScreen: React.FC<Props> = ({ user, onAcceptRequest }) => {
+export const ProfileScreen: React.FC<Props> = ({ user, onAcceptRequest, onUpdateUser }) => {
   const requests = user.notifications?.filter(n => n.type === 'connection_request') || [];
+  
+  const [isEditing, setIsEditing] = useState(false);
+  const [formData, setFormData] = useState({
+    school: user.school || '',
+    targetYear: user.targetYear || 2025,
+    phone: user.phone || '',
+    notifications: {
+      email: true,
+      push: true
+    }
+  });
+
+  const handleSave = () => {
+    if (onUpdateUser) {
+      onUpdateUser({
+        school: formData.school,
+        targetYear: formData.targetYear,
+        phone: formData.phone
+      });
+    }
+    setIsEditing(false);
+  };
+
+  const regenerateAvatar = () => {
+    if (onUpdateUser) {
+      const randomSeed = Math.random().toString(36).substring(7);
+      const newAvatar = `https://api.dicebear.com/7.x/avataaars/svg?seed=${randomSeed}`;
+      onUpdateUser({ avatarUrl: newAvatar });
+    }
+  };
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
-      <div className="flex items-center gap-4 mb-6">
-         <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-3xl text-white font-bold shadow-lg">
-            {user.name.charAt(0)}
-         </div>
-         <div>
-            <h2 className="text-2xl font-bold text-slate-900">{user.name}</h2>
-            <p className="text-slate-500">{user.email}</p>
-            <div className="mt-1 flex items-center gap-2">
-               <span className="text-xs bg-slate-100 px-2 py-1 rounded border border-slate-200 font-mono text-slate-600">ID: {user.id}</span>
-               <span className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded border border-blue-100 font-bold capitalize">{user.role}</span>
-            </div>
-         </div>
+    <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4">
+      
+      {/* Profile Header Card */}
+      <div className="bg-white rounded-2xl p-8 border border-slate-200 shadow-sm relative overflow-hidden">
+        <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-r from-blue-600 to-indigo-600"></div>
+        
+        <div className="relative flex flex-col md:flex-row items-center md:items-end gap-6 mt-12">
+           <div className="relative group">
+              <div className="w-32 h-32 rounded-full border-4 border-white shadow-lg bg-white overflow-hidden">
+                 <img 
+                   src={user.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.email}`} 
+                   alt="Profile" 
+                   className="w-full h-full object-cover"
+                 />
+              </div>
+              <button 
+                onClick={regenerateAvatar}
+                className="absolute bottom-2 right-2 p-2 bg-slate-900 text-white rounded-full shadow-md hover:bg-blue-600 transition-colors"
+                title="Change Avatar"
+              >
+                <Camera size={16} />
+              </button>
+           </div>
+           
+           <div className="flex-1 text-center md:text-left mb-2">
+              <h1 className="text-3xl font-bold text-slate-900">{user.name}</h1>
+              <p className="text-slate-500 font-medium">{user.email}</p>
+              <div className="flex items-center justify-center md:justify-start gap-2 mt-3">
+                 <span className="px-3 py-1 bg-blue-50 text-blue-700 text-xs font-bold uppercase tracking-wide rounded-full border border-blue-100">
+                    {user.role}
+                 </span>
+                 {user.role === 'STUDENT' && (
+                   <span className="px-3 py-1 bg-slate-100 text-slate-600 text-xs font-mono font-bold rounded-full border border-slate-200">
+                      ID: {user.id}
+                   </span>
+                 )}
+              </div>
+           </div>
+
+           <div>
+              {!isEditing ? (
+                <button 
+                  onClick={() => setIsEditing(true)}
+                  className="bg-white border border-slate-300 text-slate-700 px-6 py-2.5 rounded-xl font-bold shadow-sm hover:bg-slate-50 transition-all text-sm"
+                >
+                  Edit Profile
+                </button>
+              ) : (
+                <button 
+                  onClick={handleSave}
+                  className="bg-blue-600 text-white px-6 py-2.5 rounded-xl font-bold shadow-lg hover:bg-blue-700 transition-all text-sm flex items-center gap-2"
+                >
+                  <Save size={16} /> Save Changes
+                </button>
+              )}
+           </div>
+        </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-         <div className="px-6 py-4 border-b border-slate-100 bg-slate-50">
-            <h3 className="font-bold text-slate-800">Notifications</h3>
-         </div>
-         <div className="divide-y divide-slate-100">
-            {requests.length === 0 ? (
-               <div className="p-8 text-center text-slate-400">
-                  <p>No new notifications.</p>
-               </div>
-            ) : (
-               requests.map(req => (
-                  <div key={req.id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition">
-                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center">
-                           👋
-                        </div>
-                        <div>
-                           <p className="text-sm font-bold text-slate-800">Connection Request</p>
-                           <p className="text-xs text-slate-500">From <span className="font-semibold">{req.fromName}</span> • {new Date(req.date).toLocaleDateString()}</p>
-                        </div>
-                     </div>
-                     <div className="flex gap-2">
-                        <button 
-                           onClick={() => onAcceptRequest(req.id)}
-                           className="bg-blue-600 text-white text-xs font-bold px-3 py-1.5 rounded hover:bg-blue-700"
-                        >
-                           Accept
-                        </button>
-                        <button className="bg-slate-100 text-slate-600 text-xs font-bold px-3 py-1.5 rounded hover:bg-slate-200">
-                           Decline
-                        </button>
-                     </div>
-                  </div>
-               ))
-            )}
-         </div>
-      </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        
+        {/* Left Column: Details & Settings */}
+        <div className="md:col-span-2 space-y-8">
+           
+           {/* Personal Details */}
+           <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+              <div className="flex items-center gap-3 mb-6 border-b border-slate-100 pb-4">
+                 <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
+                    <UserIcon size={20} />
+                 </div>
+                 <h3 className="font-bold text-slate-800">Personal Details</h3>
+              </div>
 
-      {user.role === 'STUDENT' && (
-         <div className="bg-blue-50 rounded-xl p-6 border border-blue-100">
-            <h4 className="font-bold text-blue-900 mb-2">Parent Connection Guide</h4>
-            <p className="text-sm text-blue-700 mb-2">
-               To connect with your parent:
-            </p>
-            <ol className="list-decimal list-inside text-sm text-blue-700 space-y-1">
-               <li>Share your Student ID (<span className="font-mono font-bold">{user.id}</span>) with them.</li>
-               <li>Ask them to enter it in their "Family" tab.</li>
-               <li>Accept the notification that appears here.</li>
-            </ol>
-         </div>
-      )}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                 <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">School / Institute</label>
+                    <input 
+                      disabled={!isEditing}
+                      value={formData.school}
+                      onChange={(e) => setFormData({...formData, school: e.target.value})}
+                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:opacity-75 disabled:bg-slate-50"
+                      placeholder="Enter School Name"
+                    />
+                 </div>
+                 <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Target Year</label>
+                    <select 
+                      disabled={!isEditing}
+                      value={formData.targetYear}
+                      onChange={(e) => setFormData({...formData, targetYear: parseInt(e.target.value)})}
+                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:opacity-75 disabled:bg-slate-50"
+                    >
+                       <option value={2024}>2024</option>
+                       <option value={2025}>2025</option>
+                       <option value={2026}>2026</option>
+                    </select>
+                 </div>
+                 <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Phone Number</label>
+                    <input 
+                      disabled={!isEditing}
+                      value={formData.phone}
+                      onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:opacity-75 disabled:bg-slate-50"
+                      placeholder="+91 98765 43210"
+                    />
+                 </div>
+              </div>
+           </div>
+
+           {/* Notification Settings */}
+           <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+              <div className="flex items-center gap-3 mb-6 border-b border-slate-100 pb-4">
+                 <div className="p-2 bg-purple-50 text-purple-600 rounded-lg">
+                    <Bell size={20} />
+                 </div>
+                 <h3 className="font-bold text-slate-800">Notification Preferences</h3>
+              </div>
+
+              <div className="space-y-4">
+                 <div className="flex items-center justify-between p-3 hover:bg-slate-50 rounded-lg transition-colors">
+                    <div className="flex items-center gap-3">
+                       <Mail className="text-slate-400" size={18} />
+                       <div>
+                          <p className="text-sm font-bold text-slate-700">Email Notifications</p>
+                          <p className="text-xs text-slate-500">Receive weekly progress reports and alerts.</p>
+                       </div>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        className="sr-only peer"
+                        checked={formData.notifications.email}
+                        onChange={() => setFormData({...formData, notifications: {...formData.notifications, email: !formData.notifications.email}})}
+                        disabled={!isEditing}
+                      />
+                      <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                    </label>
+                 </div>
+
+                 <div className="flex items-center justify-between p-3 hover:bg-slate-50 rounded-lg transition-colors">
+                    <div className="flex items-center gap-3">
+                       <Shield className="text-slate-400" size={18} />
+                       <div>
+                          <p className="text-sm font-bold text-slate-700">Security Alerts</p>
+                          <p className="text-xs text-slate-500">Get notified about new logins and password changes.</p>
+                       </div>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        className="sr-only peer"
+                        checked={formData.notifications.push}
+                        onChange={() => setFormData({...formData, notifications: {...formData.notifications, push: !formData.notifications.push}})}
+                        disabled={!isEditing}
+                      />
+                      <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                    </label>
+                 </div>
+              </div>
+           </div>
+        </div>
+
+        {/* Right Column: Connection Requests */}
+        <div className="md:col-span-1">
+           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden sticky top-6">
+              <div className="px-6 py-4 border-b border-slate-100 bg-slate-50">
+                 <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wide">Connection Requests</h3>
+              </div>
+              <div className="divide-y divide-slate-100">
+                 {requests.length === 0 ? (
+                    <div className="p-8 text-center text-slate-400">
+                       <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                          <Bell className="w-6 h-6 text-slate-300" />
+                       </div>
+                       <p className="text-sm">No pending requests.</p>
+                    </div>
+                 ) : (
+                    requests.map(req => (
+                       <div key={req.id} className="p-4 hover:bg-slate-50 transition">
+                          <div className="flex items-center gap-3 mb-3">
+                             <div className="w-8 h-8 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center font-bold text-xs">
+                                {req.fromName.charAt(0)}
+                             </div>
+                             <div>
+                                <p className="text-sm font-bold text-slate-800">{req.fromName}</p>
+                                <p className="text-[10px] text-slate-500">Wants to connect</p>
+                             </div>
+                          </div>
+                          <div className="flex gap-2">
+                             <button 
+                                onClick={() => onAcceptRequest(req.id)}
+                                className="flex-1 bg-blue-600 text-white text-xs font-bold py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                             >
+                                Accept
+                             </button>
+                             <button className="flex-1 bg-white border border-slate-200 text-slate-600 text-xs font-bold py-2 rounded-lg hover:bg-slate-50 transition-colors">
+                                Ignore
+                             </button>
+                          </div>
+                       </div>
+                    ))
+                 )}
+              </div>
+              
+              {user.role === 'STUDENT' && (
+                 <div className="p-4 bg-blue-50 border-t border-blue-100">
+                    <p className="text-xs text-blue-700 leading-relaxed">
+                       <strong>Tip:</strong> Share your ID <span className="font-mono bg-blue-100 px-1 rounded">{user.id}</span> with your parent so they can send you a request.
+                    </p>
+                 </div>
+              )}
+           </div>
+        </div>
+
+      </div>
     </div>
   );
 };
