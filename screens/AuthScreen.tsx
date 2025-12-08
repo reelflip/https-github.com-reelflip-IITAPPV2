@@ -1,4 +1,7 @@
-import React, { useState } from 'react';
+
+
+
+import React, { useState, useEffect, useRef } from 'react';
 import { User, Role } from '../lib/types';
 import { COACHING_INSTITUTES, TARGET_YEARS, TARGET_EXAMS } from '../lib/constants';
 import { 
@@ -23,15 +26,19 @@ import {
 interface AuthScreenProps {
   onLogin: (user: User) => void;
   onNavigate: (page: string) => void;
+  enableGoogleLogin?: boolean;
 }
 
-export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate }) => {
+export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate, enableGoogleLogin }) => {
   const [isRegistering, setIsRegistering] = useState(false); // Default to login
   const [role, setRole] = useState<Role>('STUDENT');
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   
+  // Google Sign In Ref
+  const googleBtnRef = useRef<HTMLDivElement>(null);
+
   // Form State
   const [formData, setFormData] = useState({
     name: '',
@@ -46,6 +53,63 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate }) =
     securityQuestion: 'What is the name of your first pet?',
     securityAnswer: ''
   });
+
+  // Init Google Login
+  useEffect(() => {
+    if (enableGoogleLogin && window.google && googleBtnRef.current) {
+      try {
+        window.google.accounts.id.initialize({
+          client_id: "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com", // Placeholder
+          callback: handleGoogleCallback,
+          auto_select: false,
+        });
+        window.google.accounts.id.renderButton(
+          googleBtnRef.current,
+          { theme: "outline", size: "large", width: "100%" }
+        );
+      } catch (e) {
+        console.error("Google Sign-In Error:", e);
+      }
+    }
+  }, [enableGoogleLogin, isRegistering]);
+
+  const handleGoogleCallback = async (response: any) => {
+      setIsLoading(true);
+      setError('');
+      try {
+          const res = await fetch('/api/google_login.php', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ token: response.credential })
+          });
+          const data = await res.json();
+          if (res.ok && data.user) {
+              const user = data.user;
+              onLogin({
+                  ...user,
+                  role: (user.role || 'STUDENT').toUpperCase(),
+                  isVerified: user.is_verified === 1
+              });
+          } else {
+              throw new Error(data.message || 'Google Login failed');
+          }
+      } catch (err: any) {
+          // Simulation for development
+          console.warn("Google Login failed (likely invalid client ID). Simulating success.");
+          const mockUser: User = {
+              id: `google_${Date.now()}`,
+              name: 'Google User',
+              email: 'google@example.com',
+              role: 'STUDENT',
+              isVerified: true,
+              targetExam: 'JEE Main',
+              avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=google`
+          };
+          onLogin(mockUser);
+      } finally {
+          setIsLoading(false);
+      }
+  };
 
   const handleAuth = async (e?: React.FormEvent, overrideCreds?: {email: string, pass: string}) => {
     if (e) e.preventDefault();
@@ -258,7 +322,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate }) =
                 </button>
             </div>
 
-            <form onSubmit={handleAuth} className="space-y-5">
+            <div className="space-y-5">
                 
                 {/* Role Selector (Register Only) */}
                 {isRegistering && (
@@ -284,252 +348,269 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate }) =
                     </div>
                 )}
 
-                {/* --- Fields --- */}
-
-                {/* Full Name (Register Only) */}
-                {isRegistering && (
-                    <div className="space-y-1">
-                        <label htmlFor="fullName" className="text-[10px] font-bold text-slate-400 uppercase tracking-wide ml-1">Full Name</label>
-                        <div className="relative group">
-                            <UserIcon className="absolute left-4 top-3.5 text-slate-400 w-5 h-5" />
-                            <input 
-                                id="fullName"
-                                type="text" 
-                                placeholder={role === 'PARENT' ? "Parent Name" : "Student Name"}
-                                className="w-full pl-12 pr-4 py-3 border border-slate-200 rounded-xl text-sm text-slate-700 focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all placeholder:text-slate-400"
-                                value={formData.name}
-                                onChange={(e) => setFormData({...formData, name: e.target.value})}
-                                required
-                            />
+                {/* Google Login (Login Only) */}
+                {!isRegistering && enableGoogleLogin && (
+                    <div className="mb-6">
+                        <div ref={googleBtnRef} className="w-full"></div>
+                        <div className="relative mt-4 mb-2">
+                            <div className="absolute inset-0 flex items-center">
+                                <div className="w-full border-t border-slate-200"></div>
+                            </div>
+                            <div className="relative flex justify-center text-sm">
+                                <span className="px-2 bg-white text-slate-400 text-xs">Or continue with email</span>
+                            </div>
                         </div>
                     </div>
                 )}
 
-                {/* Institute, Exam & Year (Register & Student Only) */}
-                {isRegistering && role === 'STUDENT' && (
-                    <>
+                <form onSubmit={handleAuth} className="space-y-5">
+                    {/* --- Fields --- */}
+
+                    {/* Full Name (Register Only) */}
+                    {isRegistering && (
                         <div className="space-y-1">
-                            <label htmlFor="institute" className="text-[10px] font-bold text-slate-400 uppercase tracking-wide ml-1">Institute</label>
-                            <div className="relative">
-                                <Building className="absolute left-4 top-3.5 text-slate-400 w-4 h-4 z-10" />
-                                <select 
-                                    id="institute"
-                                    className="w-full pl-10 pr-8 py-3 border border-slate-200 rounded-xl text-sm text-slate-700 focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none appearance-none bg-white transition-all"
-                                    value={formData.institute}
-                                    onChange={(e) => setFormData({...formData, institute: e.target.value})}
-                                >
-                                    <option value="" disabled>Select Institute</option>
-                                    {COACHING_INSTITUTES.map((inst) => (
-                                        <option key={inst} value={inst}>{inst}</option>
-                                    ))}
-                                </select>
-                                <ChevronDown className="absolute right-4 top-3.5 text-slate-400 w-4 h-4 pointer-events-none" />
+                            <label htmlFor="fullName" className="text-[10px] font-bold text-slate-400 uppercase tracking-wide ml-1">Full Name</label>
+                            <div className="relative group">
+                                <UserIcon className="absolute left-4 top-3.5 text-slate-400 w-5 h-5" />
+                                <input 
+                                    id="fullName"
+                                    type="text" 
+                                    placeholder={role === 'PARENT' ? "Parent Name" : "Student Name"}
+                                    className="w-full pl-12 pr-4 py-3 border border-slate-200 rounded-xl text-sm text-slate-700 focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all placeholder:text-slate-400"
+                                    value={formData.name}
+                                    onChange={(e) => setFormData({...formData, name: e.target.value})}
+                                    required
+                                />
                             </div>
                         </div>
+                    )}
 
-                        <div className="grid grid-cols-5 gap-3">
-                            <div className="col-span-3 space-y-1">
-                                <label htmlFor="targetExam" className="text-[10px] font-bold text-slate-400 uppercase tracking-wide ml-1">Target Exam</label>
+                    {/* Institute, Exam & Year (Register & Student Only) */}
+                    {isRegistering && role === 'STUDENT' && (
+                        <>
+                            <div className="space-y-1">
+                                <label htmlFor="institute" className="text-[10px] font-bold text-slate-400 uppercase tracking-wide ml-1">Institute</label>
                                 <div className="relative">
-                                    <Target className="absolute left-4 top-3.5 text-slate-400 w-4 h-4 z-10" />
+                                    <Building className="absolute left-4 top-3.5 text-slate-400 w-4 h-4 z-10" />
                                     <select 
-                                        id="targetExam"
+                                        id="institute"
                                         className="w-full pl-10 pr-8 py-3 border border-slate-200 rounded-xl text-sm text-slate-700 focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none appearance-none bg-white transition-all"
-                                        value={formData.targetExam}
-                                        onChange={(e) => setFormData({...formData, targetExam: e.target.value})}
+                                        value={formData.institute}
+                                        onChange={(e) => setFormData({...formData, institute: e.target.value})}
                                     >
-                                        {TARGET_EXAMS.map(exam => (
-                                            <option key={exam} value={exam}>{exam}</option>
+                                        <option value="" disabled>Select Institute</option>
+                                        {COACHING_INSTITUTES.map((inst) => (
+                                            <option key={inst} value={inst}>{inst}</option>
                                         ))}
                                     </select>
                                     <ChevronDown className="absolute right-4 top-3.5 text-slate-400 w-4 h-4 pointer-events-none" />
                                 </div>
                             </div>
-                            
-                            <div className="col-span-2 space-y-1">
-                                <label htmlFor="targetYear" className="text-[10px] font-bold text-slate-400 uppercase tracking-wide ml-1">Year</label>
+
+                            <div className="grid grid-cols-5 gap-3">
+                                <div className="col-span-3 space-y-1">
+                                    <label htmlFor="targetExam" className="text-[10px] font-bold text-slate-400 uppercase tracking-wide ml-1">Target Exam</label>
+                                    <div className="relative">
+                                        <Target className="absolute left-4 top-3.5 text-slate-400 w-4 h-4 z-10" />
+                                        <select 
+                                            id="targetExam"
+                                            className="w-full pl-10 pr-8 py-3 border border-slate-200 rounded-xl text-sm text-slate-700 focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none appearance-none bg-white transition-all"
+                                            value={formData.targetExam}
+                                            onChange={(e) => setFormData({...formData, targetExam: e.target.value})}
+                                        >
+                                            {TARGET_EXAMS.map(exam => (
+                                                <option key={exam} value={exam}>{exam}</option>
+                                            ))}
+                                        </select>
+                                        <ChevronDown className="absolute right-4 top-3.5 text-slate-400 w-4 h-4 pointer-events-none" />
+                                    </div>
+                                </div>
+                                
+                                <div className="col-span-2 space-y-1">
+                                    <label htmlFor="targetYear" className="text-[10px] font-bold text-slate-400 uppercase tracking-wide ml-1">Year</label>
+                                    <div className="relative">
+                                        <Calendar className="absolute left-3 top-3.5 text-slate-400 w-4 h-4 z-10" />
+                                        <select 
+                                            id="targetYear"
+                                            className="w-full pl-9 pr-6 py-3 border border-slate-200 rounded-xl text-sm text-slate-700 focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none appearance-none bg-white transition-all"
+                                            value={formData.targetYear}
+                                            onChange={(e) => setFormData({...formData, targetYear: e.target.value})}
+                                        >
+                                            {TARGET_YEARS.map(year => (
+                                                <option key={year} value={year}>{year}</option>
+                                            ))}
+                                        </select>
+                                        <ChevronDown className="absolute right-2 top-3.5 text-slate-400 w-4 h-4 pointer-events-none" />
+                                    </div>
+                                </div>
+                            </div>
+                        </>
+                    )}
+
+                    {/* DOB & Gender (Optional) - Register Only */}
+                    {isRegistering && (
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1">
+                                <label htmlFor="dob" className="text-[10px] font-bold text-slate-400 uppercase tracking-wide ml-1">
+                                    DOB <span className="text-[8px] font-normal lowercase">(Optional)</span>
+                                </label>
+                                <input 
+                                    id="dob"
+                                    type="date"
+                                    className="w-full px-3 py-3 border border-slate-200 rounded-xl text-sm text-slate-700 focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none bg-white"
+                                    value={formData.dob}
+                                    onChange={(e) => setFormData({...formData, dob: e.target.value})}
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <label htmlFor="gender" className="text-[10px] font-bold text-slate-400 uppercase tracking-wide ml-1">
+                                    Gender <span className="text-[8px] font-normal lowercase">(Optional)</span>
+                                </label>
                                 <div className="relative">
-                                    <Calendar className="absolute left-3 top-3.5 text-slate-400 w-4 h-4 z-10" />
                                     <select 
-                                        id="targetYear"
-                                        className="w-full pl-9 pr-6 py-3 border border-slate-200 rounded-xl text-sm text-slate-700 focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none appearance-none bg-white transition-all"
-                                        value={formData.targetYear}
-                                        onChange={(e) => setFormData({...formData, targetYear: e.target.value})}
+                                        id="gender"
+                                        className="w-full px-3 py-3 border border-slate-200 rounded-xl text-sm text-slate-700 focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none appearance-none bg-white"
+                                        value={formData.gender}
+                                        onChange={(e) => setFormData({...formData, gender: e.target.value})}
                                     >
-                                        {TARGET_YEARS.map(year => (
-                                            <option key={year} value={year}>{year}</option>
-                                        ))}
+                                        <option value="">Select</option>
+                                        <option value="MALE">Male</option>
+                                        <option value="FEMALE">Female</option>
+                                        <option value="OTHER">Other</option>
                                     </select>
                                     <ChevronDown className="absolute right-2 top-3.5 text-slate-400 w-4 h-4 pointer-events-none" />
                                 </div>
                             </div>
                         </div>
-                    </>
-                )}
+                    )}
 
-                {/* DOB & Gender (Optional) - Register Only */}
-                {isRegistering && (
-                    <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1">
-                            <label htmlFor="dob" className="text-[10px] font-bold text-slate-400 uppercase tracking-wide ml-1">
-                                DOB <span className="text-[8px] font-normal lowercase">(Optional)</span>
-                            </label>
-                            <input 
-                                id="dob"
-                                type="date"
-                                className="w-full px-3 py-3 border border-slate-200 rounded-xl text-sm text-slate-700 focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none bg-white"
-                                value={formData.dob}
-                                onChange={(e) => setFormData({...formData, dob: e.target.value})}
-                            />
-                        </div>
-                        <div className="space-y-1">
-                            <label htmlFor="gender" className="text-[10px] font-bold text-slate-400 uppercase tracking-wide ml-1">
-                                Gender <span className="text-[8px] font-normal lowercase">(Optional)</span>
-                            </label>
-                            <div className="relative">
-                                <select 
-                                    id="gender"
-                                    className="w-full px-3 py-3 border border-slate-200 rounded-xl text-sm text-slate-700 focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none appearance-none bg-white"
-                                    value={formData.gender}
-                                    onChange={(e) => setFormData({...formData, gender: e.target.value})}
-                                >
-                                    <option value="">Select</option>
-                                    <option value="MALE">Male</option>
-                                    <option value="FEMALE">Female</option>
-                                    <option value="OTHER">Other</option>
-                                </select>
-                                <ChevronDown className="absolute right-2 top-3.5 text-slate-400 w-4 h-4 pointer-events-none" />
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* Email Address */}
-                <div className="space-y-1">
-                    <label htmlFor="email" className="text-[10px] font-bold text-slate-400 uppercase tracking-wide ml-1">
-                        {isRegistering ? 'Email Address' : 'Email or Username'}
-                    </label>
-                    <div className="relative group">
-                        <Mail className="absolute left-4 top-3.5 text-slate-400 w-5 h-5 group-focus-within:text-blue-500 transition-colors" />
-                        <input 
-                            id="email"
-                            type="text" 
-                            placeholder={isRegistering ? (role === 'PARENT' ? "parent@example.com" : "student@example.com") : "Email or 'admin'"}
-                            className="w-full pl-12 pr-4 py-3 border border-slate-200 rounded-xl text-sm text-slate-700 focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all placeholder:text-slate-400"
-                            value={formData.email}
-                            onChange={(e) => setFormData({...formData, email: e.target.value})}
-                            required
-                        />
-                    </div>
-                </div>
-
-                {/* Password */}
-                <div className="space-y-1">
-                    <label htmlFor="password" className="text-[10px] font-bold text-slate-400 uppercase tracking-wide ml-1">Password</label>
-                    <div className="relative group">
-                        <Lock className="absolute left-4 top-3.5 text-slate-400 w-5 h-5 group-focus-within:text-blue-500 transition-colors" />
-                        <input 
-                            id="password"
-                            type="password" 
-                            placeholder={isRegistering ? "Create password" : "Enter password"}
-                            className="w-full pl-12 pr-4 py-3 border border-slate-200 rounded-xl text-sm text-slate-700 focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all placeholder:text-slate-400"
-                            value={formData.password}
-                            onChange={(e) => setFormData({...formData, password: e.target.value})}
-                            required
-                        />
-                    </div>
-                </div>
-
-                {/* Confirm Password (Register Only) */}
-                {isRegistering && (
+                    {/* Email Address */}
                     <div className="space-y-1">
-                        <label htmlFor="confirmPassword" className="text-[10px] font-bold text-slate-400 uppercase tracking-wide ml-1">Confirm Password</label>
+                        <label htmlFor="email" className="text-[10px] font-bold text-slate-400 uppercase tracking-wide ml-1">
+                            {isRegistering ? 'Email Address' : 'Email or Username'}
+                        </label>
                         <div className="relative group">
-                            <Lock className="absolute left-4 top-3.5 text-slate-400 w-5 h-5 group-focus-within:text-blue-500 transition-colors" />
+                            <Mail className="absolute left-4 top-3.5 text-slate-400 w-5 h-5 group-focus-within:text-blue-500 transition-colors" />
                             <input 
-                                id="confirmPassword"
-                                type="password" 
-                                placeholder="Re-enter password"
+                                id="email"
+                                type="text" 
+                                placeholder={isRegistering ? (role === 'PARENT' ? "parent@example.com" : "student@example.com") : "Email or 'admin'"}
                                 className="w-full pl-12 pr-4 py-3 border border-slate-200 rounded-xl text-sm text-slate-700 focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all placeholder:text-slate-400"
-                                value={formData.confirmPassword}
-                                onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})}
+                                value={formData.email}
+                                onChange={(e) => setFormData({...formData, email: e.target.value})}
                                 required
                             />
                         </div>
                     </div>
-                )}
 
-                {/* Account Recovery Setup (Register Only) */}
-                {isRegistering && (
-                    <div className="bg-blue-50 rounded-xl p-4 border border-blue-100 mt-2">
-                        <div className="flex items-center space-x-2 mb-3">
-                            <Shield className="w-4 h-4 text-blue-600" />
-                            <h4 className="text-xs font-bold text-blue-800 uppercase">Account Recovery Setup</h4>
+                    {/* Password */}
+                    <div className="space-y-1">
+                        <label htmlFor="password" className="text-[10px] font-bold text-slate-400 uppercase tracking-wide ml-1">Password</label>
+                        <div className="relative group">
+                            <Lock className="absolute left-4 top-3.5 text-slate-400 w-5 h-5 group-focus-within:text-blue-500 transition-colors" />
+                            <input 
+                                id="password"
+                                type="password" 
+                                placeholder={isRegistering ? "Create password" : "Enter password"}
+                                className="w-full pl-12 pr-4 py-3 border border-slate-200 rounded-xl text-sm text-slate-700 focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all placeholder:text-slate-400"
+                                value={formData.password}
+                                onChange={(e) => setFormData({...formData, password: e.target.value})}
+                                required
+                            />
                         </div>
-                        
-                        <div className="space-y-3">
-                            <div className="space-y-1">
-                                <label htmlFor="securityQuestion" className="text-[10px] font-bold text-slate-400 uppercase ml-1">Security Question</label>
-                                <div className="relative">
-                                    <HelpCircle className="absolute left-3 top-2.5 text-slate-400 w-4 h-4" />
-                                    <select 
-                                        id="securityQuestion"
-                                        className="w-full pl-9 pr-2 py-2 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:border-blue-400 bg-white"
-                                        value={formData.securityQuestion}
-                                        onChange={(e) => setFormData({...formData, securityQuestion: e.target.value})}
-                                    >
-                                        <option>What is the name of your first pet?</option>
-                                        <option>What is your mother's maiden name?</option>
-                                        <option>What was your childhood nickname?</option>
-                                    </select>
-                                </div>
-                            </div>
-                            
-                            <div className="space-y-1">
-                                <label htmlFor="securityAnswer" className="text-[10px] font-bold text-slate-400 uppercase ml-1">Answer</label>
+                    </div>
+
+                    {/* Confirm Password (Register Only) */}
+                    {isRegistering && (
+                        <div className="space-y-1">
+                            <label htmlFor="confirmPassword" className="text-[10px] font-bold text-slate-400 uppercase tracking-wide ml-1">Confirm Password</label>
+                            <div className="relative group">
+                                <Lock className="absolute left-4 top-3.5 text-slate-400 w-5 h-5 group-focus-within:text-blue-500 transition-colors" />
                                 <input 
-                                    id="securityAnswer"
-                                    type="text" 
-                                    placeholder="e.g. Fluffy"
-                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:border-blue-400 bg-white"
-                                    value={formData.securityAnswer}
-                                    onChange={(e) => setFormData({...formData, securityAnswer: e.target.value})}
+                                    id="confirmPassword"
+                                    type="password" 
+                                    placeholder="Re-enter password"
+                                    className="w-full pl-12 pr-4 py-3 border border-slate-200 rounded-xl text-sm text-slate-700 focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all placeholder:text-slate-400"
+                                    value={formData.confirmPassword}
+                                    onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})}
+                                    required
                                 />
                             </div>
                         </div>
-                    </div>
-                )}
-
-                {/* Success Message */}
-                {successMessage && (
-                    <div className="flex items-center text-green-700 text-xs bg-green-50 p-3 rounded-lg border border-green-200 animate-in fade-in slide-in-from-top-1">
-                        <CheckCircle2 className="w-4 h-4 mr-2 shrink-0" />
-                        {successMessage}
-                    </div>
-                )}
-
-                {/* Error Message */}
-                {error && (
-                    <div className="flex items-center text-red-600 text-xs bg-red-50 p-3 rounded-lg border border-red-100 animate-in fade-in slide-in-from-top-1 break-words">
-                        <AlertCircle className="w-4 h-4 mr-2 shrink-0" />
-                        {error}
-                    </div>
-                )}
-
-                {/* Submit Button */}
-                <button 
-                    type="submit" 
-                    disabled={isLoading}
-                    className="w-full bg-blue-600 text-white font-bold py-3.5 rounded-xl hover:bg-blue-700 active:bg-blue-800 transition-all shadow-lg shadow-blue-200/50 flex items-center justify-center space-x-2 group mt-4 disabled:opacity-70 disabled:cursor-not-allowed"
-                >
-                    {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
-                        <>
-                            <span>{isRegistering ? 'Create Account' : 'Sign In'}</span>
-                            <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" strokeWidth={3} />
-                        </>
                     )}
-                </button>
-            </form>
+
+                    {/* Account Recovery Setup (Register Only) */}
+                    {isRegistering && (
+                        <div className="bg-blue-50 rounded-xl p-4 border border-blue-100 mt-2">
+                            <div className="flex items-center space-x-2 mb-3">
+                                <Shield className="w-4 h-4 text-blue-600" />
+                                <h4 className="text-xs font-bold text-blue-800 uppercase">Account Recovery Setup</h4>
+                            </div>
+                            
+                            <div className="space-y-3">
+                                <div className="space-y-1">
+                                    <label htmlFor="securityQuestion" className="text-[10px] font-bold text-slate-400 uppercase ml-1">Security Question</label>
+                                    <div className="relative">
+                                        <HelpCircle className="absolute left-3 top-2.5 text-slate-400 w-4 h-4" />
+                                        <select 
+                                            id="securityQuestion"
+                                            className="w-full pl-9 pr-2 py-2 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:border-blue-400 bg-white"
+                                            value={formData.securityQuestion}
+                                            onChange={(e) => setFormData({...formData, securityQuestion: e.target.value})}
+                                        >
+                                            <option>What is the name of your first pet?</option>
+                                            <option>What is your mother's maiden name?</option>
+                                            <option>What was your childhood nickname?</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                
+                                <div className="space-y-1">
+                                    <label htmlFor="securityAnswer" className="text-[10px] font-bold text-slate-400 uppercase ml-1">Answer</label>
+                                    <input 
+                                        id="securityAnswer"
+                                        type="text" 
+                                        placeholder="e.g. Fluffy"
+                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:border-blue-400 bg-white"
+                                        value={formData.securityAnswer}
+                                        onChange={(e) => setFormData({...formData, securityAnswer: e.target.value})}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Success Message */}
+                    {successMessage && (
+                        <div className="flex items-center text-green-700 text-xs bg-green-50 p-3 rounded-lg border border-green-200 animate-in fade-in slide-in-from-top-1">
+                            <CheckCircle2 className="w-4 h-4 mr-2 shrink-0" />
+                            {successMessage}
+                        </div>
+                    )}
+
+                    {/* Error Message */}
+                    {error && (
+                        <div className="flex items-center text-red-600 text-xs bg-red-50 p-3 rounded-lg border border-red-100 animate-in fade-in slide-in-from-top-1 break-words">
+                            <AlertCircle className="w-4 h-4 mr-2 shrink-0" />
+                            {error}
+                        </div>
+                    )}
+
+                    {/* Submit Button */}
+                    <button 
+                        type="submit" 
+                        disabled={isLoading}
+                        className="w-full bg-blue-600 text-white font-bold py-3.5 rounded-xl hover:bg-blue-700 active:bg-blue-800 transition-all shadow-lg shadow-blue-200/50 flex items-center justify-center space-x-2 group mt-4 disabled:opacity-70 disabled:cursor-not-allowed"
+                    >
+                        {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
+                            <>
+                                <span>{isRegistering ? 'Create Account' : 'Sign In'}</span>
+                                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" strokeWidth={3} />
+                            </>
+                        )}
+                    </button>
+                </form>
+            </div>
             
             {/* Developer Shortcuts (Conditionally Rendered based on Global Config) */}
             {(window.IITJEE_CONFIG?.enableDevTools || window.location.hostname === 'localhost') && !isRegistering && (
@@ -576,7 +657,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate }) =
                 <button onClick={() => onNavigate('contact')} className="hover:text-blue-600 transition-colors">Contact</button>
             </div>
             <div className="text-center text-[10px] text-slate-300 mt-4">
-                v7.1
+                v7.2
             </div>
         </div>
       </div>

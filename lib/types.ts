@@ -6,6 +6,15 @@ declare global {
     IITJEE_CONFIG: {
       enableDevTools: boolean;
     };
+    google?: {
+      accounts: {
+        id: {
+          initialize: (config: any) => void;
+          renderButton: (parent: HTMLElement, options: any) => void;
+          prompt: () => void;
+        }
+      }
+    };
   }
 }
 
@@ -103,6 +112,7 @@ export interface User {
   studentId?: string; // For parents to connect
   parentId?: string; // For students
   pendingRequest?: { fromId: string; fromName: string };
+  googleId?: string; // For Social Login
 }
 
 export interface TimetableConfig {
@@ -238,6 +248,6 @@ export type Screen =
   | 'dashboard' | 'syllabus' | 'tests' | 'ai-tutor' | 'focus' | 'analytics' | 'timetable' 
   | 'revision' | 'mistakes' | 'flashcards' | 'backlogs' | 'hacks' | 'wellness' | 'profile'
   | 'overview' | 'users' | 'videos' | 'content' | 'diagnostics' | 'system' | 'deployment' 
-  | 'tests_admin' | 'content_admin' | 'video_admin' | 'admin_analytics'
-  | 'family' | 'public-blog' | 'about' | 'blog' | 'exams' | 'privacy' | 'contact'
-  | 'blog_admin';
+  | 'tests_admin' | 'content_admin' | 'video_admin' | 'admin_analytics' | 'syllabus_admin'
+  | 'inbox' | 'blog_admin'
+  | 'family' | 'public-blog' | 'about' | 'blog' | 'exams' | 'privacy' | 'contact';

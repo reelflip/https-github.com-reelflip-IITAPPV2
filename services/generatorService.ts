@@ -1,3 +1,4 @@
+
 import { Subject, TopicStatus, Role } from '../lib/types';
 
 export const getDeploymentPhases = () => [
@@ -24,7 +25,7 @@ export const generateHtaccess = () => `
 `;
 
 export const generateSQLSchema = () => `
--- IITGEEPrep Database Schema v7.1
+-- IITGEEPrep Database Schema v7.2
 -- Target: MySQL / MariaDB (Hostinger)
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
@@ -47,6 +48,7 @@ CREATE TABLE IF NOT EXISTS \`users\` (
   \`parent_id\` int(11) DEFAULT NULL,
   \`linked_student_id\` int(11) DEFAULT NULL,
   \`is_verified\` tinyint(1) DEFAULT 1,
+  \`google_id\` varchar(255) DEFAULT NULL,
   \`created_at\` timestamp DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (\`id\`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -152,7 +154,15 @@ CREATE TABLE IF NOT EXISTS \`blog_posts\` (
   PRIMARY KEY (\`id\`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 8. EXTRAS
+-- 8. EXTRAS (Syllabus, Videos, Notifications)
+CREATE TABLE IF NOT EXISTS \`topics\` (
+  \`id\` varchar(50) NOT NULL,
+  \`name\` varchar(255) NOT NULL,
+  \`chapter\` varchar(255) NOT NULL,
+  \`subject\` varchar(20) NOT NULL,
+  PRIMARY KEY (\`id\`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS \`videos\` (
   \`topic_id\` varchar(50) NOT NULL,
   \`video_url\` varchar(255) NOT NULL,
@@ -309,7 +319,30 @@ try {
         folder: 'api',
         desc: 'API Root Health Check',
         content: `${phpHeader}
-echo json_encode(["status" => "active", "message" => "IITGEEPrep API v7.1 Operational", "timestamp" => date('c')]);
+echo json_encode(["status" => "active", "message" => "IITGEEPrep API v7.2 Operational", "timestamp" => date('c')]);
+?>`
+    },
+    {
+        name: 'manage_syllabus.php',
+        folder: 'api',
+        desc: 'Syllabus CRUD',
+        content: `${phpHeader}
+$data = json_decode(file_get_contents("php://input"));
+$method = $_SERVER['REQUEST_METHOD'];
+
+if ($method === 'GET') {
+    $stmt = $conn->query("SELECT * FROM topics");
+    echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
+}
+elseif ($method === 'POST') {
+    $stmt = $conn->prepare("INSERT INTO topics (id, name, chapter, subject) VALUES (?, ?, ?, ?)");
+    $stmt->execute([$data->id, $data->name, $data->chapter, $data->subject]);
+    echo json_encode(["message" => "Created"]);
+}
+elseif ($method === 'DELETE') {
+    $conn->prepare("DELETE FROM topics WHERE id = ?")->execute([$_GET['id']]);
+    echo json_encode(["message" => "Deleted"]);
+}
 ?>`
     },
     {
@@ -338,6 +371,58 @@ if(!empty($data->email) && !empty($data->password)) {
 } else {
     http_response_code(400);
     echo json_encode(["message" => "Incomplete data"]);
+}
+?>`
+    },
+    {
+        name: 'google_login.php',
+        folder: 'api',
+        desc: 'Google Sign-In',
+        content: `${phpHeader}
+$data = json_decode(file_get_contents("php://input"));
+
+if(!empty($data->token)) {
+    // 1. Verify Token with Google
+    $url = "https://oauth2.googleapis.com/tokeninfo?id_token=" . $data->token;
+    $response = file_get_contents($url);
+    $payload = json_decode($response);
+
+    if($payload && isset($payload->email)) {
+        $email = $payload->email;
+        $name = $payload->name;
+        $sub = $payload->sub; // Google ID
+
+        // 2. Check if user exists
+        $stmt = $conn->prepare("SELECT * FROM users WHERE email = ? LIMIT 1");
+        $stmt->execute([$email]);
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if($user) {
+            // Update Google ID if missing
+            if(empty($user['google_id'])) {
+                $upd = $conn->prepare("UPDATE users SET google_id = ? WHERE id = ?");
+                $upd->execute([$sub, $user['id']]);
+            }
+            unset($user['password_hash']);
+            echo json_encode(["status" => "success", "user" => $user]);
+        } else {
+            // 3. Create New User
+            $stmt = $conn->prepare("INSERT INTO users (name, email, password_hash, role, google_id, is_verified) VALUES (?, ?, ?, 'STUDENT', ?, 1)");
+            // Use dummy password for social login
+            $dummyPass = password_hash(uniqid(), PASSWORD_DEFAULT);
+            $stmt->execute([$name, $email, $dummyPass, $sub]);
+            
+            $id = $conn->lastInsertId();
+            $stmt = $conn->prepare("SELECT * FROM users WHERE id = ?");
+            $stmt->execute([$id]);
+            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+            unset($user['password_hash']);
+            echo json_encode(["status" => "success", "user" => $user]);
+        }
+    } else {
+        http_response_code(401);
+        echo json_encode(["status" => "error", "message" => "Invalid Google Token"]);
+    }
 }
 ?>`
     },
@@ -773,7 +858,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $stmt = $conn->prepare("INSERT INTO backlogs (id, user_id, title, subject_id, priority, status, deadline) VALUES (?, ?, ?, ?, ?, ?, ?)");
     $stmt->execute([$data->id, $data->user_id, $data->title, $data->subjectId, $data->priority, $data->status, $data->deadline]);
 }
-// ... other methods omitted for brevity
 echo json_encode(["message" => "OK"]);
 ?>`
     },

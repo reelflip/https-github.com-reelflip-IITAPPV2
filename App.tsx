@@ -1,5 +1,12 @@
 
 
+
+
+
+
+
+
+
 import React, { useState, useEffect } from 'react';
 import { Navigation } from './components/Navigation';
 import { AuthScreen } from './screens/AuthScreen';
@@ -21,9 +28,17 @@ import { ProfileScreen } from './screens/ProfileScreen';
 import { VideoManagerScreen } from './screens/VideoManagerScreen';
 import { AdminTestManagerScreen } from './screens/AdminTestManagerScreen';
 import { AdminUserManagementScreen } from './screens/AdminUserManagementScreen';
-import { User, UserProgress, TopicStatus, TestAttempt, Screen, Goal, MistakeLog, Flashcard, MemoryHack, BlogPost, VideoLesson, Question, Test, TimetableConfig } from './lib/types';
+import { AdminSyllabusScreen } from './screens/AdminSyllabusScreen';
+import { AdminBlogScreen } from './screens/AdminBlogScreen';
+import { AdminInboxScreen } from './screens/AdminInboxScreen';
+import { AboutUsScreen } from './screens/AboutUsScreen';
+import { ContactUsScreen } from './screens/ContactUsScreen';
+import { ExamGuideScreen } from './screens/ExamGuideScreen';
+import { PrivacyPolicyScreen } from './screens/PrivacyPolicyScreen';
+import { PublicLayout } from './components/PublicLayout';
+import { User, UserProgress, TopicStatus, TestAttempt, Screen, Goal, MistakeLog, Flashcard, MemoryHack, BlogPost, VideoLesson, Question, Test, TimetableConfig, Topic, ContactMessage } from './lib/types';
 import { calculateNextRevision } from './lib/utils';
-import { getTopicsBySubject, SYLLABUS_DATA } from './lib/syllabusData';
+import { SYLLABUS_DATA } from './lib/syllabusData';
 
 // Placeholder for screens not yet fully implemented
 const ComingSoonScreen = ({ title, icon }: { title: string, icon: string }) => (
@@ -83,6 +98,7 @@ export default function App() {
   // --- State ---
   const [user, setUser] = useState<User | null>(null);
   const [currentScreen, setCurrentScreen] = useState<Screen>('dashboard');
+  const [enableGoogleLogin, setEnableGoogleLogin] = useState(true); // Admin Controlled
   
   // Persisted Data for CURRENT USER
   const [progress, setProgress] = useState<Record<string, UserProgress>>({});
@@ -91,6 +107,9 @@ export default function App() {
   const [mistakes, setMistakes] = useState<MistakeLog[]>([]);
   const [timetableData, setTimetableData] = useState<{config: TimetableConfig, slots: any[]} | null>(null);
   
+  // Dynamic Syllabus State
+  const [syllabus, setSyllabus] = useState<Topic[]>(SYLLABUS_DATA);
+
   // Data for LINKED Student (Only for Parent View)
   const [linkedStudentData, setLinkedStudentData] = useState<{
       progress: Record<string, UserProgress>;
@@ -113,6 +132,7 @@ export default function App() {
       'p-units': { topicId: 'p-units', videoUrl: 'https://www.youtube.com/embed/j16d8Z0dM30', description: 'Introduction to Units & Dimensions' }, 
       'p-kinematics': { topicId: 'p-kinematics', videoUrl: 'https://www.youtube.com/embed/5kM3q9z9y9g', description: 'Kinematics 1D Basics' }
   });
+  const [contactMessages, setContactMessages] = useState<ContactMessage[]>([]);
   
   // Admin Tests & Question Bank
   const [questionBank, setQuestionBank] = useState<Question[]>([]);
@@ -197,6 +217,10 @@ export default function App() {
     const savedVideos = localStorage.getItem('iitjee_videos');
     const savedQuestions = localStorage.getItem('iitjee_questions');
     const savedAdminTests = localStorage.getItem('iitjee_admin_tests');
+    const savedSyllabus = localStorage.getItem('iitjee_syllabus');
+    const savedGoogleConfig = localStorage.getItem('iitjee_enable_google');
+
+    if (savedGoogleConfig !== null) setEnableGoogleLogin(savedGoogleConfig === 'true');
 
     if (savedUser) {
         const u = JSON.parse(savedUser);
@@ -207,6 +231,9 @@ export default function App() {
         if(u.role === 'PARENT' && u.linkedStudentId) {
             loadLinkedStudent(u.linkedStudentId);
         }
+        if(u.role === 'ADMIN') {
+            // Fetch messages count roughly or handle it in screen
+        }
     }
     
     if (savedCards) setFlashcards(JSON.parse(savedCards));
@@ -215,6 +242,7 @@ export default function App() {
     if (savedVideos) setVideoMap(JSON.parse(savedVideos));
     if (savedQuestions) setQuestionBank(JSON.parse(savedQuestions));
     if (savedAdminTests) setAdminTests(JSON.parse(savedAdminTests));
+    if (savedSyllabus) setSyllabus(JSON.parse(savedSyllabus));
   }, []);
 
   // Save current user data locally
@@ -236,7 +264,9 @@ export default function App() {
     localStorage.setItem('iitjee_videos', JSON.stringify(videoMap));
     localStorage.setItem('iitjee_questions', JSON.stringify(questionBank));
     localStorage.setItem('iitjee_admin_tests', JSON.stringify(adminTests));
-  }, [user, progress, testAttempts, goals, mistakes, timetableData, flashcards, hacks, blogs, videoMap, questionBank, adminTests]);
+    localStorage.setItem('iitjee_syllabus', JSON.stringify(syllabus));
+    localStorage.setItem('iitjee_enable_google', String(enableGoogleLogin));
+  }, [user, progress, testAttempts, goals, mistakes, timetableData, flashcards, hacks, blogs, videoMap, questionBank, adminTests, syllabus, enableGoogleLogin]);
 
   // --- Helpers ---
   const loadLinkedStudent = (studentId: string) => {
@@ -288,7 +318,7 @@ export default function App() {
   };
 
   const handleNavigation = (page: string) => {
-      if (page === 'blog') setCurrentScreen('public-blog');
+      setCurrentScreen(page as Screen);
   };
 
   // --- Connection Logic ---
@@ -394,16 +424,61 @@ export default function App() {
     if(type === 'blog') setBlogs(prev => prev.filter(i => i.id !== id));
   };
 
+  // --- Dynamic Syllabus Handlers ---
+  const handleAddTopic = (topic: Omit<Topic, 'id'>) => {
+      const newTopic: Topic = { ...topic, id: `${topic.subject[0].toLowerCase()}_${Date.now()}` };
+      setSyllabus(prev => [...prev, newTopic]);
+  };
+
+  const handleDeleteTopic = (id: string) => {
+      setSyllabus(prev => prev.filter(t => t.id !== id));
+  };
+
   // --- Render ---
+  
+  // Public Routes (Accessible without login)
   if (currentScreen === 'public-blog') {
     return <PublicBlogScreen blogs={blogs} onBack={() => {
-        setCurrentScreen('dashboard'); 
-        if(!user) return; 
+        // If logged in, go to dashboard, else go to login
+        user ? setCurrentScreen('dashboard') : setCurrentScreen('dashboard'); 
     }} />;
   }
 
+  if (currentScreen === 'about') {
+      return (
+          <PublicLayout onNavigate={handleNavigation} currentScreen="about">
+              <AboutUsScreen />
+          </PublicLayout>
+      );
+  }
+
+  if (currentScreen === 'contact') {
+      return (
+          <PublicLayout onNavigate={handleNavigation} currentScreen="contact">
+              <ContactUsScreen />
+          </PublicLayout>
+      );
+  }
+
+  if (currentScreen === 'exams') {
+      return (
+          <PublicLayout onNavigate={handleNavigation} currentScreen="exams">
+              <ExamGuideScreen />
+          </PublicLayout>
+      );
+  }
+
+  if (currentScreen === 'privacy') {
+      return (
+          <PublicLayout onNavigate={handleNavigation} currentScreen="privacy">
+              <PrivacyPolicyScreen />
+          </PublicLayout>
+      );
+  }
+
+  // Auth Guard
   if (!user) {
-    return <AuthScreen onLogin={handleLogin} onNavigate={handleNavigation} />;
+    return <AuthScreen onLogin={handleLogin} onNavigate={handleNavigation} enableGoogleLogin={enableGoogleLogin} />;
   }
 
   return (
@@ -440,7 +515,19 @@ export default function App() {
                     </div>
                 )}
                 {currentScreen === 'tests' && <TestScreen history={linkedStudentData?.tests || []} addTestAttempt={()=>{}} availableTests={adminTests} />}
-                {currentScreen === 'syllabus' && <SyllabusScreen user={user} subjects={SYLLABUS_DATA} progress={linkedStudentData?.progress || {}} onUpdateProgress={()=>{}} readOnly={true} videoMap={videoMap} />}
+                {currentScreen === 'syllabus' && <SyllabusScreen user={user} subjects={syllabus} progress={linkedStudentData?.progress || {}} onUpdateProgress={()=>{}} readOnly={true} videoMap={videoMap} />}
+                {currentScreen === 'profile' && (
+                    <ProfileScreen 
+                        user={user} 
+                        onAcceptRequest={()=>{}} 
+                        onUpdateUser={(u) => {
+                            const updated = { ...user, ...u };
+                            setUser(updated);
+                            saveUserToDB(updated);
+                        }} 
+                        linkedStudentName={linkedStudentData?.studentName}
+                    />
+                )} 
              </>
           )}
 
@@ -453,7 +540,7 @@ export default function App() {
                     addGoal={addGoal} toggleGoal={toggleGoal} setScreen={setCurrentScreen}
                     />
                 )}
-                {currentScreen === 'syllabus' && <SyllabusScreen user={user} subjects={SYLLABUS_DATA} progress={progress} onUpdateProgress={updateTopicProgress} videoMap={videoMap} />}
+                {currentScreen === 'syllabus' && <SyllabusScreen user={user} subjects={syllabus} progress={progress} onUpdateProgress={updateTopicProgress} videoMap={videoMap} />}
                 {currentScreen === 'revision' && <RevisionScreen progress={progress} handleRevisionComplete={handleRevisionComplete} />}
                 {currentScreen === 'tests' && <TestScreen history={testAttempts} addTestAttempt={addTestAttempt} availableTests={adminTests} />}
                 {currentScreen === 'timetable' && (
@@ -476,14 +563,27 @@ export default function App() {
           {/* ADMIN SCREENS */}
           {user.role === 'ADMIN' && (
               <>
-                {currentScreen === 'overview' && <AdminDashboardScreen user={user} />}
+                {currentScreen === 'overview' && <AdminDashboardScreen user={user} onNavigate={setCurrentScreen} enableGoogleLogin={enableGoogleLogin} onToggleGoogle={() => setEnableGoogleLogin(!enableGoogleLogin)} />}
                 {currentScreen === 'users' && <AdminUserManagementScreen />}
-                {(currentScreen === 'content' || currentScreen === 'blog_admin') && (
+                {currentScreen === 'syllabus_admin' && (
+                    <AdminSyllabusScreen 
+                        syllabus={syllabus} 
+                        onAddTopic={handleAddTopic} 
+                        onDeleteTopic={handleDeleteTopic} 
+                    />
+                )}
+                {(currentScreen === 'inbox' || currentScreen === 'content_admin') && (
+                    <AdminInboxScreen />
+                )}
+                {currentScreen === 'content' && (
                     <ContentManagerScreen 
                     flashcards={flashcards} hacks={hacks} blogs={blogs}
                     onAddFlashcard={addFlashcard} onAddHack={addHack} onAddBlog={addBlog} onDelete={deleteContent}
-                    initialTab={currentScreen === 'blog_admin' ? 'blog' : 'flashcards'}
+                    initialTab='flashcards'
                     />
+                )}
+                {currentScreen === 'blog_admin' && (
+                    <AdminBlogScreen blogs={blogs} onAddBlog={addBlog} onDeleteBlog={(id) => deleteContent('blog', id)} />
                 )}
                 {(currentScreen === 'videos' || currentScreen === 'video_admin') && (
                     <VideoManagerScreen videoMap={videoMap} onUpdateVideo={updateVideo} />
@@ -493,6 +593,7 @@ export default function App() {
                         questionBank={questionBank} tests={adminTests}
                         onAddQuestion={addQuestion} onCreateTest={createTest}
                         onDeleteQuestion={deleteQuestion} onDeleteTest={deleteTest}
+                        syllabus={syllabus}
                     />
                 )}
                 {currentScreen === 'diagnostics' && <DiagnosticsScreen />}
@@ -501,7 +602,7 @@ export default function App() {
           )}
 
           {/* Shared/Placeholders */}
-          {['ai-tutor','focus','analytics','wellness','system','content_admin','admin_analytics'].includes(currentScreen) && (
+          {['ai-tutor','focus','analytics','wellness','system','admin_analytics'].includes(currentScreen) && (
               <ComingSoonScreen title={currentScreen.charAt(0).toUpperCase() + currentScreen.slice(1)} icon="🚧" />
           )}
         </div>

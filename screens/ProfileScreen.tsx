@@ -1,15 +1,18 @@
 
+
+
 import React, { useState } from 'react';
 import { User } from '../lib/types';
-import { Camera, Save, Bell, Mail, Shield, User as UserIcon } from 'lucide-react';
+import { Camera, Save, Bell, Mail, Shield, User as UserIcon, CheckCircle2 } from 'lucide-react';
 
 interface Props {
   user: User;
   onAcceptRequest: (notificationId: string) => void;
   onUpdateUser?: (updates: Partial<User>) => void;
+  linkedStudentName?: string;
 }
 
-export const ProfileScreen: React.FC<Props> = ({ user, onAcceptRequest, onUpdateUser }) => {
+export const ProfileScreen: React.FC<Props> = ({ user, onAcceptRequest, onUpdateUser, linkedStudentName }) => {
   const requests = user.notifications?.filter(n => n.type === 'connection_request') || [];
   
   const [isEditing, setIsEditing] = useState(false);
@@ -117,30 +120,36 @@ export const ProfileScreen: React.FC<Props> = ({ user, onAcceptRequest, onUpdate
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                 <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">School / Institute</label>
-                    <input 
-                      disabled={!isEditing}
-                      value={formData.school}
-                      onChange={(e) => setFormData({...formData, school: e.target.value})}
-                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:opacity-75 disabled:bg-slate-50"
-                      placeholder="Enter School Name"
-                    />
-                 </div>
-                 <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Target Year</label>
-                    <select 
-                      disabled={!isEditing}
-                      value={formData.targetYear}
-                      onChange={(e) => setFormData({...formData, targetYear: parseInt(e.target.value)})}
-                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:opacity-75 disabled:bg-slate-50"
-                    >
-                       <option value={2024}>2024</option>
-                       <option value={2025}>2025</option>
-                       <option value={2026}>2026</option>
-                    </select>
-                 </div>
-                 <div>
+                 {/* Show School/Year only for Students */}
+                 {user.role === 'STUDENT' && (
+                     <>
+                        <div>
+                            <label className="block text-xs font-bold text-slate-500 uppercase mb-2">School / Institute</label>
+                            <input 
+                            disabled={!isEditing}
+                            value={formData.school}
+                            onChange={(e) => setFormData({...formData, school: e.target.value})}
+                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:opacity-75 disabled:bg-slate-50"
+                            placeholder="Enter School Name"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Target Year</label>
+                            <select 
+                            disabled={!isEditing}
+                            value={formData.targetYear}
+                            onChange={(e) => setFormData({...formData, targetYear: parseInt(e.target.value)})}
+                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:opacity-75 disabled:bg-slate-50"
+                            >
+                            <option value={2024}>2024</option>
+                            <option value={2025}>2025</option>
+                            <option value={2026}>2026</option>
+                            </select>
+                        </div>
+                     </>
+                 )}
+                 
+                 <div className={user.role === 'PARENT' ? 'md:col-span-2' : ''}>
                     <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Phone Number</label>
                     <input 
                       disabled={!isEditing}
@@ -206,54 +215,83 @@ export const ProfileScreen: React.FC<Props> = ({ user, onAcceptRequest, onUpdate
            </div>
         </div>
 
-        {/* Right Column: Connection Requests */}
-        <div className="md:col-span-1">
+        {/* Right Column: Connection Info */}
+        <div className="md:col-span-1 space-y-6">
+           
+           {/* Active Connection Card */}
+           {(user.parentId || user.linkedStudentId) && (
+               <div className="bg-green-50 rounded-xl border border-green-200 p-6 shadow-sm">
+                   <div className="flex items-center gap-3 mb-2">
+                       <div className="p-1.5 bg-green-200 rounded-full text-green-700">
+                           <CheckCircle2 size={16} />
+                       </div>
+                       <h3 className="font-bold text-green-900 text-sm uppercase tracking-wide">
+                           {user.role === 'STUDENT' ? 'Parent Linked' : 'Student Linked'}
+                       </h3>
+                   </div>
+                   <p className="text-green-800 font-bold text-lg mt-2">
+                       {user.role === 'STUDENT' ? `Parent ID: ${user.parentId}` : (linkedStudentName || `ID: ${user.linkedStudentId}`)}
+                   </p>
+                   <p className="text-green-600 text-xs mt-1">Data sync is active.</p>
+               </div>
+           )}
+
+           {/* Connection Requests (Student Only) */}
            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden sticky top-6">
               <div className="px-6 py-4 border-b border-slate-100 bg-slate-50">
-                 <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wide">Connection Requests</h3>
-              </div>
-              <div className="divide-y divide-slate-100">
-                 {requests.length === 0 ? (
-                    <div className="p-8 text-center text-slate-400">
-                       <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                          <Bell className="w-6 h-6 text-slate-300" />
-                       </div>
-                       <p className="text-sm">No pending requests.</p>
-                    </div>
-                 ) : (
-                    requests.map(req => (
-                       <div key={req.id} className="p-4 hover:bg-slate-50 transition">
-                          <div className="flex items-center gap-3 mb-3">
-                             <div className="w-8 h-8 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center font-bold text-xs">
-                                {req.fromName.charAt(0)}
-                             </div>
-                             <div>
-                                <p className="text-sm font-bold text-slate-800">{req.fromName}</p>
-                                <p className="text-[10px] text-slate-500">Wants to connect</p>
-                             </div>
-                          </div>
-                          <div className="flex gap-2">
-                             <button 
-                                onClick={() => onAcceptRequest(req.id)}
-                                className="flex-1 bg-blue-600 text-white text-xs font-bold py-2 rounded-lg hover:bg-blue-700 transition-colors"
-                             >
-                                Accept
-                             </button>
-                             <button className="flex-1 bg-white border border-slate-200 text-slate-600 text-xs font-bold py-2 rounded-lg hover:bg-slate-50 transition-colors">
-                                Ignore
-                             </button>
-                          </div>
-                       </div>
-                    ))
-                 )}
+                 <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wide">
+                    {user.role === 'STUDENT' ? 'Connection Requests' : 'Family Status'}
+                 </h3>
               </div>
               
-              {user.role === 'STUDENT' && (
-                 <div className="p-4 bg-blue-50 border-t border-blue-100">
-                    <p className="text-xs text-blue-700 leading-relaxed">
-                       <strong>Tip:</strong> Share your ID <span className="font-mono bg-blue-100 px-1 rounded">{user.id}</span> with your parent so they can send you a request.
-                    </p>
-                 </div>
+              {user.role === 'STUDENT' ? (
+                  <div className="divide-y divide-slate-100">
+                    {requests.length === 0 ? (
+                        <div className="p-8 text-center text-slate-400">
+                        <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                            <Bell className="w-6 h-6 text-slate-300" />
+                        </div>
+                        <p className="text-sm">No pending requests.</p>
+                        </div>
+                    ) : (
+                        requests.map(req => (
+                        <div key={req.id} className="p-4 hover:bg-slate-50 transition">
+                            <div className="flex items-center gap-3 mb-3">
+                                <div className="w-8 h-8 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center font-bold text-xs">
+                                    {req.fromName.charAt(0)}
+                                </div>
+                                <div>
+                                    <p className="text-sm font-bold text-slate-800">{req.fromName}</p>
+                                    <p className="text-[10px] text-slate-500">Wants to connect</p>
+                                </div>
+                            </div>
+                            <div className="flex gap-2">
+                                <button 
+                                    onClick={() => onAcceptRequest(req.id)}
+                                    className="flex-1 bg-blue-600 text-white text-xs font-bold py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                                >
+                                    Accept
+                                </button>
+                                <button className="flex-1 bg-white border border-slate-200 text-slate-600 text-xs font-bold py-2 rounded-lg hover:bg-slate-50 transition-colors">
+                                    Ignore
+                                </button>
+                            </div>
+                        </div>
+                        ))
+                    )}
+                    <div className="p-4 bg-blue-50 border-t border-blue-100">
+                        <p className="text-xs text-blue-700 leading-relaxed">
+                        <strong>Tip:</strong> Share your ID <span className="font-mono bg-blue-100 px-1 rounded">{user.id}</span> with your parent so they can send you a request.
+                        </p>
+                    </div>
+                  </div>
+              ) : (
+                  // Parent View for this card
+                  <div className="p-6 text-center text-slate-500">
+                      <p className="text-sm">
+                          To connect with a student, go to the <strong>Family</strong> tab and search for their ID.
+                      </p>
+                  </div>
               )}
            </div>
         </div>

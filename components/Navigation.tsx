@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Screen, User } from '../lib/types';
 
@@ -58,6 +59,8 @@ export const Navigation: React.FC<NavigationProps> = ({ currentScreen, setScreen
   const ADMIN_MENU: {id: Screen, icon: string, label: string}[] = [
     { id: 'overview', icon: "⊞", label: "Overview" },
     { id: 'users', icon: "👥", label: "Users" },
+    { id: 'inbox', icon: "📥", label: "Inbox" },
+    { id: 'syllabus_admin', icon: "📑", label: "Syllabus" },
     { id: 'tests', icon: "📄", label: "Tests" },
     { id: 'videos', icon: "📚", label: "Videos" },
     { id: 'content', icon: "📡", label: "Content" },
@@ -92,7 +95,7 @@ export const Navigation: React.FC<NavigationProps> = ({ currentScreen, setScreen
         <h1 className="text-xl font-bold text-white tracking-tight">IIT<span className="text-blue-500">JEE</span>Prep</h1>
         <div className="flex items-center gap-2 mt-1">
           <p className="text-xs text-slate-500 uppercase tracking-wider">{user.role}</p>
-          <span className="text-xs text-slate-600">• v7.1</span>
+          <span className="text-xs text-slate-600">• v7.2</span>
         </div>
       </div>
 

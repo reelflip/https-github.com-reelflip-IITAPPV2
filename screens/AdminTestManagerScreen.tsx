@@ -1,7 +1,6 @@
 
 import React, { useState } from 'react';
-import { Question, Test } from '../lib/types';
-import { SYLLABUS_DATA } from '../lib/syllabusData';
+import { Question, Test, Topic } from '../lib/types';
 import { Button } from '../components/Button';
 import { PageHeader } from '../components/PageHeader';
 import { NATIONAL_EXAMS } from '../lib/constants';
@@ -14,10 +13,11 @@ interface Props {
   onCreateTest: (t: Test) => void;
   onDeleteQuestion: (id: string) => void;
   onDeleteTest: (id: string) => void;
+  syllabus: Topic[];
 }
 
 export const AdminTestManagerScreen: React.FC<Props> = ({ 
-  questionBank, tests, onAddQuestion, onCreateTest, onDeleteQuestion, onDeleteTest 
+  questionBank, tests, onAddQuestion, onCreateTest, onDeleteQuestion, onDeleteTest, syllabus 
 }) => {
   const [activeTab, setActiveTab] = useState<'questions' | 'tests'>('questions');
 
@@ -53,7 +53,8 @@ export const AdminTestManagerScreen: React.FC<Props> = ({
             <QuestionBankManager 
                 questions={questionBank} 
                 onAdd={onAddQuestion} 
-                onDelete={onDeleteQuestion} 
+                onDelete={onDeleteQuestion}
+                syllabus={syllabus}
             />
          ) : (
             <TestBuilder 
@@ -70,7 +71,7 @@ export const AdminTestManagerScreen: React.FC<Props> = ({
 
 // --- Sub-Components ---
 
-const QuestionBankManager = ({ questions, onAdd, onDelete }: { questions: Question[], onAdd: (q: Question) => void, onDelete: (id: string) => void }) => {
+const QuestionBankManager = ({ questions, onAdd, onDelete, syllabus }: { questions: Question[], onAdd: (q: Question) => void, onDelete: (id: string) => void, syllabus: Topic[] }) => {
     const [subject, setSubject] = useState('Physics');
     const [topicId, setTopicId] = useState('');
     const [text, setText] = useState('');
@@ -81,7 +82,7 @@ const QuestionBankManager = ({ questions, onAdd, onDelete }: { questions: Questi
     
     const [filterSub, setFilterSub] = useState('ALL');
 
-    const topics = SYLLABUS_DATA.filter(t => t.subject === subject);
+    const topics = syllabus.filter(t => t.subject === subject);
     const filteredQuestions = questions.filter(q => filterSub === 'ALL' || q.subjectId === (filterSub === 'Physics' ? 'phys' : filterSub === 'Chemistry' ? 'chem' : 'math'));
 
     const handleAdd = () => {

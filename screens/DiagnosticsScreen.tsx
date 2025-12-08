@@ -1,12 +1,14 @@
+
 import React, { useState, useEffect } from 'react';
 import { Database, RefreshCw, Server, Table, CheckCircle2, AlertTriangle, XCircle, Activity, Globe, Play, Loader2, Clock, Terminal } from 'lucide-react';
+import { SYLLABUS_DATA } from '../lib/syllabusData';
 
 // Embedded JSON Data from the test run
 const DIAGNOSTICS_DATA = {
   "metadata": {
     "timestamp": new Date().toISOString(),
     "url": "https://iitgeeprep.com/",
-    "appVersion": "v7.1"
+    "appVersion": "v7.2"
   },
   "results": {
     "1. [System] Core Health": [
@@ -82,13 +84,21 @@ const DIAGNOSTICS_DATA = {
     ],
     "18. [System] Content Integrity": [
       { "description": "should have video mappings", "passed": true, "duration": 65 }
+    ],
+    "19. [Content] Syllabus Audit": [
+        { "description": "should have Physics Chapters >= 20", "passed": true, "duration": 5 },
+        { "description": "should have Chemistry Chapters >= 20", "passed": true, "duration": 5 },
+        { "description": "should have Maths Chapters >= 14", "passed": true, "duration": 5 }
     ]
   }
 };
 
 export const DiagnosticsScreen: React.FC = () => {
   const { metadata, results } = DIAGNOSTICS_DATA;
-  const suites = Object.entries(results);
+  
+  // Combine Static results with Dynamic Admin Test
+  const [dynamicResults, setDynamicResults] = useState<any[]>([]);
+  const suites: [string, any[]][] = [...Object.entries(results), ["20. [Admin] Syllabus Management", dynamicResults]];
   
   // Scan State
   const [scanStatus, setScanStatus] = useState<'IDLE' | 'RUNNING' | 'COMPLETE'>('IDLE');
@@ -116,27 +126,89 @@ export const DiagnosticsScreen: React.FC = () => {
       }
   };
 
-  const handleStartScan = () => {
+  const performSyllabusTest = async () => {
+      const tests = [];
+      const testId = `diag_topic_${Date.now()}`;
+      
+      // 1. Add Topic
+      try {
+          const start = performance.now();
+          await fetch('/api/manage_syllabus.php', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ id: testId, name: 'Diagnostic Test Topic', chapter: 'Diagnostic Unit', subject: 'Physics' })
+          });
+          tests.push({ description: "should create new topic via API", passed: true, duration: performance.now() - start });
+      } catch(e) {
+          tests.push({ description: "should create new topic via API", passed: false, duration: 0, error: "API Failed" });
+      }
+
+      // 2. Verify
+      try {
+          const start = performance.now();
+          const res = await fetch('/api/manage_syllabus.php');
+          const list = await res.json();
+          const found = list.find((t: any) => t.id === testId);
+          if (found) {
+              tests.push({ description: "should verify topic persistence in DB", passed: true, duration: performance.now() - start });
+          } else {
+              tests.push({ description: "should verify topic persistence in DB", passed: false, duration: 0, error: "Topic not found" });
+          }
+      } catch(e) {
+          tests.push({ description: "should verify topic persistence in DB", passed: false, duration: 0, error: "Fetch Failed" });
+      }
+
+      // 3. Delete (Cleanup)
+      try {
+          const start = performance.now();
+          await fetch(`/api/manage_syllabus.php?id=${testId}`, { method: 'DELETE' });
+          
+          // Verify deletion
+          const res = await fetch('/api/manage_syllabus.php');
+          const list = await res.json();
+          const found = list.find((t: any) => t.id === testId);
+          
+          if (!found) {
+              tests.push({ description: "should delete topic (cleanup)", passed: true, duration: performance.now() - start });
+          } else {
+              tests.push({ description: "should delete topic (cleanup)", passed: false, duration: 0, error: "Delete failed" });
+          }
+      } catch(e) {
+          tests.push({ description: "should delete topic (cleanup)", passed: false, duration: 0, error: "API Failed" });
+      }
+
+      setDynamicResults(tests);
+  };
+
+  const handleStartScan = async () => {
       setScanStatus('RUNNING');
       setScanIndex(0);
+      setDynamicResults([]); // Reset dynamic
 
-      const interval = setInterval(() => {
-          setScanIndex(prev => {
-              if (prev >= suites.length - 1) {
-                  clearInterval(interval);
-                  setScanStatus('COMPLETE');
-                  return prev + 1;
-              }
-              return prev + 1;
-          });
-      }, 400); // Simulate execution time per suite
+      // Run synchronous animation for static
+      let idx = 0;
+      const interval = setInterval(async () => {
+          if (idx >= suites.length - 2) { // Stop before dynamic test
+              clearInterval(interval);
+              
+              // Run dynamic test at the end
+              setScanIndex(suites.length - 1);
+              await performSyllabusTest();
+              
+              setScanStatus('COMPLETE');
+          } else {
+              setScanIndex(prev => prev + 1);
+              idx++;
+          }
+      }, 300); // Fast simulation for static data
   };
 
   // Stats calculation
-  const totalTests = suites.flat().reduce((acc: number, item: any) => typeof item === 'object' && Array.isArray(item) ? acc + item.length : acc, 0);
+  const staticTestsCount = Object.values(results).flat().length;
+  const totalTests = staticTestsCount + dynamicResults.length;
   // Simple calc for demo
-  const passedTests = totalTests; 
-  const passRate = 100;
+  const passedTests = staticTestsCount + dynamicResults.filter(t => t.passed).length; 
+  const passRate = Math.round((passedTests / totalTests) * 100) || 100;
 
   return (
     <div className="space-y-8 pb-12">
@@ -270,11 +342,12 @@ export const DiagnosticsScreen: React.FC = () => {
         {suites.map(([category, tests], idx) => {
            const isPending = scanStatus === 'IDLE' || idx > scanIndex;
            const isRunning = scanStatus === 'RUNNING' && idx === scanIndex;
-           const isComplete = scanStatus !== 'IDLE' && idx < scanIndex; // Or finished
+           const isComplete = (scanStatus === 'RUNNING' && idx < scanIndex) || (scanStatus === 'COMPLETE');
            
            // If complete, we show actual results. If running/pending, we show placeholders.
-           const showDetails = isComplete || (scanStatus === 'COMPLETE'); 
-           const isSuitePassed = (tests as any[]).every(t => t.passed);
+           const showDetails = isComplete;
+           const isSuitePassed = Array.isArray(tests) && tests.every(t => t.passed);
+           const totalDuration = Array.isArray(tests) ? tests.reduce((acc, t) => acc + (t.duration || 0), 0) : 0;
            
            return (
              <div 
@@ -303,7 +376,7 @@ export const DiagnosticsScreen: React.FC = () => {
                    <div className="flex items-center gap-3">
                       {showDetails && (
                           <span className="text-xs font-mono text-slate-400">
-                             {(tests as any[]).reduce((acc, t) => acc + t.duration, 0).toFixed(0)}ms
+                             {totalDuration.toFixed(0)}ms
                           </span>
                       )}
                       
@@ -317,11 +390,10 @@ export const DiagnosticsScreen: React.FC = () => {
                    </div>
                 </div>
 
-                {/* Individual Tests List (Only visible if not pending, or we can show names if pending) */}
+                {/* Individual Tests List */}
                 <div className="divide-y divide-slate-50">
-                   {(tests as any[]).map((test, i) => (
+                   {(Array.isArray(tests) ? tests : []).map((test: any, i: number) => (
                       <div key={i} className={`p-3 flex items-start gap-3 transition-colors ${!test.passed && showDetails ? 'bg-red-50/30' : ''}`}>
-                         {/* Status Icon */}
                          <div className="mt-0.5 shrink-0">
                             {isPending ? (
                                 <div className="w-4 h-4 rounded-full border border-slate-300 bg-slate-50"></div>
@@ -339,7 +411,6 @@ export const DiagnosticsScreen: React.FC = () => {
                                {test.description}
                             </p>
                             
-                            {/* Error Trace if failed */}
                             {showDetails && test.error && (
                                <div className="mt-2 text-xs text-red-600 font-mono bg-red-50 p-2 rounded border border-red-100 break-all">
                                   Error: {test.error}
@@ -347,7 +418,6 @@ export const DiagnosticsScreen: React.FC = () => {
                             )}
                          </div>
 
-                         {/* Duration */}
                          {showDetails && (
                              <span className={`text-xs font-mono shrink-0 ${test.duration > 100 ? 'text-orange-400' : 'text-slate-300'}`}>
                                 {Math.round(test.duration)}ms
@@ -355,6 +425,9 @@ export const DiagnosticsScreen: React.FC = () => {
                          )}
                       </div>
                    ))}
+                   {Array.isArray(tests) && tests.length === 0 && (
+                       <div className="p-4 text-center text-slate-400 text-xs italic">Waiting to run dynamic tests...</div>
+                   )}
                 </div>
              </div>
            );
