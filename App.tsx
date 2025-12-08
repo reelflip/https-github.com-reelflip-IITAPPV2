@@ -27,8 +27,9 @@ import { AboutUsScreen } from './screens/AboutUsScreen';
 import { ContactUsScreen } from './screens/ContactUsScreen';
 import { ExamGuideScreen } from './screens/ExamGuideScreen';
 import { PrivacyPolicyScreen } from './screens/PrivacyPolicyScreen';
-import { FocusScreen } from './screens/FocusScreen'; // Import FocusScreen
+import { FocusScreen } from './screens/FocusScreen';
 import { AnalyticsScreen } from './screens/AnalyticsScreen';
+import { WellnessScreen } from './screens/WellnessScreen'; // Import WellnessScreen
 import { PublicLayout } from './components/PublicLayout';
 import { User, UserProgress, TopicStatus, TestAttempt, Screen, Goal, MistakeLog, Flashcard, MemoryHack, BlogPost, VideoLesson, Question, Test, TimetableConfig, Topic, ContactMessage } from './lib/types';
 import { calculateNextRevision } from './lib/utils';
@@ -521,6 +522,7 @@ export default function App() {
                 {currentScreen === 'backlogs' && <BacklogScreen progress={progress} />}
                 {currentScreen === 'hacks' && <HacksScreen hacks={hacks} />}
                 {currentScreen === 'analytics' && <AnalyticsScreen user={user} progress={progress} testAttempts={testAttempts} />}
+                {currentScreen === 'wellness' && <WellnessScreen />}
                 {currentScreen === 'profile' && <ProfileScreen user={user} onAcceptRequest={acceptConnectionRequest} onUpdateUser={(u) => { const updated = { ...user, ...u }; setUser(updated); saveUserToDB(updated); }} />}
               </>
           )}
@@ -541,7 +543,7 @@ export default function App() {
           )}
 
           {/* Shared/Placeholders */}
-          {['ai-tutor','wellness','system','admin_analytics'].includes(currentScreen) && (
+          {['ai-tutor','system','admin_analytics'].includes(currentScreen) && (
               <ComingSoonScreen title={currentScreen.charAt(0).toUpperCase() + currentScreen.slice(1)} icon="🚧" />
           )}
         </div>
