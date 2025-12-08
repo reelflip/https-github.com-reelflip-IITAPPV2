@@ -27,6 +27,8 @@ import { AboutUsScreen } from './screens/AboutUsScreen';
 import { ContactUsScreen } from './screens/ContactUsScreen';
 import { ExamGuideScreen } from './screens/ExamGuideScreen';
 import { PrivacyPolicyScreen } from './screens/PrivacyPolicyScreen';
+import { FocusScreen } from './screens/FocusScreen'; // Import FocusScreen
+import { AnalyticsScreen } from './screens/AnalyticsScreen';
 import { PublicLayout } from './components/PublicLayout';
 import { User, UserProgress, TopicStatus, TestAttempt, Screen, Goal, MistakeLog, Flashcard, MemoryHack, BlogPost, VideoLesson, Question, Test, TimetableConfig, Topic, ContactMessage } from './lib/types';
 import { calculateNextRevision } from './lib/utils';
@@ -498,7 +500,7 @@ export default function App() {
              <>
                 {currentScreen === 'dashboard' && <DashboardScreen user={user} progress={linkedStudentData?.progress || {}} testAttempts={linkedStudentData?.tests || []} goals={[]} addGoal={()=>{}} toggleGoal={()=>{}} setScreen={setCurrentScreen} />}
                 {currentScreen === 'family' && <ParentFamilyScreen user={user} onSendRequest={sendConnectionRequest} linkedData={linkedStudentData} />}
-                {currentScreen === 'analytics' && <ComingSoonScreen title="Student Analytics" icon="📊" />}
+                {currentScreen === 'analytics' && <AnalyticsScreen user={user} progress={linkedStudentData?.progress || {}} testAttempts={linkedStudentData?.tests || []} />}
                 {currentScreen === 'timetable' && <div className="p-8 text-center text-slate-500 bg-white rounded-xl border border-slate-200">Timetable viewing is available in Student account.</div>}
                 {currentScreen === 'tests' && <TestScreen history={linkedStudentData?.tests || []} addTestAttempt={()=>{}} availableTests={adminTests} />}
                 {currentScreen === 'syllabus' && <SyllabusScreen user={user} subjects={syllabus} progress={linkedStudentData?.progress || {}} onUpdateProgress={()=>{}} readOnly={true} videoMap={videoMap} />}
@@ -513,10 +515,12 @@ export default function App() {
                 {currentScreen === 'revision' && <RevisionScreen progress={progress} handleRevisionComplete={handleRevisionComplete} />}
                 {currentScreen === 'tests' && <TestScreen history={testAttempts} addTestAttempt={addTestAttempt} availableTests={adminTests} />}
                 {currentScreen === 'timetable' && <TimetableScreen user={user} savedConfig={timetableData?.config} savedSlots={timetableData?.slots} onSave={saveTimetable} progress={progress} />}
+                {currentScreen === 'focus' && <FocusScreen />}
                 {currentScreen === 'flashcards' && <FlashcardScreen flashcards={flashcards} />}
                 {currentScreen === 'mistakes' && <MistakesScreen mistakes={mistakes} addMistake={addMistake} />}
                 {currentScreen === 'backlogs' && <BacklogScreen progress={progress} />}
                 {currentScreen === 'hacks' && <HacksScreen hacks={hacks} />}
+                {currentScreen === 'analytics' && <AnalyticsScreen user={user} progress={progress} testAttempts={testAttempts} />}
                 {currentScreen === 'profile' && <ProfileScreen user={user} onAcceptRequest={acceptConnectionRequest} onUpdateUser={(u) => { const updated = { ...user, ...u }; setUser(updated); saveUserToDB(updated); }} />}
               </>
           )}
@@ -537,7 +541,7 @@ export default function App() {
           )}
 
           {/* Shared/Placeholders */}
-          {['ai-tutor','focus','analytics','wellness','system','admin_analytics'].includes(currentScreen) && (
+          {['ai-tutor','wellness','system','admin_analytics'].includes(currentScreen) && (
               <ComingSoonScreen title={currentScreen.charAt(0).toUpperCase() + currentScreen.slice(1)} icon="🚧" />
           )}
         </div>
