@@ -129,59 +129,76 @@ export const MobileNavigation: React.FC<NavigationProps> = ({ currentScreen, set
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const menuItems = getMenu(user.role);
   
-  // Primary items for bottom bar (max 4)
-  const primaryItems = menuItems.slice(0, 4);
-  const secondaryItems = menuItems.slice(4);
+  // Logic to fit items on bottom bar:
+  // We want to show: [Item 1] [Item 2] [Item 3] [More] [Exit]
+  // Total 5 slots. If total items <= 4, we don't need 'More', just show all + Exit.
+  
+  const showMore = menuItems.length > 4;
+  const primaryCount = showMore ? 3 : 4;
+  
+  const primaryItems = menuItems.slice(0, primaryCount);
+  const secondaryItems = menuItems.slice(primaryCount);
 
   return (
     <>
       {/* Bottom Bar */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 z-50 flex justify-around items-center px-2 py-2 shadow-lg safe-area-pb">
+      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 z-50 flex justify-around items-center px-1 py-2 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] safe-area-pb">
         {primaryItems.map(item => (
           <button
             key={item.id}
             onClick={() => { setScreen(item.id); setIsDrawerOpen(false); }}
-            className={`flex flex-col items-center p-2 rounded-xl transition-all ${
+            className={`flex flex-col items-center justify-center p-1.5 rounded-xl transition-all min-w-[60px] ${
               currentScreen === item.id ? 'text-blue-600 bg-blue-50' : 'text-slate-400'
             }`}
           >
             <span className="text-xl mb-0.5">{item.icon}</span>
-            <span className="text-[10px] font-bold truncate max-w-[60px]">{item.label}</span>
+            <span className="text-[10px] font-bold truncate max-w-[64px]">{item.label}</span>
           </button>
         ))}
         
         {/* More Button */}
+        {showMore && (
+          <button
+            onClick={() => setIsDrawerOpen(true)}
+            className={`flex flex-col items-center justify-center p-1.5 rounded-xl transition-all min-w-[60px] ${
+              isDrawerOpen || secondaryItems.some(i => i.id === currentScreen) ? 'text-blue-600 bg-blue-50' : 'text-slate-400'
+            }`}
+          >
+            <MoreHorizontal className="w-6 h-6 mb-0.5" />
+            <span className="text-[10px] font-bold">More</span>
+          </button>
+        )}
+
+        {/* Exit Button */}
         <button
-          onClick={() => setIsDrawerOpen(true)}
-          className={`flex flex-col items-center p-2 rounded-xl transition-all ${
-            isDrawerOpen || secondaryItems.some(i => i.id === currentScreen) ? 'text-blue-600 bg-blue-50' : 'text-slate-400'
-          }`}
+          onClick={logout}
+          className="flex flex-col items-center justify-center p-1.5 rounded-xl transition-all min-w-[60px] text-red-400 hover:bg-red-50 active:scale-95"
         >
-          <MoreHorizontal className="w-6 h-6 mb-0.5" />
-          <span className="text-[10px] font-bold">More</span>
+          <LogOut className="w-6 h-6 mb-0.5" />
+          <span className="text-[10px] font-bold">Exit</span>
         </button>
       </div>
 
       {/* Drawer Overlay */}
-      {isDrawerOpen && (
+      {isDrawerOpen && secondaryItems.length > 0 && (
         <div className="fixed inset-0 z-[60] flex flex-col justify-end md:hidden">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsDrawerOpen(false)}></div>
-          <div className="bg-white rounded-t-2xl p-6 relative z-10 max-h-[80vh] overflow-y-auto animate-in slide-in-from-bottom-10">
+          <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={() => setIsDrawerOpen(false)}></div>
+          <div className="bg-white rounded-t-2xl p-6 relative z-10 max-h-[70vh] overflow-y-auto animate-in slide-in-from-bottom-10 shadow-2xl">
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-lg font-bold text-slate-800">Menu</h3>
-              <button onClick={() => setIsDrawerOpen(false)} className="p-2 bg-slate-100 rounded-full text-slate-500">
+              <button onClick={() => setIsDrawerOpen(false)} className="p-2 bg-slate-100 rounded-full text-slate-500 hover:bg-slate-200">
                 <X className="w-5 h-5" />
               </button>
             </div>
             
-            <div className="grid grid-cols-3 gap-4 mb-8">
+            <div className="grid grid-cols-3 gap-4">
               {secondaryItems.map(item => (
                 <button
                   key={item.id}
                   onClick={() => { setScreen(item.id); setIsDrawerOpen(false); }}
-                  className={`flex flex-col items-center justify-center p-4 rounded-xl border transition-all ${
+                  className={`flex flex-col items-center justify-center p-4 rounded-xl border transition-all active:scale-95 ${
                     currentScreen === item.id 
-                    ? 'bg-blue-50 border-blue-200 text-blue-700' 
+                    ? 'bg-blue-50 border-blue-200 text-blue-700 shadow-sm' 
                     : 'bg-slate-50 border-slate-100 text-slate-600'
                   }`}
                 >
@@ -190,13 +207,6 @@ export const MobileNavigation: React.FC<NavigationProps> = ({ currentScreen, set
                 </button>
               ))}
             </div>
-
-            <button 
-              onClick={logout}
-              className="w-full flex items-center justify-center gap-2 p-4 bg-red-50 text-red-600 rounded-xl font-bold border border-red-100"
-            >
-              <LogOut className="w-5 h-5" /> Sign Out
-            </button>
           </div>
         </div>
       )}
