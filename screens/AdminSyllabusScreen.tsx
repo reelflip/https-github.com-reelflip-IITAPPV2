@@ -122,7 +122,7 @@ export const AdminSyllabusScreen: React.FC<Props> = ({ syllabus, onAddTopic, onD
                 </div>
 
                 <div className="space-y-4 max-h-[600px] overflow-y-auto custom-scrollbar pr-2">
-                    {Object.entries(grouped).map(([chap, topics]) => (
+                    {Object.entries(grouped).map(([chap, topics]: [string, Topic[]]) => (
                         <div key={chap} className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
                             <div className="bg-slate-50 px-4 py-3 border-b border-slate-200 flex justify-between items-center">
                                 <span className="font-bold text-slate-700 text-sm">{chap}</span>
