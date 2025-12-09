@@ -1,5 +1,3 @@
-
-
 import { Subject, TopicStatus, Role } from '../lib/types';
 
 export const getDeploymentPhases = () => [
@@ -26,7 +24,7 @@ export const generateHtaccess = () => `
 `;
 
 export const generateSQLSchema = () => `
--- IITGEEPrep Database Schema v7.6
+-- IITGEEPrep Database Schema v8.0
 -- Target: MySQL / MariaDB (Hostinger)
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
@@ -336,7 +334,7 @@ try {
         folder: 'api',
         desc: 'API Root Health Check',
         content: `${phpHeader}
-echo json_encode(["status" => "active", "message" => "IITGEEPrep API v7.5 Operational", "timestamp" => date('c')]);
+echo json_encode(["status" => "active", "message" => "IITGEEPrep API v8.0 Operational", "timestamp" => date('c')]);
 ?>`
     },
     {

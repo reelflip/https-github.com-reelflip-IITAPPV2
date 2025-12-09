@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Database, RefreshCw, Server, Table, CheckCircle2, AlertTriangle, XCircle, Activity, Globe, Play, Loader2, Clock, Terminal } from 'lucide-react';
 import { SYLLABUS_DATA } from '../lib/syllabusData';
@@ -8,7 +7,7 @@ const DIAGNOSTICS_DATA = {
   "metadata": {
     "timestamp": new Date().toISOString(),
     "url": "https://iitgeeprep.com/",
-    "appVersion": "v7.6"
+    "appVersion": "v8.0"
   },
   "results": {
     "1. [System] Core Health": [
@@ -388,7 +387,7 @@ export const DiagnosticsScreen: React.FC = () => {
             <button 
                 onClick={handleStartScan}
                 disabled={scanStatus === 'RUNNING'}
-                className="bg-green-600 hover:bg-green-500 text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-green-900/20 flex items-center transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="bg-green-600 hover:bg-green-50 text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-green-900/20 flex items-center transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
                 {scanStatus === 'RUNNING' ? <Loader2 className="w-5 h-5 mr-2 animate-spin"/> : <Play className="w-5 h-5 mr-2"/>} 
                 {scanStatus === 'RUNNING' ? 'Scanning...' : scanStatus === 'COMPLETE' ? 'Re-Run Scan' : 'Start Full Scan'}
