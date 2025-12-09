@@ -94,12 +94,12 @@ export const Navigation: React.FC<NavigationProps> = ({ currentScreen, setScreen
         <h1 className="text-xl font-bold text-white tracking-tight">IIT<span className="text-blue-500">JEE</span>Prep</h1>
         <div className="flex items-center gap-2 mt-1">
           <p className="text-xs text-slate-500 uppercase tracking-wider">{user.role}</p>
-          <span className="text-xs text-slate-600">• v8.7</span>
+          <span className="text-xs text-slate-600">• v9.3</span>
         </div>
       </div>
 
       <nav className="flex-1 space-y-1 pb-4">
-        {menuItems.map(item => (
+        {menuItems.map((item: any) => (
           <NavItem 
             key={item.id} 
             id={item.id} 
@@ -138,7 +138,7 @@ export const MobileNavigation: React.FC<NavigationProps> = ({ currentScreen, set
     <>
       {/* Bottom Bar */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 z-50 flex justify-around items-center px-1 py-2 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] safe-area-pb">
-        {primaryItems.map(item => (
+        {primaryItems.map((item: any) => (
           <button
             key={item.id}
             onClick={() => { setScreen(item.id); setIsDrawerOpen(false); }}
@@ -155,7 +155,7 @@ export const MobileNavigation: React.FC<NavigationProps> = ({ currentScreen, set
           <button
             onClick={() => setIsDrawerOpen(true)}
             className={`flex flex-col items-center justify-center p-1.5 rounded-xl transition-all min-w-[60px] ${
-              isDrawerOpen || secondaryItems.some(i => i.id === currentScreen) ? 'text-blue-600 bg-blue-50' : 'text-slate-400'
+              isDrawerOpen || secondaryItems.some((i: any) => i.id === currentScreen) ? 'text-blue-600 bg-blue-50' : 'text-slate-400'
             }`}
           >
             <MoreHorizontal className="w-6 h-6 mb-0.5" />
@@ -186,7 +186,7 @@ export const MobileNavigation: React.FC<NavigationProps> = ({ currentScreen, set
             </div>
             
             <div className="grid grid-cols-3 gap-4">
-              {secondaryItems.map(item => (
+              {secondaryItems.map((item: any) => (
                 <button
                   key={item.id}
                   onClick={() => { setScreen(item.id); setIsDrawerOpen(false); }}

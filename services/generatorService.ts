@@ -1,5 +1,60 @@
 import { Subject, TopicStatus, Role } from '../lib/types';
 
+export const generateFrontendGuide = () => `# Deployment Manual for Hostinger (Shared Hosting)
+
+## Prerequisites
+1. A Hostinger Shared Hosting Plan.
+2. A Domain Name connected to Hostinger.
+3. Node.js installed on your local machine.
+
+## Phase 1: Build Frontend (Local)
+1. Open your project terminal.
+2. Run \`npm run build\`.
+3. This creates a \`dist\` folder.
+4. Compress the contents of the \`dist\` folder into \`frontend.zip\`.
+
+## Phase 2: Database Setup (Hostinger)
+1. Go to **Databases** > **Management** in Hostinger Panel.
+2. Create a new MySQL Database.
+   - Note down Database Name, Username, and Password.
+3. Click **Enter phpMyAdmin**.
+4. Select your new database.
+5. Click **Import** tab.
+6. Upload the \`database.sql\` file downloaded from the System Center.
+7. Click **Go** to execute.
+
+## Phase 3: Backend Upload (Hostinger)
+1. Go to **File Manager** in Hostinger Panel.
+2. Navigate to \`public_html\`.
+3. Create a new folder named \`api\`.
+4. Enter \`api\` folder.
+5. Upload all PHP files downloaded from System Center.
+6. Edit \`config.php\`:
+   - Update \`$host\`, \`$db_name\`, \`$username\`, \`$password\` with your database details.
+7. Go back to \`public_html\`.
+8. Create or Edit \`.htaccess\` file and paste the content provided in System Center.
+
+## Phase 4: Frontend Upload (Hostinger)
+1. Go to **File Manager** > \`public_html\`.
+2. Upload \`frontend.zip\`.
+3. Right-click and **Extract**.
+4. Ensure \`index.html\` is in \`public_html\` (not in a subfolder).
+5. Delete \`frontend.zip\`.
+
+## Phase 5: Google Auth (Optional)
+1. Go to Google Cloud Console.
+2. Create a Project.
+3. Configure OAuth Consent Screen.
+4. Create Credentials > OAuth Client ID (Web Application).
+5. Add your domain (e.g., \`https://yourdomain.com\`) to **Authorized JavaScript origins**.
+6. Update \`AuthScreen.tsx\` locally with new Client ID and rebuild, or update if dynamic config is enabled.
+
+## Phase 6: Verification
+1. Open your website.
+2. Go to **System** > **Diagnostics** (if admin) or check Console for network errors.
+3. Run the "Connection Tester" in Deployment Screen to verify API connectivity.
+`;
+
 export const getDeploymentPhases = () => [
     { title: "Build & Prep", subtitle: "Local Machine", bg: "bg-blue-50 border-blue-200", color: "text-blue-700", steps: ["Run `npm run build`", "Zip the `dist` folder"] },
     { title: "Database Setup", subtitle: "Hostinger Panel", bg: "bg-yellow-50 border-yellow-200", color: "text-yellow-700", steps: ["Create MySQL Database", "Import `database.sql`"] },
@@ -24,7 +79,7 @@ export const generateHtaccess = () => `
 `;
 
 export const generateSQLSchema = () => `
--- IITGEEPrep Database Schema v8.7
+-- IITGEEPrep Database Schema v9.3
 -- Target: MySQL / MariaDB (Hostinger)
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
@@ -151,6 +206,7 @@ CREATE TABLE IF NOT EXISTS \`blog_posts\` (
   \`content\` longtext,
   \`author\` varchar(100),
   \`image_url\` varchar(255),
+  \`category\` varchar(50) DEFAULT 'Strategy',
   \`date\` timestamp DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (\`id\`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -240,56 +296,11 @@ CREATE TABLE IF NOT EXISTS \`system_settings\` (
 INSERT INTO \`users\` (\`name\`, \`email\`, \`password_hash\`, \`role\`) VALUES 
 ('System Admin', 'admin@iitgeeprep.com', 'Ishika@123', 'ADMIN');
 
+-- Seed Sample Blog Post (Editable by Admin)
+INSERT INTO \`blog_posts\` (\`title\`, \`excerpt\`, \`content\`, \`author\`, \`category\`, \`image_url\`) VALUES
+('JEE Main & Advanced 2025: Complete Roadmap', 'A strategic month-by-month guide to conquering Physics, Chemistry, and Maths while managing Board Exams.', '<h2>The Foundation</h2><p>Success in JEE Main and Advanced is not just about hard work; it is about <strong>smart work</strong> and consistent effort.</p><h3>1. Chemistry: The Scoring Machine</h3><p>Chemistry is the easiest subject to score in if you stick to the basics. <strong>NCERT is your Bible</strong> for Inorganic Chemistry. Do not ignore it.</p><h3>2. Physics: Concepts over Formulas</h3><p>Avoid rote memorization. Focus on Mechanics and Electrodynamics as they form the bulk of the paper. Solve Irodov for Advanced preparation.</p><h3>3. Mathematics: Practice is Key</h3><p>Calculus and Algebra require daily practice. Solve at least 30-40 problems every day to build muscle memory.</p><h3>4. Mock Tests</h3><p>Start taking full-length mock tests at least 6 months before the exam. Analyze your mistakes using the <strong>Mistake Notebook</strong> feature in this app.</p>', 'System Admin', 'Strategy', 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&q=80&w=1000');
+
 COMMIT;
-`;
-
-export const generateFrontendGuide = () => `# IITGEEPrep Hostinger Deployment Guide (v8.7)
-
-## Phase 1: Preparation
-1. Run \`npm run build\` in your local terminal.
-2. Go to the \`dist\` folder created.
-3. Select all files inside \`dist\` and zip them (e.g., \`frontend.zip\`).
-
-## Phase 2: Database
-1. Log in to Hostinger hPanel.
-2. Go to Databases > Management.
-3. Create a new MySQL Database. Note down:
-   - Database Name
-   - Database Username
-   - Database Password
-4. Click "Enter phpMyAdmin".
-5. Select your database on the left.
-6. Click "Import" tab -> Choose \`database.sql\` (downloaded from Admin Panel) -> Go.
-
-## Phase 3: Backend API
-1. In Hostinger, go to Files > File Manager.
-2. Navigate to \`public_html\`.
-3. Create a new folder named \`api\`.
-4. Open \`api\` folder.
-5. Upload all PHP files generated by the Admin Panel (download the zip).
-6. Right-click \`config.php\` -> Edit.
-7. Update \`$db_name\`, \`$username\`, \`$password\` with details from Phase 2.
-8. Save.
-
-## Phase 4: Frontend
-1. Go back to \`public_html\`.
-2. Upload \`frontend.zip\`.
-3. Right-click -> Extract.
-4. Ensure \`index.html\` is directly inside \`public_html\`, not in a subfolder.
-5. Upload \`.htaccess\` to \`public_html\` to handle routing.
-
-## Phase 5: Google Login (Optional)
-1. Go to Google Cloud Console > APIs & Services > Credentials.
-2. Create Credentials > OAuth Client ID > Web Application.
-3. **IMPORTANT:** Add your website URL (e.g., https://yourdomain.com) to **Authorized JavaScript Origins**.
-4. Copy the Client ID.
-5. In your local code, update \`AuthScreen.tsx\` with this Client ID.
-6. Re-build and re-upload the frontend.
-
-## Phase 6: Verify
-1. Open your website domain.
-2. Login with 'admin@iitgeeprep.com' and password 'Ishika@123'.
-3. If it works, you are live!
 `;
 
 // --- PHP FILE GENERATORS ---
@@ -334,7 +345,7 @@ try {
         folder: 'api',
         desc: 'API Root Health Check',
         content: `${phpHeader}
-echo json_encode(["status" => "active", "message" => "IITGEEPrep API v8.7 Operational", "timestamp" => date('c')]);
+echo json_encode(["status" => "active", "message" => "IITGEEPrep API v9.3 Operational", "timestamp" => date('c')]);
 ?>`
     },
     {
@@ -410,8 +421,6 @@ if ($action === 'get_question') {
     $stmt = $conn->prepare("SELECT id FROM users WHERE email = ? AND security_answer = ?");
     $stmt->execute([$data->email, $data->answer]);
     if ($stmt->rowCount() > 0) {
-        // Reset Password
-        // For simple implementations requested, we update the password directly
         $upd = $conn->prepare("UPDATE users SET password_hash = ? WHERE email = ?");
         $upd->execute([$data->newPassword, $data->email]);
         echo json_encode(["status" => "success", "message" => "Password updated"]);
@@ -430,7 +439,6 @@ if ($action === 'get_question') {
 $data = json_decode(file_get_contents("php://input"));
 
 if(!empty($data->token)) {
-    // 1. Verify Token with Google
     $url = "https://oauth2.googleapis.com/tokeninfo?id_token=" . $data->token;
     $response = file_get_contents($url);
     $payload = json_decode($response);
@@ -669,7 +677,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         $stmt = $conn->query("SELECT * FROM memory_hacks");
         echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
     } else if ($type === 'blogs') {
-        $stmt = $conn->query("SELECT * FROM blog_posts");
+        $stmt = $conn->query("SELECT * FROM blog_posts ORDER BY date DESC");
         echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
     }
 } 
@@ -681,8 +689,8 @@ elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt = $conn->prepare("INSERT INTO memory_hacks (title, description, tag, trick) VALUES (?, ?, ?, ?)");
         $stmt->execute([$data->title, $data->description, $data->tag, $data->trick]);
     } else if ($type === 'blog') {
-        $stmt = $conn->prepare("INSERT INTO blog_posts (title, excerpt, content, author, image_url) VALUES (?, ?, ?, ?, ?)");
-        $stmt->execute([$data->title, $data->excerpt, $data->content, $data->author, $data->imageUrl]);
+        $stmt = $conn->prepare("INSERT INTO blog_posts (title, excerpt, content, author, image_url, category) VALUES (?, ?, ?, ?, ?, ?)");
+        $stmt->execute([$data->title, $data->excerpt, $data->content, $data->author, $data->imageUrl, $data->category ?? 'Strategy']);
     }
     echo json_encode(["message" => "Created"]);
 }
@@ -706,7 +714,7 @@ $stmt = $conn->prepare("INSERT INTO test_attempts (id, user_id, test_id, score, 
 $id = uniqid('att_');
 $stmt->execute([
     $id, $data->user_id, $data->testId, $data->score, $data->totalQuestions*4, $data->accuracy_percent, 
-    $data->correctCount, $data->incorrectCount, $data->unattemptedCount
+    $data->correctCount, $data->incorrectCount, $data->unattempted_count
 ]);
 
 // Save Details

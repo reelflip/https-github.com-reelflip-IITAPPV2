@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Navigation, MobileNavigation } from './components/Navigation';
 import { AuthScreen } from './screens/AuthScreen';
@@ -40,18 +39,16 @@ import { calculateNextRevision } from './lib/utils';
 import { SYLLABUS_DATA } from './lib/syllabusData';
 import { TrendingUp, Bell } from 'lucide-react';
 
-// Placeholder for screens not yet fully implemented
+const APP_VERSION = '9.3';
+
 const ComingSoonScreen = ({ title, icon }: { title: string, icon: string }) => (
   <div className="flex flex-col items-center justify-center h-[70vh] text-center">
     <div className="text-6xl mb-4">{icon}</div>
     <h2 className="text-3xl font-bold text-slate-900 mb-2">{title}</h2>
-    <p className="text-slate-500 max-w-md">
-      This feature is available in the Pro version or is currently under development.
-    </p>
+    <p className="text-slate-500 max-w-md">This feature is available in the Pro version or is currently under development.</p>
   </div>
 );
 
-// --- DEMO DATA SEEDING ---
 const DEMO_TESTS: Test[] = [
     {
         id: 'demo_jee_main_1',
@@ -64,43 +61,10 @@ const DEMO_TESTS: Test[] = [
             { id: 'q1', subjectId: 'phys', topicId: 'p-kin-1d', text: 'A particle moves with velocity v = t^2 - 2t. Find distance traveled in first 3 seconds.', options: ['4m', '6m', '8m', '2m'], correctOptionIndex: 1, source: 'JEE Main', year: 2024 },
             { id: 'q2', subjectId: 'phys', topicId: 'p-electro', text: 'Two point charges q and 4q are separated by distance r. Where should a third charge be placed for equilibrium?', options: ['r/3 from q', 'r/3 from 4q', 'r/2', '2r/3 from q'], correctOptionIndex: 0, source: 'JEE Main', year: 2023 }
         ]
-    },
-    {
-        id: 'demo_jee_adv_1',
-        title: 'JEE Advanced 2022 - Paper 1 (Mixed)',
-        durationMinutes: 180,
-        category: 'ADMIN',
-        difficulty: 'ADVANCED',
-        examType: 'JEE',
-        questions: [
-            { id: 'q3', subjectId: 'chem', topicId: 'c-thermo', text: 'For an adiabatic expansion of an ideal gas, the plot of ln P vs ln V is linear with slope:', options: ['-γ', 'γ', '1-γ', 'γ-1'], correctOptionIndex: 0, source: 'JEE Advanced', year: 2022 }
-        ]
-    },
-    {
-        id: 'demo_bitsat_1',
-        title: 'BITSAT English & Logic Speed Test',
-        durationMinutes: 45,
-        category: 'ADMIN',
-        difficulty: 'CUSTOM',
-        examType: 'BITSAT',
-        questions: [
-            { id: 'q4', subjectId: 'math', topicId: 'm-stats', text: 'The mean of 5 observations is 4. If one observation is excluded, new mean is 3. Find excluded value.', options: ['8', '6', '4', '2'], correctOptionIndex: 0, source: 'BITSAT', year: 2023 }
-        ]
-    },
-    {
-        id: 'demo_viteee_1',
-        title: 'VITEEE Science Quickfire',
-        durationMinutes: 90,
-        category: 'ADMIN',
-        difficulty: 'CUSTOM',
-        examType: 'VITEEE',
-        questions: [
-            { id: 'q5', subjectId: 'phys', topicId: 'p-units', text: 'Dimensions of Planck Constant are same as:', options: ['Energy', 'Power', 'Angular Momentum', 'Force'], correctOptionIndex: 2, source: 'VITEEE', year: 2021 }
-        ]
     }
 ];
 
-// --- SIMULATED USER DATABASE HELPERS ---
+// --- DB Helpers ---
 const getUserDB = (): User[] => {
     const db = localStorage.getItem('iitjee_users_db');
     return db ? JSON.parse(db) : [];
@@ -109,42 +73,30 @@ const getUserDB = (): User[] => {
 const saveUserToDB = (user: User) => {
     const db = getUserDB();
     const index = db.findIndex(u => u.id === user.id);
-    if (index >= 0) {
-        db[index] = user;
-    } else {
-        db.push(user);
-    }
+    if (index >= 0) db[index] = user;
+    else db.push(user);
     localStorage.setItem('iitjee_users_db', JSON.stringify(db));
 };
 
 const findUserById = (id: string) => getUserDB().find(u => u.id === id);
 
 export default function App() {
-  // --- State ---
   const [user, setUser] = useState<User | null>(null);
   const [currentScreen, setCurrentScreen] = useState<Screen>('dashboard');
-  const [enableGoogleLogin, setEnableGoogleLogin] = useState(true); // Admin Controlled
+  const [enableGoogleLogin, setEnableGoogleLogin] = useState(true);
   const [gaMeasurementId, setGaMeasurementId] = useState<string | null>(null);
   
-  // Persisted Data for CURRENT USER
+  // Persisted Data
   const [progress, setProgress] = useState<Record<string, UserProgress>>({});
   const [testAttempts, setTestAttempts] = useState<TestAttempt[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [mistakes, setMistakes] = useState<MistakeLog[]>([]);
-  const [backlogs, setBacklogs] = useState<BacklogItem[]>([]); // Backlog State
+  const [backlogs, setBacklogs] = useState<BacklogItem[]>([]);
   const [timetableData, setTimetableData] = useState<{config: TimetableConfig, slots: any[]} | null>(null);
-  
-  // Dynamic Syllabus State
   const [syllabus, setSyllabus] = useState<Topic[]>(SYLLABUS_DATA);
-
-  // Data for LINKED Student (Only for Parent View)
-  const [linkedStudentData, setLinkedStudentData] = useState<{
-      progress: Record<string, UserProgress>;
-      tests: TestAttempt[];
-      studentName: string;
-  } | undefined>(undefined);
+  const [linkedStudentData, setLinkedStudentData] = useState<{ progress: Record<string, UserProgress>; tests: TestAttempt[]; studentName: string; } | undefined>(undefined);
   
-  // Content Data (Shared/Admin Managed)
+  // Shared Content
   const [flashcards, setFlashcards] = useState<Flashcard[]>([
      { id: 1, front: "Newton's Second Law", back: "F = ma", subjectId: 'phys' },
      { id: 2, front: "Integration of sin(x)", back: "-cos(x) + C", subjectId: 'math' }
@@ -152,20 +104,38 @@ export default function App() {
   const [hacks, setHacks] = useState<MemoryHack[]>([
      { id: 1, title: 'Trig Values', description: 'Remember SOH CAH TOA', tag: 'Maths', subjectId: 'math', trick: 'SOH CAH TOA' }
   ]);
+  // Rich Blog Seed directly in frontend state for immediate visibility
   const [blogs, setBlogs] = useState<BlogPost[]>([
-     { id: 1, title: 'JEE 2025 Strategy', excerpt: 'How to plan your year...', content: 'Full guide here.', author: 'Admin', date: new Date().toISOString() }
+     { 
+       id: 1, 
+       title: 'JEE Main & Advanced 2025: Complete Roadmap', 
+       excerpt: 'A strategic month-by-month guide to conquering Physics, Chemistry, and Maths while managing Board Exams.', 
+       content: '<h2>The Foundation</h2><p>Success in JEE Main and Advanced is not just about hard work; it is about <strong>smart work</strong> and consistent effort.</p><h3>1. Chemistry: The Scoring Machine</h3><p>Chemistry is the easiest subject to score in if you stick to the basics. <strong>NCERT is your Bible</strong> for Inorganic Chemistry. Do not ignore it.</p><h3>2. Physics: Concepts over Formulas</h3><p>Avoid rote memorization. Focus on Mechanics and Electrodynamics as they form the bulk of the paper. Solve Irodov for Advanced preparation.</p><h3>3. Mathematics: Practice is Key</h3><p>Calculus and Algebra require daily practice. Solve at least 30-40 problems every day to build muscle memory.</p><h3>4. Mock Tests</h3><p>Start taking full-length mock tests at least 6 months before the exam. Analyze your mistakes using the <strong>Mistake Notebook</strong> feature in this app.</p>', 
+       author: 'System Admin', 
+       date: new Date().toISOString(),
+       imageUrl: 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&q=80&w=1000',
+       category: 'Strategy'
+     }
   ]);
-  const [videoMap, setVideoMap] = useState<Record<string, VideoLesson>>({
-      'p-units': { topicId: 'p-units', videoUrl: 'https://www.youtube.com/embed/j16d8Z0dM30', description: 'Introduction to Units & Dimensions' }, 
-      'p-kinematics': { topicId: 'p-kinematics', videoUrl: 'https://www.youtube.com/embed/5kM3q9z9y9g', description: 'Kinematics 1D Basics' }
-  });
-  const [contactMessages, setContactMessages] = useState<ContactMessage[]>([]);
   
-  // Admin Tests & Question Bank
+  const [videoMap, setVideoMap] = useState<Record<string, VideoLesson>>({});
   const [questionBank, setQuestionBank] = useState<Question[]>([]);
   const [adminTests, setAdminTests] = useState<Test[]>([]);
 
-  // --- Initialize Google Analytics ---
+  // --- Version Check & Cache Busting (Fixes Stale Content) ---
+  useEffect(() => {
+      const storedVersion = localStorage.getItem('iitjee_app_version');
+      if (storedVersion !== APP_VERSION) {
+          console.log(`Upgrading from ${storedVersion} to ${APP_VERSION}. Clearing content cache.`);
+          // Clear shared content caches to force fresh load/seed from our new state defaults
+          localStorage.removeItem('iitjee_blogs');
+          localStorage.removeItem('iitjee_hacks');
+          localStorage.removeItem('iitjee_flashcards');
+          localStorage.setItem('iitjee_app_version', APP_VERSION);
+      }
+  }, []);
+
+  // --- 1. Init Google Analytics ---
   useEffect(() => {
       const initGA = async () => {
           try {
@@ -173,7 +143,6 @@ export default function App() {
               if(!res.ok) return;
               const text = await res.text();
               if(!text || !text.trim()) return;
-              
               const data = JSON.parse(text);
               if (data && data.value && !window.gtag) {
                   setGaMeasurementId(data.value);
@@ -181,31 +150,109 @@ export default function App() {
                   script.async = true;
                   script.src = `https://www.googletagmanager.com/gtag/js?id=${data.value}`;
                   document.head.appendChild(script);
-
                   window.dataLayer = window.dataLayer || [];
                   function gtag(...args: any[]){window.dataLayer.push(args);}
                   window.gtag = gtag;
                   gtag('js', new Date());
                   gtag('config', data.value);
               }
-          } catch (e) {
-              console.debug("GA Init Failed (likely offline/no settings table)");
-          }
+          } catch (e) { console.debug("GA Init Failed"); }
       };
       initGA();
   }, []);
 
-  // Track Page Views
+  // --- 2. Fetch Public Content (Blogs/Hacks) from API ---
   useEffect(() => {
-      if (window.gtag && gaMeasurementId) {
-          window.gtag('event', 'screen_view', {
-              'screen_name': currentScreen,
-              'app_name': 'IITJEEPrep'
-          });
-      }
-  }, [currentScreen, gaMeasurementId]);
+      const fetchPublicContent = async () => {
+          try {
+            // Fetch Blogs
+            const blogRes = await fetch('/api/manage_content.php?type=blogs');
+            if (blogRes.ok) {
+                const blogData = await blogRes.json();
+                if (Array.isArray(blogData) && blogData.length > 0) setBlogs(blogData);
+            }
 
-  // --- Data Loading Logic ---
+            // Fetch Flashcards
+            const fcRes = await fetch('/api/manage_content.php?type=flashcards');
+            if (fcRes.ok) {
+                const fcData = await fcRes.json();
+                if (Array.isArray(fcData) && fcData.length > 0) setFlashcards(fcData);
+            }
+            
+            // Fetch Hacks
+            const hacksRes = await fetch('/api/manage_content.php?type=hacks');
+            if (hacksRes.ok) {
+                const hacksData = await hacksRes.json();
+                if (Array.isArray(hacksData) && hacksData.length > 0) setHacks(hacksData);
+            }
+
+          } catch (e) {
+             console.error("Failed to fetch public content", e);
+             // Fallback to local storage if API fails, otherwise keep seed data from useState
+             const savedBlogs = localStorage.getItem('iitjee_blogs');
+             if (savedBlogs) setBlogs(JSON.parse(savedBlogs));
+          }
+      };
+      fetchPublicContent();
+  }, []);
+
+  // --- 3. Initial Data Load (User & LocalStorage) ---
+  useEffect(() => {
+    const savedUser = localStorage.getItem('iitjee_user');
+    const savedVideos = localStorage.getItem('iitjee_videos');
+    const savedQuestions = localStorage.getItem('iitjee_questions');
+    const savedAdminTests = localStorage.getItem('iitjee_admin_tests');
+    const savedSyllabus = localStorage.getItem('iitjee_syllabus');
+    const savedGoogleConfig = localStorage.getItem('iitjee_enable_google');
+
+    if (savedGoogleConfig !== null) setEnableGoogleLogin(savedGoogleConfig === 'true');
+
+    if (savedUser) {
+        const u = JSON.parse(savedUser);
+        setUser(u);
+        fetchRemoteData(u.id);
+        if(u.role === 'PARENT' && u.linkedStudentId) loadLinkedStudent(u.linkedStudentId);
+    }
+    
+    if (savedVideos) setVideoMap(JSON.parse(savedVideos));
+    if (savedQuestions) setQuestionBank(JSON.parse(savedQuestions));
+    
+    if (savedAdminTests) {
+        const parsedTests = JSON.parse(savedAdminTests);
+        setAdminTests(parsedTests.length > 0 ? parsedTests : DEMO_TESTS);
+    } else {
+        setAdminTests(DEMO_TESTS);
+    }
+
+    if (savedSyllabus) setSyllabus(JSON.parse(savedSyllabus));
+  }, []);
+
+  // --- 4. Persist User Data ---
+  useEffect(() => {
+    if (user) {
+        localStorage.setItem('iitjee_user', JSON.stringify(user));
+        saveUserToDB(user);
+        localStorage.setItem(`iitjee_progress_${user.id}`, JSON.stringify(progress));
+        localStorage.setItem(`iitjee_tests_${user.id}`, JSON.stringify(testAttempts));
+        localStorage.setItem(`iitjee_goals_${user.id}`, JSON.stringify(goals));
+        localStorage.setItem(`iitjee_mistakes_${user.id}`, JSON.stringify(mistakes));
+        localStorage.setItem(`iitjee_backlogs_${user.id}`, JSON.stringify(backlogs));
+        if (timetableData) localStorage.setItem(`iitjee_timetable_${user.id}`, JSON.stringify(timetableData));
+    }
+    // Only persist admin content if changed locally
+    localStorage.setItem('iitjee_videos', JSON.stringify(videoMap));
+    localStorage.setItem('iitjee_questions', JSON.stringify(questionBank));
+    localStorage.setItem('iitjee_admin_tests', JSON.stringify(adminTests));
+    localStorage.setItem('iitjee_syllabus', JSON.stringify(syllabus));
+    localStorage.setItem('iitjee_enable_google', String(enableGoogleLogin));
+    
+    // Cache public content
+    if(blogs.length > 0) localStorage.setItem('iitjee_blogs', JSON.stringify(blogs));
+    if(flashcards.length > 0) localStorage.setItem('iitjee_flashcards', JSON.stringify(flashcards));
+    if(hacks.length > 0) localStorage.setItem('iitjee_hacks', JSON.stringify(hacks));
+
+  }, [user, progress, testAttempts, goals, mistakes, backlogs, timetableData, videoMap, questionBank, adminTests, syllabus, enableGoogleLogin, blogs, flashcards, hacks]);
+
   const loadLocalData = (userId: string) => {
     const savedProgress = localStorage.getItem(`iitjee_progress_${userId}`);
     const savedTests = localStorage.getItem(`iitjee_tests_${userId}`);
@@ -226,10 +273,8 @@ export default function App() {
       try {
           const res = await fetch(`/api/get_dashboard.php?user_id=${userId}`);
           if (!res.ok) throw new Error('API Error or Offline');
-          
           const text = await res.text();
           if (!text) throw new Error('Empty response');
-          
           const data = JSON.parse(text);
           if (Array.isArray(data.progress)) {
               const progMap: Record<string, UserProgress> = {};
@@ -247,91 +292,19 @@ export default function App() {
                   };
               });
               setProgress(progMap);
-          } else {
-              setProgress({});
-          }
-
+          } else { setProgress({}); }
           if (data.attempts) setTestAttempts(data.attempts);
           if (data.goals) setGoals(data.goals);
-          // if (data.backlogs) setBacklogs(data.backlogs); // Assuming backend support
-          
           if (data.timetable) {
-              setTimetableData({
-                  config: data.timetable.config,
-                  slots: data.timetable.slots
-              });
-          } else {
-              setTimetableData(null);
-          }
-      } catch (e) {
-          loadLocalData(userId);
-      }
+              setTimetableData({ config: data.timetable.config, slots: data.timetable.slots });
+          } else { setTimetableData(null); }
+      } catch (e) { loadLocalData(userId); }
   };
-
-  useEffect(() => {
-    const savedUser = localStorage.getItem('iitjee_user');
-    const savedCards = localStorage.getItem('iitjee_flashcards');
-    const savedHacks = localStorage.getItem('iitjee_hacks');
-    const savedBlogs = localStorage.getItem('iitjee_blogs');
-    const savedVideos = localStorage.getItem('iitjee_videos');
-    const savedQuestions = localStorage.getItem('iitjee_questions');
-    const savedAdminTests = localStorage.getItem('iitjee_admin_tests');
-    const savedSyllabus = localStorage.getItem('iitjee_syllabus');
-    const savedGoogleConfig = localStorage.getItem('iitjee_enable_google');
-
-    if (savedGoogleConfig !== null) setEnableGoogleLogin(savedGoogleConfig === 'true');
-
-    if (savedUser) {
-        const u = JSON.parse(savedUser);
-        setUser(u);
-        fetchRemoteData(u.id);
-        if(u.role === 'PARENT' && u.linkedStudentId) loadLinkedStudent(u.linkedStudentId);
-    }
-    
-    if (savedCards) setFlashcards(JSON.parse(savedCards));
-    if (savedHacks) setHacks(JSON.parse(savedHacks));
-    if (savedBlogs) setBlogs(JSON.parse(savedBlogs));
-    if (savedVideos) setVideoMap(JSON.parse(savedVideos));
-    if (savedQuestions) setQuestionBank(JSON.parse(savedQuestions));
-    
-    if (savedAdminTests) {
-        const parsedTests = JSON.parse(savedAdminTests);
-        setAdminTests(parsedTests.length > 0 ? parsedTests : DEMO_TESTS);
-    } else {
-        setAdminTests(DEMO_TESTS);
-    }
-
-    if (savedSyllabus) setSyllabus(JSON.parse(savedSyllabus));
-  }, []);
-
-  useEffect(() => {
-    if (user) {
-        localStorage.setItem('iitjee_user', JSON.stringify(user));
-        saveUserToDB(user);
-        localStorage.setItem(`iitjee_progress_${user.id}`, JSON.stringify(progress));
-        localStorage.setItem(`iitjee_tests_${user.id}`, JSON.stringify(testAttempts));
-        localStorage.setItem(`iitjee_goals_${user.id}`, JSON.stringify(goals));
-        localStorage.setItem(`iitjee_mistakes_${user.id}`, JSON.stringify(mistakes));
-        localStorage.setItem(`iitjee_backlogs_${user.id}`, JSON.stringify(backlogs));
-        if (timetableData) {
-            localStorage.setItem(`iitjee_timetable_${user.id}`, JSON.stringify(timetableData));
-        }
-    }
-    localStorage.setItem('iitjee_flashcards', JSON.stringify(flashcards));
-    localStorage.setItem('iitjee_hacks', JSON.stringify(hacks));
-    localStorage.setItem('iitjee_blogs', JSON.stringify(blogs));
-    localStorage.setItem('iitjee_videos', JSON.stringify(videoMap));
-    localStorage.setItem('iitjee_questions', JSON.stringify(questionBank));
-    localStorage.setItem('iitjee_admin_tests', JSON.stringify(adminTests));
-    localStorage.setItem('iitjee_syllabus', JSON.stringify(syllabus));
-    localStorage.setItem('iitjee_enable_google', String(enableGoogleLogin));
-  }, [user, progress, testAttempts, goals, mistakes, backlogs, timetableData, flashcards, hacks, blogs, videoMap, questionBank, adminTests, syllabus, enableGoogleLogin]);
 
   const loadLinkedStudent = (studentId: string) => {
       const sProgress = localStorage.getItem(`iitjee_progress_${studentId}`);
       const sTests = localStorage.getItem(`iitjee_tests_${studentId}`);
       const studentUser = findUserById(studentId);
-      
       if (studentUser) {
           setLinkedStudentData({
               progress: sProgress ? JSON.parse(sProgress) : {},
@@ -345,116 +318,57 @@ export default function App() {
     const existingDb = getUserDB();
     const existingUser = existingDb.find(u => u.email === userData.email);
     let newUser: User;
-    if (existingUser) {
-        newUser = { ...existingUser, ...userData, id: existingUser.id }; 
-    } else {
-        newUser = { 
-            ...userData,
-            id: userData.id || Math.floor(100000 + Math.random() * 900000).toString(),
-            notifications: []
-        };
-    }
+    if (existingUser) { newUser = { ...existingUser, ...userData, id: existingUser.id }; } 
+    else { newUser = { ...userData, id: userData.id || Math.floor(100000 + Math.random() * 900000).toString(), notifications: [] }; }
     setUser(newUser);
     fetchRemoteData(newUser.id);
     if (newUser.role === 'ADMIN') setCurrentScreen('overview');
-    else if (newUser.role === 'PARENT') {
-        setCurrentScreen('dashboard');
-        if(newUser.linkedStudentId) loadLinkedStudent(newUser.linkedStudentId);
-    }
+    else if (newUser.role === 'PARENT') { setCurrentScreen('dashboard'); if(newUser.linkedStudentId) loadLinkedStudent(newUser.linkedStudentId); }
     else setCurrentScreen('dashboard');
   };
 
-  const handleLogout = () => {
-    setUser(null);
-    setCurrentScreen('dashboard');
-    localStorage.removeItem('iitjee_user');
-    setLinkedStudentData(undefined);
-  };
-
-  const handleNavigation = (page: string) => {
-      setCurrentScreen(page as Screen);
-  };
-
+  const handleLogout = () => { setUser(null); setCurrentScreen('dashboard'); localStorage.removeItem('iitjee_user'); setLinkedStudentData(undefined); };
+  const handleNavigation = (page: string) => { setCurrentScreen(page as Screen); };
   const sendConnectionRequest = async (studentId: string): Promise<{success: boolean, message: string}> => {
       if(!user) return { success: false, message: 'Not logged in' };
       const student = findUserById(studentId);
       if(!student) return { success: false, message: 'Student ID not found' };
       if(student.role !== 'STUDENT') return { success: false, message: 'ID belongs to non-student' };
-      
-      const updatedStudent = {
-          ...student,
-          notifications: [
-              ...(student.notifications || []),
-              {
-                  id: Date.now().toString(),
-                  fromId: user.id,
-                  fromName: user.name,
-                  type: 'connection_request' as const,
-                  date: new Date().toISOString()
-              }
-          ]
-      };
+      const updatedStudent = { ...student, notifications: [ ...(student.notifications || []), { id: Date.now().toString(), fromId: user.id, fromName: user.name, type: 'connection_request' as const, date: new Date().toISOString() } ] };
       saveUserToDB(updatedStudent);
       return { success: true, message: 'Invitation sent successfully!' };
   };
-
   const acceptConnectionRequest = (notificationId: string) => {
       if(!user) return;
       const notification = user.notifications?.find(n => n.id === notificationId);
       if(!notification) return;
       const parentId = notification.fromId;
       const parent = findUserById(parentId);
-      const updatedStudent: User = {
-          ...user,
-          notifications: user.notifications?.filter(n => n.id !== notificationId),
-          parentId: parentId 
-      };
+      const updatedStudent: User = { ...user, notifications: user.notifications?.filter(n => n.id !== notificationId), parentId: parentId };
       setUser(updatedStudent); 
-      if(parent) {
-          const updatedParent = { ...parent, linkedStudentId: user.id };
-          saveUserToDB(updatedParent);
-      }
+      if(parent) { const updatedParent = { ...parent, linkedStudentId: user.id }; saveUserToDB(updatedParent); }
   };
-
   const updateTopicProgress = (topicId: string, updates: Partial<UserProgress>) => {
     setProgress(prev => {
-      const current = prev[topicId] || { 
-        topicId, status: 'NOT_STARTED', lastRevised: null, revisionLevel: 0, nextRevisionDate: null 
-      };
+      const current = prev[topicId] || { topicId, status: 'NOT_STARTED', lastRevised: null, revisionLevel: 0, nextRevisionDate: null };
       if (updates.status === 'COMPLETED' && current.status !== 'COMPLETED') {
         const now = new Date().toISOString();
-        updates.lastRevised = now;
-        updates.nextRevisionDate = calculateNextRevision(0, now);
-        updates.revisionLevel = 0;
+        updates.lastRevised = now; updates.nextRevisionDate = calculateNextRevision(0, now); updates.revisionLevel = 0;
       }
       return { ...prev, [topicId]: { ...current, ...updates } };
     });
   };
-
   const handleRevisionComplete = (topicId: string) => {
     setProgress(prev => {
       const current = prev[topicId];
       if (!current) return prev;
       const now = new Date().toISOString();
       const newLevel = Math.min(current.revisionLevel + 1, 4);
-      return {
-        ...prev,
-        [topicId]: { ...current, lastRevised: now, revisionLevel: newLevel, nextRevisionDate: calculateNextRevision(newLevel, now) }
-      };
+      return { ...prev, [topicId]: { ...current, lastRevised: now, revisionLevel: newLevel, nextRevisionDate: calculateNextRevision(newLevel, now) } };
     });
   };
-
-  const updateVideo = (topicId: string, url: string, description: string) => {
-      setVideoMap(prev => ({ 
-          ...prev, 
-          [topicId]: { topicId, videoUrl: url, description } 
-      }));
-  };
-
-  const saveTimetable = (config: TimetableConfig, slots: any[]) => {
-      setTimetableData({ config, slots });
-  };
-
+  const updateVideo = (topicId: string, url: string, description: string) => { setVideoMap(prev => ({ ...prev, [topicId]: { topicId, videoUrl: url, description } })); };
+  const saveTimetable = (config: TimetableConfig, slots: any[]) => { setTimetableData({ config, slots }); };
   const addQuestion = (q: Question) => setQuestionBank(prev => [...prev, q]);
   const deleteQuestion = (id: string) => setQuestionBank(prev => prev.filter(q => q.id !== id));
   const createTest = (t: Test) => setAdminTests(prev => [...prev, t]);
@@ -465,74 +379,37 @@ export default function App() {
   const addMistake = (m: Omit<MistakeLog, 'id' | 'date'>) => setMistakes(prev => [{ ...m, id: Date.now().toString(), date: new Date().toISOString() }, ...prev]);
   const addFlashcard = (card: Omit<Flashcard, 'id'>) => setFlashcards(prev => [...prev, { ...card, id: Date.now() }]);
   const addHack = (hack: Omit<MemoryHack, 'id'>) => setHacks(prev => [...prev, { ...hack, id: Date.now() }]);
-  const addBlog = (blog: Omit<BlogPost, 'id' | 'date'>) => setBlogs(prev => [...prev, { ...blog, id: Date.now(), date: new Date().toISOString() }]);
+  const addBlog = (blog: Omit<BlogPost, 'id' | 'date'>) => setBlogs(prev => [{ ...blog, id: Date.now(), date: new Date().toISOString() }, ...prev]);
   const deleteContent = (type: 'flashcard' | 'hack' | 'blog', id: number) => {
     if(type === 'flashcard') setFlashcards(prev => prev.filter(i => i.id !== id));
     if(type === 'hack') setHacks(prev => prev.filter(i => i.id !== id));
     if(type === 'blog') setBlogs(prev => prev.filter(i => i.id !== id));
   };
-  const handleAddTopic = (topic: Omit<Topic, 'id'>) => {
-      const newTopic: Topic = { ...topic, id: `${topic.subject[0].toLowerCase()}_${Date.now()}` };
-      setSyllabus(prev => [...prev, newTopic]);
-  };
-  const handleDeleteTopic = (id: string) => {
-      setSyllabus(prev => prev.filter(t => t.id !== id));
-  };
+  const handleAddTopic = (topic: Omit<Topic, 'id'>) => { const newTopic: Topic = { ...topic, id: `${topic.subject[0].toLowerCase()}_${Date.now()}` }; setSyllabus(prev => [...prev, newTopic]); };
+  const handleDeleteTopic = (id: string) => { setSyllabus(prev => prev.filter(t => t.id !== id)); };
+  const addBacklog = (item: Omit<BacklogItem, 'id' | 'status'>) => { setBacklogs(prev => [...prev, { ...item, id: `bl_${Date.now()}`, status: 'PENDING' }]); };
+  const toggleBacklog = (id: string) => { setBacklogs(prev => prev.map(b => b.id === id ? { ...b, status: b.status === 'PENDING' ? 'COMPLETED' : 'PENDING' } : b)); };
+  const deleteBacklog = (id: string) => { setBacklogs(prev => prev.filter(b => b.id !== id)); };
 
-  // Backlog Handlers
-  const addBacklog = (item: Omit<BacklogItem, 'id' | 'status'>) => {
-      setBacklogs(prev => [...prev, { ...item, id: `bl_${Date.now()}`, status: 'PENDING' }]);
-  };
-  const toggleBacklog = (id: string) => {
-      setBacklogs(prev => prev.map(b => b.id === id ? { ...b, status: b.status === 'PENDING' ? 'COMPLETED' : 'PENDING' } : b));
-  };
-  const deleteBacklog = (id: string) => {
-      setBacklogs(prev => prev.filter(b => b.id !== id));
-  };
-
-  // Public Routes
   if (currentScreen === 'public-blog') return <PublicBlogScreen blogs={blogs} onBack={() => user ? setCurrentScreen('dashboard') : setCurrentScreen('dashboard')} />;
   if (currentScreen === 'about') return <PublicLayout onNavigate={handleNavigation} currentScreen="about"><AboutUsScreen /></PublicLayout>;
   if (currentScreen === 'contact') return <PublicLayout onNavigate={handleNavigation} currentScreen="contact"><ContactUsScreen /></PublicLayout>;
   if (currentScreen === 'exams') return <PublicLayout onNavigate={handleNavigation} currentScreen="exams"><ExamGuideScreen /></PublicLayout>;
   if (currentScreen === 'privacy') return <PublicLayout onNavigate={handleNavigation} currentScreen="privacy"><PrivacyPolicyScreen /></PublicLayout>;
 
-  // Auth Guard
-  if (!user) {
-    return <AuthScreen onLogin={handleLogin} onNavigate={handleNavigation} enableGoogleLogin={enableGoogleLogin} />;
-  }
+  if (!user) { return <AuthScreen onLogin={handleLogin} onNavigate={handleNavigation} enableGoogleLogin={enableGoogleLogin} />; }
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900 flex">
-      {/* Desktop Sidebar */}
-      <Navigation 
-        currentScreen={currentScreen} 
-        setScreen={setCurrentScreen} 
-        logout={handleLogout} 
-        user={user}
-      />
-
+      <Navigation currentScreen={currentScreen} setScreen={setCurrentScreen} logout={handleLogout} user={user} />
       <main className="flex-1 md:ml-64 p-4 md:p-8 overflow-y-auto h-screen pb-24 md:pb-8 relative">
-        
-        {/* Mobile Header */}
         <div className="md:hidden flex justify-between items-center mb-6 sticky top-0 bg-slate-50 z-30 py-2 border-b border-slate-200">
-            <div className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-slate-900 rounded-full flex items-center justify-center text-blue-400">
-                    <TrendingUp className="w-5 h-5" />
-                </div>
-                <span className="font-bold text-lg text-slate-800">IITGEEPrep</span>
-            </div>
+            <div className="flex items-center gap-2"><div className="w-8 h-8 bg-slate-900 rounded-full flex items-center justify-center text-blue-400"><TrendingUp className="w-5 h-5" /></div><span className="font-bold text-lg text-slate-800">IITGEEPrep</span></div>
             <div className="flex items-center gap-3">
-                {user.notifications && user.notifications.length > 0 && (
-                    <div className="relative p-2">
-                        <Bell className="w-6 h-6 text-slate-600" />
-                        <span className="absolute top-1 right-2 w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse border border-white"></span>
-                    </div>
-                )}
+                {user.notifications && user.notifications.length > 0 && <div className="relative p-2"><Bell className="w-6 h-6 text-slate-600" /><span className="absolute top-1 right-2 w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse border border-white"></span></div>}
                 {user.avatarUrl && <img src={user.avatarUrl} className="w-8 h-8 rounded-full border border-slate-300" alt="Avatar" />}
             </div>
         </div>
-
         <div className="max-w-6xl mx-auto">
           {user.role === 'PARENT' && (
              <>
@@ -545,7 +422,6 @@ export default function App() {
                 {currentScreen === 'profile' && <ProfileScreen user={user} onAcceptRequest={()=>{}} onUpdateUser={(u) => { const updated = { ...user, ...u }; setUser(updated); saveUserToDB(updated); }} linkedStudentName={linkedStudentData?.studentName} />} 
              </>
           )}
-
           {user.role === 'STUDENT' && (
               <>
                 <AITutorChat />
@@ -565,7 +441,6 @@ export default function App() {
                 {currentScreen === 'profile' && <ProfileScreen user={user} onAcceptRequest={acceptConnectionRequest} onUpdateUser={(u) => { const updated = { ...user, ...u }; setUser(updated); saveUserToDB(updated); }} />}
               </>
           )}
-
           {user.role === 'ADMIN' && (
               <>
                 {currentScreen === 'overview' && <AdminDashboardScreen user={user} onNavigate={setCurrentScreen} enableGoogleLogin={enableGoogleLogin} onToggleGoogle={() => setEnableGoogleLogin(!enableGoogleLogin)} />}
@@ -582,15 +457,9 @@ export default function App() {
                 {currentScreen === 'system' && <AdminSystemScreen />}
               </>
           )}
-
-          {/* Shared/Placeholders */}
-          {['admin_analytics'].includes(currentScreen) && (
-              <ComingSoonScreen title={currentScreen.charAt(0).toUpperCase() + currentScreen.slice(1)} icon="🚧" />
-          )}
+          {['admin_analytics'].includes(currentScreen) && <ComingSoonScreen title={currentScreen.charAt(0).toUpperCase() + currentScreen.slice(1)} icon="🚧" />}
         </div>
       </main>
-
-      {/* Mobile Navigation */}
       <MobileNavigation currentScreen={currentScreen} setScreen={setCurrentScreen} logout={handleLogout} user={user} />
     </div>
   );

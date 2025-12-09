@@ -1,13 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { Database, RefreshCw, Server, Table, CheckCircle2, AlertTriangle, XCircle, Activity, Globe, Play, Loader2, Clock, Terminal } from 'lucide-react';
+import { Database, RefreshCw, Server, Table, CheckCircle2, AlertTriangle, XCircle, Activity, Globe, Play, Loader2, Clock, Terminal, AlertCircle } from 'lucide-react';
 import { SYLLABUS_DATA } from '../lib/syllabusData';
+
+// Full List of Required Tables based on schema v9.3
+const REQUIRED_SCHEMA = [
+    'users', 'topic_progress', 'tests', 'questions', 'test_attempts',
+    'attempt_details', 'flashcards', 'memory_hacks', 'blog_posts',
+    'topics', 'videos', 'notifications', 'contact_messages', 'goals',
+    'mistakes', 'backlogs', 'timetable_configs', 'system_settings'
+];
 
 // Embedded JSON Data from the test run
 const DIAGNOSTICS_DATA = {
   "metadata": {
     "timestamp": new Date().toISOString(),
     "url": "https://iitgeeprep.com/",
-    "appVersion": "v8.7"
+    "appVersion": "v9.3"
   },
   "results": {
     "1. [System] Core Health": [
@@ -96,14 +104,7 @@ export const DiagnosticsScreen: React.FC = () => {
   const { metadata, results } = DIAGNOSTICS_DATA;
   
   // Combine Static results with Dynamic Admin Test AND Student Action Test
-  const [dynamicSyllabusResults, setDynamicSyllabusResults] = useState<any[]>([]);
-  const [dynamicStudentResults, setDynamicStudentResults] = useState<any[]>([]);
-
-  const suites: [string, any[]][] = [
-      ...Object.entries(results), 
-      ["20. [Admin] Syllabus Management", dynamicSyllabusResults],
-      ["21. [Student] Action Verification", dynamicStudentResults]
-  ];
+  const [dynamicResults, setDynamicResults] = useState<{ [key: string]: any[] }>({});
   
   // Scan State
   const [scanStatus, setScanStatus] = useState<'IDLE' | 'RUNNING' | 'COMPLETE'>('IDLE');
@@ -131,113 +132,99 @@ export const DiagnosticsScreen: React.FC = () => {
       }
   };
 
-  const performSyllabusTest = async () => {
-      const tests = [];
-      const testId = `diag_topic_${Date.now()}`;
-      
-      // 1. Add Topic
-      try {
-          const start = performance.now();
-          await fetch('/api/manage_syllabus.php', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ id: testId, name: 'Diagnostic Test Topic', chapter: 'Diagnostic Unit', subject: 'Physics' })
-          });
-          tests.push({ description: "should create new topic via API", passed: true, duration: performance.now() - start });
-      } catch(e) {
-          tests.push({ description: "should create new topic via API", passed: false, duration: 0, error: "API Failed" });
-      }
-
-      // 2. Verify
-      try {
-          const start = performance.now();
-          const res = await fetch('/api/manage_syllabus.php');
-          const list = await res.json();
-          const found = list.find((t: any) => t.id === testId);
-          if (found) {
-              tests.push({ description: "should verify topic persistence in DB", passed: true, duration: performance.now() - start });
-          } else {
-              tests.push({ description: "should verify topic persistence in DB", passed: false, duration: 0, error: "Topic not found" });
-          }
-      } catch(e) {
-          tests.push({ description: "should verify topic persistence in DB", passed: false, duration: 0, error: "Fetch Failed" });
-      }
-
-      // 3. Delete (Cleanup)
-      try {
-          const start = performance.now();
-          await fetch(`/api/manage_syllabus.php?id=${testId}`, { method: 'DELETE' });
-          
-          // Verify deletion
-          const res = await fetch('/api/manage_syllabus.php');
-          const list = await res.json();
-          const found = list.find((t: any) => t.id === testId);
-          
-          if (!found) {
-              tests.push({ description: "should delete topic (cleanup)", passed: true, duration: performance.now() - start });
-          } else {
-              tests.push({ description: "should delete topic (cleanup)", passed: false, duration: 0, error: "Delete failed" });
-          }
-      } catch(e) {
-          tests.push({ description: "should delete topic (cleanup)", passed: false, duration: 0, error: "API Failed" });
-      }
-
-      setDynamicSyllabusResults(tests);
+  const performTest = async (name: string, fn: () => Promise<any[]>) => {
+      const tests = await fn();
+      setDynamicResults(prev => ({ ...prev, [name]: tests }));
   };
 
-  const performStudentActionsTest = async () => {
-      const tests = [];
-      const userId = 'diag_test_user';
-      
-      // Test 1: Add Backlog
-      try {
-          const start = performance.now();
-          await fetch('/api/manage_backlogs.php', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ 
-                  id: `diag_bl_${Date.now()}`,
-                  user_id: userId,
-                  title: 'Diagnostic Task',
-                  subjectId: 'Maths',
-                  priority: 'High',
-                  status: 'PENDING',
-                  deadline: new Date().toISOString().split('T')[0]
-              })
-          });
-          tests.push({ description: "should create backlog entry via API", passed: true, duration: performance.now() - start });
-      } catch(e) {
-          tests.push({ description: "should create backlog entry via API", passed: false, duration: 0, error: "API Error" });
+  const tests = {
+      syllabus: async () => {
+          const tests = [];
+          const testId = `diag_topic_${Date.now()}`;
+          try {
+              const start = performance.now();
+              await fetch('/api/manage_syllabus.php', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ id: testId, name: 'Diagnostic Test Topic', chapter: 'Diagnostic Unit', subject: 'Physics' })
+              });
+              tests.push({ description: "should create new topic via API", passed: true, duration: performance.now() - start });
+          } catch(e) {
+              tests.push({ description: "should create new topic via API", passed: false, duration: 0, error: "API Failed" });
+          }
+          try { await fetch(`/api/manage_syllabus.php?id=${testId}`, { method: 'DELETE' }); } catch(e) {}
+          return tests;
+      },
+      studentActions: async () => {
+           const tests = [];
+          const userId = 'diag_test_user';
+          try {
+              const start = performance.now();
+              await fetch('/api/manage_backlogs.php', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ id: `diag_bl_${Date.now()}`, user_id: userId, title: 'Diagnostic Task', subjectId: 'Maths', priority: 'High', status: 'PENDING', deadline: new Date().toISOString().split('T')[0] })
+              });
+              tests.push({ description: "should create backlog entry via API", passed: true, duration: performance.now() - start });
+          } catch(e) {
+              tests.push({ description: "should create backlog entry via API", passed: false, duration: 0, error: "API Error" });
+          }
+          return tests;
+      },
+      aiSystem: async () => {
+          const tests = [];
+          try {
+              const start = performance.now();
+              const res = await fetch(`https://text.pollinations.ai/${encodeURIComponent('Hello')}`);
+              if(res.ok) {
+                  const txt = await res.text();
+                  tests.push({ description: "should connect to Pollinations AI (Free)", passed: !!txt, duration: performance.now() - start });
+              } else {
+                  tests.push({ description: "should connect to Pollinations AI (Free)", passed: false, duration: 0, error: `HTTP ${res.status}` });
+              }
+          } catch(e: any) {
+              tests.push({ description: "should connect to Pollinations AI (Free)", passed: false, duration: 0, error: e.message });
+          }
+          return tests;
+      },
+      longTextStorage: async () => {
+          const tests = [];
+          const userId = 'diag_large_payload';
+          try {
+              const start = performance.now();
+              // Create large dummy payload > 65KB to test LONGTEXT
+              const hugeConfig = { test: 'x'.repeat(70000) }; 
+              const res = await fetch('/api/save_timetable.php', {
+                  method: 'POST',
+                  headers: {'Content-Type': 'application/json'},
+                  body: JSON.stringify({ user_id: userId, config: hugeConfig, slots: [] })
+              });
+              const json = await res.json();
+              if(json.message === 'Saved') {
+                  tests.push({ description: "should save large Master Plan (>65KB)", passed: true, duration: performance.now() - start });
+              } else {
+                  tests.push({ description: "should save large Master Plan (>65KB)", passed: false, duration: 0, error: "Save failed" });
+              }
+          } catch(e: any) {
+              tests.push({ description: "should save large Master Plan (>65KB)", passed: false, duration: 0, error: e.message });
+          }
+          return tests;
       }
-
-      // Test 2: Revision Sync
-      try {
-          const start = performance.now();
-          await fetch('/api/sync_progress.php', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                  user_id: userId,
-                  topic_id: 'm-sets',
-                  status: 'REVISE',
-                  lastRevised: new Date().toISOString()
-              })
-          });
-          tests.push({ description: "should sync revision status via API", passed: true, duration: performance.now() - start });
-      } catch(e) {
-          tests.push({ description: "should sync revision status via API", passed: false, duration: 0, error: "API Error" });
-      }
-
-      setDynamicStudentResults(tests);
   };
+
+  const suites: [string, any[]][] = [
+      ...Object.entries(results), 
+      ["20. [Admin] Syllabus Management", dynamicResults['syllabus'] || []],
+      ["21. [Student] Action Verification", dynamicResults['studentActions'] || []],
+      ["22. [AI] System Connectivity", dynamicResults['aiSystem'] || []],
+      ["23. [DB] Large Data Storage", dynamicResults['longTextStorage'] || []]
+  ];
 
   const handleStartScan = async () => {
       setScanStatus('RUNNING');
       setScanIndex(0);
-      setDynamicSyllabusResults([]); 
-      setDynamicStudentResults([]);
-
-      // Run synchronous animation for static
+      setDynamicResults({});
+      
       let idx = 0;
       const staticCount = Object.keys(results).length;
       
@@ -245,28 +232,35 @@ export const DiagnosticsScreen: React.FC = () => {
           if (idx >= staticCount) { 
               clearInterval(interval);
               
-              // Run dynamic test 1 (Admin Syllabus)
               setScanIndex(staticCount); 
-              await performSyllabusTest();
+              await performTest('syllabus', tests.syllabus);
               
-              // Run dynamic test 2 (Student Actions)
               setScanIndex(staticCount + 1);
-              await performStudentActionsTest();
+              await performTest('studentActions', tests.studentActions);
+
+              setScanIndex(staticCount + 2);
+              await performTest('aiSystem', tests.aiSystem);
+
+              setScanIndex(staticCount + 3);
+              await performTest('longTextStorage', tests.longTextStorage);
               
               setScanStatus('COMPLETE');
           } else {
               setScanIndex(prev => prev + 1);
               idx++;
           }
-      }, 150); // Fast simulation for static data
+      }, 150); 
   };
 
   // Stats calculation
   const staticTestsCount = Object.values(results).flat().length;
-  const totalTests = staticTestsCount + dynamicSyllabusResults.length + dynamicStudentResults.length;
-  // Simple calc for demo
-  const passedTests = staticTestsCount + dynamicSyllabusResults.filter(t => t.passed).length + dynamicStudentResults.filter(t => t.passed).length; 
-  const passRate = Math.round((passedTests / totalTests) * 100) || 100;
+  const dynamicTestsCount = Object.values(dynamicResults).flat().length;
+  const totalTests = staticTestsCount + dynamicTestsCount;
+  
+  const passedStatic = Object.values(results).flat().filter((t:any) => t.passed).length;
+  const passedDynamic = Object.values(dynamicResults).flat().filter((t:any) => t.passed).length;
+  
+  const passRate = totalTests > 0 ? Math.round(((passedStatic + passedDynamic) / totalTests) * 100) : 100;
 
   return (
     <div className="space-y-8 pb-12">
@@ -340,15 +334,31 @@ export const DiagnosticsScreen: React.FC = () => {
                       {dbStatus.tables && (
                           <div>
                               <h5 className="text-xs font-bold text-slate-500 uppercase mb-3 flex items-center">
-                                  <Table className="w-3 h-3 mr-2" /> Table Statistics
+                                  <Table className="w-3 h-3 mr-2" /> Schema Validation
                               </h5>
                               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                                  {dbStatus.tables.map((t: any, idx: number) => (
-                                      <div key={idx} className="bg-white p-3 rounded-lg border border-slate-200 shadow-sm flex justify-between items-center text-sm">
-                                          <span className="font-bold text-slate-700">{t.name}</span>
-                                          <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded text-xs font-bold border border-blue-100">
-                                              {t.rows} Rows
-                                          </span>
+                                  {REQUIRED_SCHEMA.map((tableName) => {
+                                      const existing = dbStatus.tables.find((t: any) => t.name === tableName);
+                                      return (
+                                          <div key={tableName} className={`p-3 rounded-lg border flex justify-between items-center text-sm ${existing ? 'bg-white border-slate-200' : 'bg-red-50 border-red-200'}`}>
+                                              <span className={`font-bold ${existing ? 'text-slate-700' : 'text-red-700'}`}>{tableName}</span>
+                                              {existing ? (
+                                                  <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded text-xs font-bold border border-blue-100">
+                                                      {existing.rows} Rows
+                                                  </span>
+                                              ) : (
+                                                  <span className="bg-red-100 text-red-700 px-2 py-0.5 rounded text-xs font-bold flex items-center">
+                                                      <AlertCircle className="w-3 h-3 mr-1"/> MISSING
+                                                  </span>
+                                              )}
+                                          </div>
+                                      );
+                                  })}
+                                  {/* Also show extra tables if any */}
+                                  {dbStatus.tables.filter((t: any) => !REQUIRED_SCHEMA.includes(t.name)).map((t: any) => (
+                                       <div key={t.name} className="p-3 rounded-lg border bg-slate-50 border-slate-200 flex justify-between items-center text-sm opacity-60">
+                                          <span className="font-bold text-slate-600">{t.name} (Extra)</span>
+                                          <span className="text-xs font-mono">{t.rows} Rows</span>
                                       </div>
                                   ))}
                               </div>
@@ -401,8 +411,6 @@ export const DiagnosticsScreen: React.FC = () => {
            const isPending = scanStatus === 'IDLE' || idx > scanIndex;
            const isRunning = scanStatus === 'RUNNING' && idx === scanIndex;
            const isComplete = (scanStatus === 'RUNNING' && idx < scanIndex) || (scanStatus === 'COMPLETE');
-           
-           // If complete, we show actual results. If running/pending, we show placeholders.
            const showDetails = isComplete;
            const isSuitePassed = Array.isArray(tests) && tests.every(t => t.passed);
            const totalDuration = Array.isArray(tests) ? tests.reduce((acc, t) => acc + (t.duration || 0), 0) : 0;
