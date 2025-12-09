@@ -24,6 +24,7 @@ import { AdminSyllabusScreen } from './screens/AdminSyllabusScreen';
 import { AdminBlogScreen } from './screens/AdminBlogScreen';
 import { AdminInboxScreen } from './screens/AdminInboxScreen';
 import { AdminAnalyticsScreen } from './screens/AdminAnalyticsScreen';
+import { AdminSystemScreen } from './screens/AdminSystemScreen';
 import { AboutUsScreen } from './screens/AboutUsScreen';
 import { ContactUsScreen } from './screens/ContactUsScreen';
 import { ExamGuideScreen } from './screens/ExamGuideScreen';
@@ -33,6 +34,7 @@ import { AnalyticsScreen } from './screens/AnalyticsScreen';
 import { WellnessScreen } from './screens/WellnessScreen';
 import { BacklogScreen } from './screens/BacklogScreen'; 
 import { PublicLayout } from './components/PublicLayout';
+import { AITutorChat } from './components/AITutorChat';
 import { User, UserProgress, TopicStatus, TestAttempt, Screen, Goal, MistakeLog, Flashcard, MemoryHack, BlogPost, VideoLesson, Question, Test, TimetableConfig, Topic, ContactMessage, BacklogItem } from './lib/types';
 import { calculateNextRevision } from './lib/utils';
 import { SYLLABUS_DATA } from './lib/syllabusData';
@@ -506,7 +508,7 @@ export default function App() {
         user={user}
       />
 
-      <main className="flex-1 md:ml-64 p-4 md:p-8 overflow-y-auto h-screen pb-24 md:pb-8">
+      <main className="flex-1 md:ml-64 p-4 md:p-8 overflow-y-auto h-screen pb-24 md:pb-8 relative">
         
         {/* Mobile Header */}
         <div className="md:hidden flex justify-between items-center mb-6 sticky top-0 bg-slate-50 z-30 py-2 border-b border-slate-200">
@@ -542,12 +544,14 @@ export default function App() {
 
           {user.role === 'STUDENT' && (
               <>
+                <AITutorChat />
                 {currentScreen === 'dashboard' && <DashboardScreen user={user} progress={progress} testAttempts={testAttempts} goals={goals} addGoal={addGoal} toggleGoal={toggleGoal} setScreen={setCurrentScreen} />}
                 {currentScreen === 'syllabus' && <SyllabusScreen user={user} subjects={syllabus} progress={progress} onUpdateProgress={updateTopicProgress} videoMap={videoMap} />}
                 {currentScreen === 'revision' && <RevisionScreen progress={progress} handleRevisionComplete={handleRevisionComplete} />}
                 {currentScreen === 'tests' && <TestScreen user={user} history={testAttempts} addTestAttempt={addTestAttempt} availableTests={adminTests} />}
                 {currentScreen === 'timetable' && <TimetableScreen user={user} savedConfig={timetableData?.config} savedSlots={timetableData?.slots} onSave={saveTimetable} progress={progress} />}
                 {currentScreen === 'focus' && <FocusScreen />}
+                {currentScreen === 'ai-tutor' && <div className="p-12 text-center text-slate-500 italic">Click the AI Robot icon in the bottom right to start chatting!</div>}
                 {currentScreen === 'flashcards' && <FlashcardScreen flashcards={flashcards} />}
                 {currentScreen === 'mistakes' && <MistakesScreen mistakes={mistakes} addMistake={addMistake} />}
                 {currentScreen === 'backlogs' && <BacklogScreen backlogs={backlogs} onAddBacklog={addBacklog} onToggleBacklog={toggleBacklog} onDeleteBacklog={deleteBacklog} />}
@@ -571,11 +575,12 @@ export default function App() {
                 {currentScreen === 'analytics' && <AdminAnalyticsScreen />}
                 {currentScreen === 'diagnostics' && <DiagnosticsScreen />}
                 {currentScreen === 'deployment' && <DeploymentScreen />}
+                {currentScreen === 'system' && <AdminSystemScreen />}
               </>
           )}
 
           {/* Shared/Placeholders */}
-          {['ai-tutor','system','admin_analytics'].includes(currentScreen) && (
+          {['admin_analytics'].includes(currentScreen) && (
               <ComingSoonScreen title={currentScreen.charAt(0).toUpperCase() + currentScreen.slice(1)} icon="🚧" />
           )}
         </div>
