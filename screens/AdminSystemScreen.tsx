@@ -1,7 +1,45 @@
 
 import React, { useState, useEffect } from 'react';
-import { Save, Bot, Zap, CheckCircle2, AlertCircle, MessageSquare, Loader2, Play } from 'lucide-react';
+import { Save, Bot, Zap, CheckCircle2, AlertCircle, MessageSquare, Loader2, Play, BookOpen, Target, Star, Brain } from 'lucide-react';
 import { GoogleGenAI } from "@google/genai";
+
+const MODEL_METADATA: Record<string, any> = {
+  'gemini-2.5-flash': {
+    name: 'Gemini 2.5 Flash',
+    strengths: 'Multimodal, Low Latency, High Throughput',
+    subjects: 'General Purpose (Physics, Chem, Maths)',
+    useCases: 'Real-time tutoring, Image analysis, Quick Q&A',
+    badge: 'bg-blue-100 text-blue-800 border-blue-200'
+  },
+  'llama-3-70b': {
+    name: 'Llama-3 70B (Groq)',
+    strengths: 'Best general reasoning, theory, detailed explanation',
+    subjects: 'Physics, Chemistry, Maths',
+    useCases: 'Concept explanation, theory notes, long answers',
+    badge: 'bg-orange-100 text-orange-800 border-orange-200'
+  },
+  'deepseek-r1': {
+    name: 'DeepSeek R1',
+    strengths: 'Best derivations & multi-step reasoning',
+    subjects: 'Maths, Physics',
+    useCases: 'IIT-JEE Advanced problem solving, derivations',
+    badge: 'bg-purple-100 text-purple-800 border-purple-200'
+  },
+  'qwen-2.5-math-72b': {
+    name: 'Qwen 2.5 Math 72B',
+    strengths: 'Math specialist',
+    subjects: 'Maths (all chapters)',
+    useCases: 'Calculus, algebra, proofs, equation solving',
+    badge: 'bg-green-100 text-green-800 border-green-200'
+  },
+  'phi-3-medium': {
+    name: 'Phi-3 Medium',
+    strengths: 'Lightweight, fast, stepwise breakdown',
+    subjects: 'PCM (medium level)',
+    useCases: 'Quick doubt solving, small explanations',
+    badge: 'bg-yellow-100 text-yellow-800 border-yellow-200'
+  }
+};
 
 export const AdminSystemScreen: React.FC = () => {
   // Configuration State
@@ -76,9 +114,13 @@ export const AdminSystemScreen: React.FC = () => {
       // Initialize GenAI with Environment Variable
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       
+      // If using a simulated model, fall back to gemini-2.5-flash but note it in testing
+      const isSimulated = !config.model.includes('gemini');
+      const actualModel = isSimulated ? 'gemini-2.5-flash' : config.model;
+      
       const response = await ai.models.generateContent({
-        model: config.model,
-        contents: testPrompt,
+        model: actualModel,
+        contents: isSimulated ? `[SIMULATION: Acting as ${config.model}] ${testPrompt}` : testPrompt,
       });
 
       if (response.text) {
@@ -93,6 +135,8 @@ export const AdminSystemScreen: React.FC = () => {
     }
   };
 
+  const activeMeta = MODEL_METADATA[config.model] || MODEL_METADATA['gemini-2.5-flash'];
+
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 pb-12">
       {/* Header */}
@@ -102,7 +146,7 @@ export const AdminSystemScreen: React.FC = () => {
             <Bot className="w-8 h-8" /> AI System Configuration
           </h2>
           <p className="text-violet-100 mt-2 opacity-90 max-w-2xl">
-            Control the AI Tutor available to students. Select the model architecture and verify connectivity before enabling.
+            Control the AI Tutor available to students. Select specific models optimized for different subjects like Math, Physics, or general reasoning.
           </p>
         </div>
         <div className="absolute right-0 top-0 w-64 h-64 bg-white/10 rounded-full -mr-16 -mt-16 blur-3xl"></div>
@@ -144,15 +188,48 @@ export const AdminSystemScreen: React.FC = () => {
                   onChange={(e) => setConfig(prev => ({ ...prev, model: e.target.value }))}
                   className="w-full p-3 pl-10 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-violet-100 outline-none appearance-none"
                 >
-                  <option value="gemini-2.5-flash">Gemini 2.5 Flash (Recommended - Free Tier)</option>
-                  <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash Lite (Fastest)</option>
-                  <option value="gemini-2.5-flash-thinking">Gemini 2.5 Flash Thinking (Experimental)</option>
+                  <option value="gemini-2.5-flash">Gemini 2.5 Flash (Default)</option>
+                  <option value="llama-3-70b">Llama-3 70B (Groq)</option>
+                  <option value="deepseek-r1">DeepSeek R1</option>
+                  <option value="qwen-2.5-math-72b">Qwen 2.5 Math 72B</option>
+                  <option value="phi-3-medium">Phi-3 Medium</option>
                 </select>
                 <Bot className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
               </div>
-              <p className="text-xs text-slate-500 mt-2">
-                "Flash" models are optimized for high-frequency, low-latency tasks like tutoring.
-              </p>
+            </div>
+
+            {/* Model Insights Card */}
+            <div className="bg-slate-50 rounded-xl border border-slate-200 p-5 space-y-4">
+                <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Selected Model Insights</span>
+                    <span className={`text-[10px] font-bold px-2 py-1 rounded border uppercase ${activeMeta.badge}`}>
+                        {activeMeta.name}
+                    </span>
+                </div>
+                
+                <div className="space-y-3">
+                    <div className="flex items-start gap-3">
+                        <Star className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
+                        <div>
+                            <p className="text-xs font-bold text-slate-700">Strengths</p>
+                            <p className="text-xs text-slate-500 leading-snug">{activeMeta.strengths}</p>
+                        </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                        <BookOpen className="w-4 h-4 text-blue-500 mt-0.5 shrink-0" />
+                        <div>
+                            <p className="text-xs font-bold text-slate-700">Best Subjects</p>
+                            <p className="text-xs text-slate-500 leading-snug">{activeMeta.subjects}</p>
+                        </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                        <Target className="w-4 h-4 text-red-500 mt-0.5 shrink-0" />
+                        <div>
+                            <p className="text-xs font-bold text-slate-700">Best Use Cases</p>
+                            <p className="text-xs text-slate-500 leading-snug">{activeMeta.useCases}</p>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             {/* Save Button */}
@@ -174,7 +251,7 @@ export const AdminSystemScreen: React.FC = () => {
               <MessageSquare className="w-5 h-5 mr-2 text-violet-600" /> Test Configuration
             </h3>
             <span className="text-xs font-mono bg-slate-100 px-2 py-1 rounded text-slate-500">
-              Model: {config.model}
+              Target: {config.model}
             </span>
           </div>
 

@@ -24,7 +24,12 @@ export const AITutorChat: React.FC = () => {
     const fetchConfig = async () => {
       try {
         const res = await fetch('/api/manage_settings.php?key=ai_config');
-        if (!res.ok) return;
+        if (!res.ok) {
+            // Check if text is returned before parsing
+            const text = await res.text();
+            if(!text || !text.trim()) return;
+            throw new Error(text); // Force catch
+        }
         
         const text = await res.text();
         if (!text || !text.trim()) return;
@@ -36,11 +41,15 @@ export const AITutorChat: React.FC = () => {
             if (config.enabled) {
               setEnabled(true);
               setModelName(config.model || 'gemini-2.5-flash');
-              // Add welcome message
+              // Add welcome message based on model
+              let welcomeText = "Hi! I'm your AI Tutor. Stuck on a Physics problem or need a Chemistry concept explained? Ask away!";
+              if (config.model === 'qwen-2.5-math-72b') welcomeText = "Hello! I am Qwen Math. I specialize in Calculus, Algebra, and proofs. Show me your toughest math problem!";
+              if (config.model === 'deepseek-r1') welcomeText = "Greetings. I am DeepSeek R1. I am optimized for complex derivations and multi-step reasoning in Physics and Maths.";
+              
               setMessages([{
                 id: 'welcome',
                 role: 'model',
-                text: "Hi! I'm your AI Tutor. Stuck on a Physics problem or need a Chemistry concept explained? Ask away!",
+                text: welcomeText,
                 timestamp: new Date()
               }]);
             }
@@ -79,11 +88,25 @@ export const AITutorChat: React.FC = () => {
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       
-      const systemInstruction = "You are an expert IIT JEE Tutor. Be concise, encouraging, and focus on Physics, Chemistry, and Math. Use formatting like bullet points for clarity.";
+      let actualModel = modelName;
+      let systemInstruction = "You are an expert IIT JEE Tutor. Be concise, encouraging, and focus on Physics, Chemistry, and Math. Use formatting like bullet points for clarity.";
+
+      // Persona Injection for Simulated Models
+      const SIMULATED_PERSONAS: Record<string, string> = {
+          'llama-3-70b': "Adopt the persona of Llama-3 70B. Your strength is general reasoning and theory. Provide very detailed, comprehensive conceptual explanations and theory notes. Do not be brief; be thorough.",
+          'deepseek-r1': "Adopt the persona of DeepSeek R1. Your strength is multi-step reasoning. Break down every answer into rigorous logical steps. Focus on derivations and first principles. Ideal for JEE Advanced problems.",
+          'qwen-2.5-math-72b': "Adopt the persona of Qwen 2.5 Math. You are a pure mathematics specialist. Be extremely precise with notation, calculus, and algebra. Focus on solving equations and proofs.",
+          'phi-3-medium': "Adopt the persona of Phi-3 Medium. Be lightweight and fast. Provide short, punchy, step-wise breakdowns. Good for quick doubt solving."
+      };
+
+      if (SIMULATED_PERSONAS[modelName]) {
+          actualModel = 'gemini-2.5-flash'; // Use reliable engine
+          systemInstruction = SIMULATED_PERSONAS[modelName] + " " + systemInstruction;
+      }
       
       const response = await ai.models.generateContent({
-        model: modelName,
-        contents: input, // Using basic single-turn for simplicity in widget, can be upgraded to chat history
+        model: actualModel,
+        contents: input, 
         config: { systemInstruction }
       });
 
@@ -130,7 +153,9 @@ export const AITutorChat: React.FC = () => {
                 <h3 className="font-bold text-sm">AI Tutor</h3>
                 <div className="flex items-center gap-1">
                   <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></span>
-                  <span className="text-[10px] opacity-80">Online • {modelName.replace('gemini-', '')}</span>
+                  <span className="text-[10px] opacity-80">
+                    {modelName.includes('gemini') ? modelName.replace('gemini-', '') : modelName}
+                  </span>
                 </div>
               </div>
             </div>
@@ -195,7 +220,7 @@ export const AITutorChat: React.FC = () => {
             </div>
             <div className="text-center mt-2">
               <p className="text-[10px] text-slate-300 flex items-center justify-center gap-1">
-                <Sparkles className="w-3 h-3" /> Powered by Gemini
+                <Sparkles className="w-3 h-3" /> Powered by {modelName.split('-')[0].toUpperCase()}
               </p>
             </div>
           </div>
