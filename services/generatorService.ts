@@ -24,7 +24,7 @@ export const generateHtaccess = () => `
 `;
 
 export const generateSQLSchema = () => `
--- IITGEEPrep Database Schema v8.0
+-- IITGEEPrep Database Schema v8.1
 -- Target: MySQL / MariaDB (Hostinger)
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
@@ -243,7 +243,7 @@ INSERT INTO \`users\` (\`name\`, \`email\`, \`password_hash\`, \`role\`) VALUES
 COMMIT;
 `;
 
-export const generateFrontendGuide = () => `# IITGEEPrep Hostinger Deployment Guide
+export const generateFrontendGuide = () => `# IITGEEPrep Hostinger Deployment Guide (v8.1)
 
 ## Phase 1: Preparation
 1. Run \`npm run build\` in your local terminal.
@@ -334,7 +334,7 @@ try {
         folder: 'api',
         desc: 'API Root Health Check',
         content: `${phpHeader}
-echo json_encode(["status" => "active", "message" => "IITGEEPrep API v8.0 Operational", "timestamp" => date('c')]);
+echo json_encode(["status" => "active", "message" => "IITGEEPrep API v8.1 Operational", "timestamp" => date('c')]);
 ?>`
     },
     {

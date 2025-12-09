@@ -7,7 +7,7 @@ const DIAGNOSTICS_DATA = {
   "metadata": {
     "timestamp": new Date().toISOString(),
     "url": "https://iitgeeprep.com/",
-    "appVersion": "v8.0"
+    "appVersion": "v8.1"
   },
   "results": {
     "1. [System] Core Health": [

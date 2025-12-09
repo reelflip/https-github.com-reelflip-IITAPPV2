@@ -1,5 +1,6 @@
+// v8.1 - Free AI Update
 import React, { useState, useEffect, useRef } from 'react';
-import { Bot, X, Send, Loader2, Sparkles, User, ChevronDown } from 'lucide-react';
+import { Bot, X, Send, Loader2, Sparkles, ChevronDown } from 'lucide-react';
 
 interface Message {
   id: string;
@@ -23,10 +24,9 @@ export const AITutorChat: React.FC = () => {
       try {
         const res = await fetch('/api/manage_settings.php?key=ai_config');
         if (!res.ok) {
-            // Check if text is returned before parsing
             const text = await res.text();
             if(!text || !text.trim()) return;
-            throw new Error(text); // Force catch
+            throw new Error(text);
         }
         
         const text = await res.text();
@@ -39,7 +39,7 @@ export const AITutorChat: React.FC = () => {
             if (config.enabled) {
               setEnabled(true);
               setModelName(config.model || 'gemini-2.5-flash');
-              // Add welcome message based on model
+              
               let welcomeText = "Hi! I'm your AI Tutor. Stuck on a Physics problem or need a Chemistry concept explained? Ask away!";
               if (config.model === 'qwen-2.5-math-72b') welcomeText = "Hello! I am Qwen Math. I specialize in Calculus, Algebra, and proofs. Show me your toughest math problem!";
               if (config.model === 'deepseek-r1') welcomeText = "Greetings. I am DeepSeek R1. I am optimized for complex derivations and multi-step reasoning in Physics and Maths.";
@@ -56,7 +56,6 @@ export const AITutorChat: React.FC = () => {
           }
         }
       } catch (err) {
-        // Silent fail for offline/demo modes
         console.debug("AI Settings fetch failed (likely offline/demo mode)");
       }
     };
@@ -86,7 +85,7 @@ export const AITutorChat: React.FC = () => {
     try {
       let systemInstruction = "You are an expert IIT JEE Tutor. Be concise, encouraging, and focus on Physics, Chemistry, and Math. Use formatting like bullet points for clarity.";
 
-      // Persona Injection for Simulated Models
+      // Persona Injection
       const SIMULATED_PERSONAS: Record<string, string> = {
           'llama-3-70b': "Adopt the persona of Llama-3 70B. Your strength is general reasoning and theory. Provide very detailed, comprehensive conceptual explanations and theory notes. Do not be brief; be thorough.",
           'deepseek-r1': "Adopt the persona of DeepSeek R1. Your strength is multi-step reasoning. Break down every answer into rigorous logical steps. Focus on derivations and first principles. Ideal for JEE Advanced problems.",
@@ -98,7 +97,7 @@ export const AITutorChat: React.FC = () => {
           systemInstruction = SIMULATED_PERSONAS[modelName] + " " + systemInstruction;
       }
       
-      // Combine history for context (last 5 messages)
+      // Combine history for context
       const conversationHistory = messages.slice(-5).map(m => `${m.role === 'user' ? 'User' : 'Tutor'}: ${m.text}`).join('\n');
       const fullPrompt = `${systemInstruction}\n\nContext:\n${conversationHistory}\n\nUser: ${input}\nTutor:`;
 

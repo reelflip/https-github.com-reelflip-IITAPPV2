@@ -1,3 +1,4 @@
+// v8.1 - Free AI Update
 import React, { useState, useEffect } from 'react';
 import { Save, Bot, Zap, CheckCircle2, AlertCircle, MessageSquare, Loader2, Play, BookOpen, Target, Star, Brain } from 'lucide-react';
 
@@ -101,7 +102,7 @@ export const AdminSystemScreen: React.FC = () => {
     }
   };
 
-  // Test Logic (Using Pollinations Free API)
+  // Test Logic (Using Pollinations Free API - No Google SDK)
   const handleTest = async () => {
     if (!testPrompt.trim()) return;
     setTesting(true);
