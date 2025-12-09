@@ -1,60 +1,5 @@
 import { Subject, TopicStatus, Role } from '../lib/types';
 
-export const generateFrontendGuide = () => `# Deployment Manual for Hostinger (Shared Hosting)
-
-## Prerequisites
-1. A Hostinger Shared Hosting Plan.
-2. A Domain Name connected to Hostinger.
-3. Node.js installed on your local machine.
-
-## Phase 1: Build Frontend (Local)
-1. Open your project terminal.
-2. Run \`npm run build\`.
-3. This creates a \`dist\` folder.
-4. Compress the contents of the \`dist\` folder into \`frontend.zip\`.
-
-## Phase 2: Database Setup (Hostinger)
-1. Go to **Databases** > **Management** in Hostinger Panel.
-2. Create a new MySQL Database.
-   - Note down Database Name, Username, and Password.
-3. Click **Enter phpMyAdmin**.
-4. Select your new database.
-5. Click **Import** tab.
-6. Upload the \`database.sql\` file downloaded from the System Center.
-7. Click **Go** to execute.
-
-## Phase 3: Backend Upload (Hostinger)
-1. Go to **File Manager** in Hostinger Panel.
-2. Navigate to \`public_html\`.
-3. Create a new folder named \`api\`.
-4. Enter \`api\` folder.
-5. Upload all PHP files downloaded from System Center.
-6. Edit \`config.php\`:
-   - Update \`$host\`, \`$db_name\`, \`$username\`, \`$password\` with your database details.
-7. Go back to \`public_html\`.
-8. Create or Edit \`.htaccess\` file and paste the content provided in System Center.
-
-## Phase 4: Frontend Upload (Hostinger)
-1. Go to **File Manager** > \`public_html\`.
-2. Upload \`frontend.zip\`.
-3. Right-click and **Extract**.
-4. Ensure \`index.html\` is in \`public_html\` (not in a subfolder).
-5. Delete \`frontend.zip\`.
-
-## Phase 5: Google Auth (Optional)
-1. Go to Google Cloud Console.
-2. Create a Project.
-3. Configure OAuth Consent Screen.
-4. Create Credentials > OAuth Client ID (Web Application).
-5. Add your domain (e.g., \`https://yourdomain.com\`) to **Authorized JavaScript origins**.
-6. Update \`AuthScreen.tsx\` locally with new Client ID and rebuild, or update if dynamic config is enabled.
-
-## Phase 6: Verification
-1. Open your website.
-2. Go to **System** > **Diagnostics** (if admin) or check Console for network errors.
-3. Run the "Connection Tester" in Deployment Screen to verify API connectivity.
-`;
-
 export const getDeploymentPhases = () => [
     { title: "Build & Prep", subtitle: "Local Machine", bg: "bg-blue-50 border-blue-200", color: "text-blue-700", steps: ["Run `npm run build`", "Zip the `dist` folder"] },
     { title: "Database Setup", subtitle: "Hostinger Panel", bg: "bg-yellow-50 border-yellow-200", color: "text-yellow-700", steps: ["Create MySQL Database", "Import `database.sql`"] },
@@ -79,7 +24,7 @@ export const generateHtaccess = () => `
 `;
 
 export const generateSQLSchema = () => `
--- IITGEEPrep Database Schema v9.3
+-- IITGEEPrep Database Schema v9.8
 -- Target: MySQL / MariaDB (Hostinger)
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
@@ -109,7 +54,9 @@ CREATE TABLE IF NOT EXISTS \`users\` (
   PRIMARY KEY (\`id\`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 2. TOPIC PROGRESS
+-- (Tables 2-8 same as v9.5)
+-- ... [topic_progress, tests, questions, test_attempts, attempt_details, flashcards, memory_hacks] ...
+
 CREATE TABLE IF NOT EXISTS \`topic_progress\` (
   \`id\` int(11) NOT NULL AUTO_INCREMENT,
   \`user_id\` int(11) NOT NULL,
@@ -130,7 +77,6 @@ CREATE TABLE IF NOT EXISTS \`topic_progress\` (
   UNIQUE KEY \`unique_user_topic\` (\`user_id\`,\`topic_id\`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 3. TESTS
 CREATE TABLE IF NOT EXISTS \`tests\` (
   \`id\` varchar(50) NOT NULL,
   \`title\` varchar(150) NOT NULL,
@@ -141,7 +87,6 @@ CREATE TABLE IF NOT EXISTS \`tests\` (
   PRIMARY KEY (\`id\`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 4. QUESTIONS
 CREATE TABLE IF NOT EXISTS \`questions\` (
   \`id\` varchar(50) NOT NULL,
   \`test_id\` varchar(50) DEFAULT NULL,
@@ -155,7 +100,6 @@ CREATE TABLE IF NOT EXISTS \`questions\` (
   PRIMARY KEY (\`id\`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 5. TEST ATTEMPTS
 CREATE TABLE IF NOT EXISTS \`test_attempts\` (
   \`id\` varchar(50) NOT NULL,
   \`user_id\` int(11) NOT NULL,
@@ -170,7 +114,6 @@ CREATE TABLE IF NOT EXISTS \`test_attempts\` (
   PRIMARY KEY (\`id\`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 6. ATTEMPT DETAILS
 CREATE TABLE IF NOT EXISTS \`attempt_details\` (
   \`id\` int(11) NOT NULL AUTO_INCREMENT,
   \`attempt_id\` varchar(50) NOT NULL,
@@ -180,7 +123,6 @@ CREATE TABLE IF NOT EXISTS \`attempt_details\` (
   PRIMARY KEY (\`id\`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 7. CONTENT (Flashcards, Hacks, Blogs)
 CREATE TABLE IF NOT EXISTS \`flashcards\` (
   \`id\` int(11) NOT NULL AUTO_INCREMENT,
   \`front\` text NOT NULL,
@@ -199,6 +141,7 @@ CREATE TABLE IF NOT EXISTS \`memory_hacks\` (
   PRIMARY KEY (\`id\`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- BLOG POSTS (With 5 Rich Seed Posts)
 CREATE TABLE IF NOT EXISTS \`blog_posts\` (
   \`id\` int(11) NOT NULL AUTO_INCREMENT,
   \`title\` varchar(255) NOT NULL,
@@ -211,7 +154,6 @@ CREATE TABLE IF NOT EXISTS \`blog_posts\` (
   PRIMARY KEY (\`id\`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 8. EXTRAS (Syllabus, Videos, Notifications)
 CREATE TABLE IF NOT EXISTS \`topics\` (
   \`id\` varchar(50) NOT NULL,
   \`name\` varchar(255) NOT NULL,
@@ -298,9 +240,62 @@ INSERT INTO \`users\` (\`name\`, \`email\`, \`password_hash\`, \`role\`) VALUES
 
 -- Seed Sample Blog Post (Editable by Admin)
 INSERT INTO \`blog_posts\` (\`title\`, \`excerpt\`, \`content\`, \`author\`, \`category\`, \`image_url\`) VALUES
-('JEE Main & Advanced 2025: Complete Roadmap', 'A strategic month-by-month guide to conquering Physics, Chemistry, and Maths while managing Board Exams.', '<h2>The Foundation</h2><p>Success in JEE Main and Advanced is not just about hard work; it is about <strong>smart work</strong> and consistent effort.</p><h3>1. Chemistry: The Scoring Machine</h3><p>Chemistry is the easiest subject to score in if you stick to the basics. <strong>NCERT is your Bible</strong> for Inorganic Chemistry. Do not ignore it.</p><h3>2. Physics: Concepts over Formulas</h3><p>Avoid rote memorization. Focus on Mechanics and Electrodynamics as they form the bulk of the paper. Solve Irodov for Advanced preparation.</p><h3>3. Mathematics: Practice is Key</h3><p>Calculus and Algebra require daily practice. Solve at least 30-40 problems every day to build muscle memory.</p><h3>4. Mock Tests</h3><p>Start taking full-length mock tests at least 6 months before the exam. Analyze your mistakes using the <strong>Mistake Notebook</strong> feature in this app.</p>', 'System Admin', 'Strategy', 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&q=80&w=1000');
+('JEE Main & Advanced 2025: Complete Roadmap', 'A strategic month-by-month guide to conquering Physics, Chemistry, and Maths while managing Board Exams.', '<h2>The Foundation</h2><p>Success in JEE Main and Advanced is not just about hard work; it is about <strong>smart work</strong> and consistent effort.</p><h3>1. Chemistry: The Scoring Machine</h3><p>Chemistry is the easiest subject to score in if you stick to the basics. <strong>NCERT is your Bible</strong> for Inorganic Chemistry. Do not ignore it.</p><h3>2. Physics: Concepts over Formulas</h3><p>Avoid rote memorization. Focus on Mechanics and Electrodynamics as they form the bulk of the paper. Solve Irodov for Advanced preparation.</p><h3>3. Mathematics: Practice is Key</h3><p>Calculus and Algebra require daily practice. Solve at least 30-40 problems every day to build muscle memory.</p><h3>4. Mock Tests</h3><p>Start taking full-length mock tests at least 6 months before the exam. Analyze your mistakes using the <strong>Mistake Notebook</strong> feature in this app.</p>', 'System Admin', 'Strategy', 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&q=80&w=1000'),
+('The Art of Mock Analysis', 'Taking a test is only 30% of the work. The real improvement comes from the 3 hours you spend analyzing it afterward.', '<h2>Why Analyze?</h2><p>Mock tests are not for judging your intelligence; they are for identifying your gaps.</p><ul><li><strong>Silly Mistakes:</strong> Did you misread the question?</li><li><strong>Conceptual Errors:</strong> Did you apply the wrong formula?</li><li><strong>Time Management:</strong> Did you spend too long on a hard question?</li></ul><p>Use the Analytics tab in this app to track your weak areas.</p>', 'Academic Head', 'Tips', 'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&q=80&w=1000'),
+('Sleep & Performance: The Hidden Link', 'Why pulling all-nighters might be destroying your rank. Learn the science of memory consolidation during sleep.', '<h2>Sleep is Study</h2><p>During REM sleep, your brain consolidates memory. If you cut sleep to study more, you actually retain less. Aim for 7 hours of quality sleep. Use the <strong>Wellness</strong> tab to practice box breathing before bed.</p>', 'Dr. Expert', 'Wellness', 'https://images.unsplash.com/photo-1541781777621-af13943727dd?auto=format&fit=crop&q=80&w=1000'),
+('Top 10 High Weightage Topics in Physics', 'Don\'t study hard, study smart. Focus on these chapters first to secure 60+ marks in Physics easily.', '<h2>The Pareto Principle</h2><p>80% of the questions come from 20% of the topics. Here is the list:</p><ol><li><strong>Modern Physics:</strong> High weightage, easy questions.</li><li><strong>Heat & Thermodynamics:</strong> Formula based, easy to score.</li><li><strong>Optics:</strong> Lengthy but predictable.</li><li><strong>Current Electricity:</strong> Always 2-3 questions.</li><li><strong>Electrostatics:</strong> Conceptual but standard patterns.</li></ol><p>Master these before moving to complex mechanics problems.</p>', 'Physics HOD', 'Subject-wise', 'https://images.unsplash.com/photo-1636466497217-26a8cbeaf0aa?auto=format&fit=crop&q=80&w=1000'),
+('Balancing Boards and JEE', 'The ultimate juggling act. How to ensure 95% in Boards without derailing your IIT preparation.', '<h2>Two Birds, One Stone</h2><p>JEE and Boards are not enemies. The syllabus is the same. The difference is the <em>approach</em>.</p><p><strong>For Physics & Chem:</strong> JEE preparation automatically covers Board concepts. You just need to practice writing subjective answers 1 month before exams.</p><p><strong>For Maths:</strong> Board level calculus is much simpler. Focus on NCERT examples.</p><p><strong>English/Optional:</strong> Dedicate Sundays exclusively to these subjects starting from January.</p>', 'Alumni Mentor', 'Strategy', 'https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&q=80&w=1000');
 
 COMMIT;
+`;
+
+export const generateFrontendGuide = () => `# IITGEEPrep Hostinger Deployment Guide (v9.8)
+
+## Phase 1: Preparation
+1. Run \`npm run build\` in your local terminal.
+2. Go to the \`dist\` folder created.
+3. Select all files inside \`dist\` and zip them (e.g., \`frontend.zip\`).
+
+## Phase 2: Database
+1. Log in to Hostinger hPanel.
+2. Go to Databases > Management.
+3. Create a new MySQL Database. Note down:
+   - Database Name
+   - Database Username
+   - Database Password
+4. Click "Enter phpMyAdmin".
+5. Select your database on the left.
+6. Click "Import" tab -> Choose \`database.sql\` (downloaded from Admin Panel) -> Go.
+
+## Phase 3: Backend API
+1. In Hostinger, go to Files > File Manager.
+2. Navigate to \`public_html\`.
+3. Create a new folder named \`api\`.
+4. Open \`api\` folder.
+5. Upload all PHP files generated by the Admin Panel (download the zip).
+6. Right-click \`config.php\` -> Edit.
+7. Update \`$db_name\`, \`$username\`, \`$password\` with details from Phase 2.
+8. Save.
+
+## Phase 4: Frontend
+1. Go back to \`public_html\`.
+2. Upload \`frontend.zip\`.
+3. Right-click -> Extract.
+4. Ensure \`index.html\` is directly inside \`public_html\`, not in a subfolder.
+5. Upload \`.htaccess\` to \`public_html\` to handle routing.
+
+## Phase 5: Google Login (Optional)
+1. Go to Google Cloud Console > APIs & Services > Credentials.
+2. Create Credentials > OAuth Client ID > Web Application.
+3. **IMPORTANT:** Add your website URL (e.g., https://yourdomain.com) to **Authorized JavaScript Origins**.
+4. Copy the Client ID.
+5. In your local code, update \`AuthScreen.tsx\` with this Client ID.
+6. Re-build and re-upload the frontend.
+
+## Phase 6: Verify
+1. Open your website domain.
+2. Login with 'admin@iitgeeprep.com' and password 'Ishika@123'.
+3. If it works, you are live!
 `;
 
 // --- PHP FILE GENERATORS ---
@@ -345,7 +340,7 @@ try {
         folder: 'api',
         desc: 'API Root Health Check',
         content: `${phpHeader}
-echo json_encode(["status" => "active", "message" => "IITGEEPrep API v9.3 Operational", "timestamp" => date('c')]);
+echo json_encode(["status" => "active", "message" => "IITGEEPrep API v9.8 Operational", "timestamp" => date('c')]);
 ?>`
     },
     {
@@ -714,7 +709,7 @@ $stmt = $conn->prepare("INSERT INTO test_attempts (id, user_id, test_id, score, 
 $id = uniqid('att_');
 $stmt->execute([
     $id, $data->user_id, $data->testId, $data->score, $data->totalQuestions*4, $data->accuracy_percent, 
-    $data->correctCount, $data->incorrectCount, $data->unattempted_count
+    $data->correctCount, $data->incorrectCount, $data->unattemptedCount
 ]);
 
 // Save Details

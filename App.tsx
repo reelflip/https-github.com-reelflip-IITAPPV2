@@ -39,7 +39,7 @@ import { calculateNextRevision } from './lib/utils';
 import { SYLLABUS_DATA } from './lib/syllabusData';
 import { TrendingUp, Bell } from 'lucide-react';
 
-const APP_VERSION = '9.3';
+const APP_VERSION = '9.8';
 
 const ComingSoonScreen = ({ title, icon }: { title: string, icon: string }) => (
   <div className="flex flex-col items-center justify-center h-[70vh] text-center">
@@ -96,7 +96,7 @@ export default function App() {
   const [syllabus, setSyllabus] = useState<Topic[]>(SYLLABUS_DATA);
   const [linkedStudentData, setLinkedStudentData] = useState<{ progress: Record<string, UserProgress>; tests: TestAttempt[]; studentName: string; } | undefined>(undefined);
   
-  // Shared Content
+  // Shared Content - Pre-seeded with Rich Data to ensure visibility
   const [flashcards, setFlashcards] = useState<Flashcard[]>([
      { id: 1, front: "Newton's Second Law", back: "F = ma", subjectId: 'phys' },
      { id: 2, front: "Integration of sin(x)", back: "-cos(x) + C", subjectId: 'math' }
@@ -104,7 +104,8 @@ export default function App() {
   const [hacks, setHacks] = useState<MemoryHack[]>([
      { id: 1, title: 'Trig Values', description: 'Remember SOH CAH TOA', tag: 'Maths', subjectId: 'math', trick: 'SOH CAH TOA' }
   ]);
-  // Rich Blog Seed directly in frontend state for immediate visibility
+  
+  // *** CRITICAL: RICH BLOG SEED ***
   const [blogs, setBlogs] = useState<BlogPost[]>([
      { 
        id: 1, 
@@ -115,6 +116,46 @@ export default function App() {
        date: new Date().toISOString(),
        imageUrl: 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&q=80&w=1000',
        category: 'Strategy'
+     },
+     { 
+       id: 2, 
+       title: 'The Art of Mock Analysis', 
+       excerpt: 'Taking a test is only 30% of the work. The real improvement comes from the 3 hours you spend analyzing it afterward.', 
+       content: '<h2>Why Analyze?</h2><p>Mock tests are not for judging your intelligence; they are for identifying your gaps.</p><ul><li><strong>Silly Mistakes:</strong> Did you misread the question?</li><li><strong>Conceptual Errors:</strong> Did you apply the wrong formula?</li><li><strong>Time Management:</strong> Did you spend too long on a hard question?</li></ul><p>Use the Analytics tab in this app to track your weak areas.</p>', 
+       author: 'Academic Head', 
+       date: new Date(Date.now() - 86400000).toISOString(),
+       imageUrl: 'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&q=80&w=1000',
+       category: 'Tips'
+     },
+     { 
+       id: 3, 
+       title: 'Sleep & Performance: The Hidden Link', 
+       excerpt: 'Why pulling all-nighters might be destroying your rank. Learn the science of memory consolidation during sleep.', 
+       content: '<h2>Sleep is Study</h2><p>During REM sleep, your brain consolidates memory. If you cut sleep to study more, you actually retain less. Aim for 7 hours of quality sleep. Use the <strong>Wellness</strong> tab to practice box breathing before bed.</p>', 
+       author: 'Dr. Expert', 
+       date: new Date(Date.now() - 172800000).toISOString(),
+       imageUrl: 'https://images.unsplash.com/photo-1541781777621-af13943727dd?auto=format&fit=crop&q=80&w=1000',
+       category: 'Wellness'
+     },
+     {
+        id: 4,
+        title: 'Top 10 High Weightage Topics in Physics',
+        excerpt: 'Don\'t study hard, study smart. Focus on these chapters first to secure 60+ marks in Physics easily.',
+        content: '<h2>The Pareto Principle</h2><p>80% of the questions come from 20% of the topics. Here is the list:</p><ol><li><strong>Modern Physics:</strong> High weightage, easy questions.</li><li><strong>Heat & Thermodynamics:</strong> Formula based, easy to score.</li><li><strong>Optics:</strong> Lengthy but predictable.</li><li><strong>Current Electricity:</strong> Always 2-3 questions.</li><li><strong>Electrostatics:</strong> Conceptual but standard patterns.</li></ol><p>Master these before moving to complex mechanics problems.</p>',
+        author: 'Physics HOD',
+        date: new Date(Date.now() - 259200000).toISOString(),
+        imageUrl: 'https://images.unsplash.com/photo-1636466497217-26a8cbeaf0aa?auto=format&fit=crop&q=80&w=1000',
+        category: 'Subject-wise'
+     },
+     {
+        id: 5,
+        title: 'Balancing Boards and JEE',
+        excerpt: 'The ultimate juggling act. How to ensure 95% in Boards without derailing your IIT preparation.',
+        content: '<h2>Two Birds, One Stone</h2><p>JEE and Boards are not enemies. The syllabus is the same. The difference is the <em>approach</em>.</p><p><strong>For Physics & Chem:</strong> JEE preparation automatically covers Board concepts. You just need to practice writing subjective answers 1 month before exams.</p><p><strong>For Maths:</strong> Board level calculus is much simpler. Focus on NCERT examples.</p><p><strong>English/Optional:</strong> Dedicate Sundays exclusively to these subjects starting from January.</p>',
+        author: 'Alumni Mentor',
+        date: new Date(Date.now() - 345600000).toISOString(),
+        imageUrl: 'https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&q=80&w=1000',
+        category: 'Strategy'
      }
   ]);
   
