@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { Navigation, MobileNavigation } from './components/Navigation';
 import { AuthScreen } from './screens/AuthScreen';
@@ -121,6 +122,7 @@ export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [currentScreen, setCurrentScreen] = useState<Screen>('dashboard');
   const [enableGoogleLogin, setEnableGoogleLogin] = useState(true); // Admin Controlled
+  const [gaMeasurementId, setGaMeasurementId] = useState<string | null>(null);
   
   // Persisted Data for CURRENT USER
   const [progress, setProgress] = useState<Record<string, UserProgress>>({});
@@ -160,6 +162,42 @@ export default function App() {
   // Admin Tests & Question Bank
   const [questionBank, setQuestionBank] = useState<Question[]>([]);
   const [adminTests, setAdminTests] = useState<Test[]>([]);
+
+  // --- Initialize Google Analytics ---
+  useEffect(() => {
+      const initGA = async () => {
+          try {
+              const res = await fetch('/api/manage_settings.php?key=google_analytics_id');
+              const data = await res.json();
+              if (data.value && !window.gtag) {
+                  setGaMeasurementId(data.value);
+                  const script = document.createElement('script');
+                  script.async = true;
+                  script.src = `https://www.googletagmanager.com/gtag/js?id=${data.value}`;
+                  document.head.appendChild(script);
+
+                  window.dataLayer = window.dataLayer || [];
+                  function gtag(...args: any[]){window.dataLayer.push(args);}
+                  window.gtag = gtag;
+                  gtag('js', new Date());
+                  gtag('config', data.value);
+              }
+          } catch (e) {
+              console.warn("GA Init Failed (likely offline/no settings table)");
+          }
+      };
+      initGA();
+  }, []);
+
+  // Track Page Views
+  useEffect(() => {
+      if (window.gtag && gaMeasurementId) {
+          window.gtag('event', 'screen_view', {
+              'screen_name': currentScreen,
+              'app_name': 'IITJEEPrep'
+          });
+      }
+  }, [currentScreen, gaMeasurementId]);
 
   // --- Data Loading Logic ---
   const loadLocalData = (userId: string) => {

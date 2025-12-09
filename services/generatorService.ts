@@ -1,4 +1,5 @@
 
+
 import { Subject, TopicStatus, Role } from '../lib/types';
 
 export const getDeploymentPhases = () => [
@@ -25,7 +26,7 @@ export const generateHtaccess = () => `
 `;
 
 export const generateSQLSchema = () => `
--- IITGEEPrep Database Schema v7.5
+-- IITGEEPrep Database Schema v7.6
 -- Target: MySQL / MariaDB (Hostinger)
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
@@ -229,6 +230,12 @@ CREATE TABLE IF NOT EXISTS \`timetable_configs\` (
   \`config_json\` text,
   \`slots_json\` text,
   PRIMARY KEY (\`user_id\`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS \`system_settings\` (
+  \`setting_key\` varchar(50) NOT NULL,
+  \`setting_value\` text,
+  PRIMARY KEY (\`setting_key\`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- Seed Admin
@@ -926,6 +933,37 @@ elseif ($method === 'PUT') {
 elseif ($method === 'DELETE') {
     $conn->prepare("DELETE FROM users WHERE id = ?")->execute([$_GET['id']]);
     echo json_encode(["message" => "Deleted"]);
+}
+?>`
+    },
+    {
+        name: 'manage_settings.php',
+        folder: 'api',
+        desc: 'System Configuration',
+        content: `${phpHeader}
+$data = json_decode(file_get_contents("php://input"));
+$method = $_SERVER['REQUEST_METHOD'];
+
+if ($method === 'GET') {
+    $key = $_GET['key'] ?? null;
+    if ($key) {
+        $stmt = $conn->prepare("SELECT setting_value FROM system_settings WHERE setting_key = ?");
+        $stmt->execute([$key]);
+        $res = $stmt->fetch(PDO::FETCH_ASSOC);
+        echo json_encode(["value" => $res['setting_value'] ?? null]);
+    } else {
+        $stmt = $conn->query("SELECT * FROM system_settings");
+        echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
+    }
+}
+elseif ($method === 'POST') {
+    $key = $data->key;
+    $value = $data->value;
+    
+    // Upsert (Insert or Update)
+    $stmt = $conn->prepare("INSERT INTO system_settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value = ?");
+    $stmt->execute([$key, $value, $value]);
+    echo json_encode(["message" => "Saved"]);
 }
 ?>`
     },

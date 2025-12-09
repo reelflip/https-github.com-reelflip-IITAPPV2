@@ -1,8 +1,9 @@
 
-import React from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { User } from '../lib/types';
 import { StatCard } from '../components/StatCard';
-import { Settings, ToggleLeft, ToggleRight, HelpCircle } from 'lucide-react';
+import { Settings, ToggleLeft, ToggleRight, HelpCircle, BarChart3, Save, CheckCircle2 } from 'lucide-react';
 
 interface Props {
   user: User;
@@ -13,8 +14,39 @@ interface Props {
 }
 
 export const AdminDashboardScreen: React.FC<Props> = ({ user, onNavigate, messageCount = 0, enableGoogleLogin, onToggleGoogle }) => {
+  const [gaId, setGaId] = useState('');
+  const [gaSaving, setGaSaving] = useState(false);
+  const [gaSaved, setGaSaved] = useState(false);
+
+  useEffect(() => {
+      // Fetch GA ID on mount
+      fetch('/api/manage_settings.php?key=google_analytics_id')
+          .then(res => res.json())
+          .then(data => {
+              if (data.value) setGaId(data.value);
+          })
+          .catch(err => console.error("Failed to fetch GA settings", err));
+  }, []);
+
+  const handleSaveGA = async () => {
+      setGaSaving(true);
+      try {
+          await fetch('/api/manage_settings.php', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ key: 'google_analytics_id', value: gaId })
+          });
+          setGaSaved(true);
+          setTimeout(() => setGaSaved(false), 2000);
+      } catch (err) {
+          console.error("Failed to save GA settings", err);
+      } finally {
+          setGaSaving(false);
+      }
+  };
+
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
       {/* Header */}
       <div className="bg-[#0f172a] rounded-xl p-8 text-white relative overflow-hidden shadow-xl">
         <div className="absolute right-0 top-0 bottom-0 w-1/3 opacity-10 pointer-events-none">
@@ -114,6 +146,38 @@ export const AdminDashboardScreen: React.FC<Props> = ({ user, onNavigate, messag
                     </div>
                 )}
              </div>
+          </div>
+
+          {/* Analytics Configuration */}
+          <div className="lg:col-span-2 bg-white p-8 rounded-xl border border-slate-200 shadow-sm">
+              <div className="flex items-center gap-3 mb-6">
+                  <BarChart3 className="w-6 h-6 text-orange-600" />
+                  <h3 className="text-lg font-bold text-slate-800">Analytics Configuration</h3>
+              </div>
+              
+              <div className="flex flex-col md:flex-row gap-6 items-end">
+                  <div className="flex-1 w-full">
+                      <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Google Analytics Measurement ID</label>
+                      <input 
+                          type="text" 
+                          value={gaId}
+                          onChange={(e) => setGaId(e.target.value)}
+                          placeholder="G-XXXXXXXXXX"
+                          className="w-full p-3 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-100 font-mono"
+                      />
+                      <p className="text-xs text-slate-400 mt-2">
+                          Enter your tag ID (starting with G-) to enable traffic tracking.
+                      </p>
+                  </div>
+                  <button 
+                      onClick={handleSaveGA}
+                      disabled={gaSaving}
+                      className="bg-orange-600 text-white px-6 py-3 rounded-lg font-bold shadow-md hover:bg-orange-700 transition-all flex items-center gap-2 disabled:opacity-70 h-[46px]"
+                  >
+                      {gaSaved ? <CheckCircle2 className="w-4 h-4" /> : <Save className="w-4 h-4" />}
+                      {gaSaved ? 'Saved!' : 'Save ID'}
+                  </button>
+              </div>
           </div>
       </div>
     </div>

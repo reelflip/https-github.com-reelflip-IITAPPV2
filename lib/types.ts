@@ -6,6 +6,8 @@ declare global {
     IITJEE_CONFIG: {
       enableDevTools: boolean;
     };
+    dataLayer: any[];
+    gtag: (...args: any[]) => void;
     google?: {
       accounts: {
         id: {
