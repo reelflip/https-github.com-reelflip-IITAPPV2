@@ -1,5 +1,4 @@
 
-
 // Add global window type definition
 declare global {
   interface Window {
@@ -117,6 +116,15 @@ export interface User {
   googleId?: string; // For Social Login
 }
 
+export interface MasterPlanWeek {
+    weekNumber: number;
+    startDate: string;
+    endDate: string;
+    focus: 'LEARNING' | 'REVISION' | 'MOCK';
+    topics: Topic[]; // Topics assigned to this week
+    completed: boolean;
+}
+
 export interface TimetableConfig {
   wakeTime: string;
   bedTime: string; 
@@ -126,6 +134,10 @@ export interface TimetableConfig {
   coachingEnd: string;
   schoolEnabled?: boolean;
   coachingDays?: string[];
+  // New: Master Plan persistence
+  masterPlan?: MasterPlanWeek[];
+  planStartDate?: string;
+  planTargetDate?: string;
 }
 
 export interface Goal {

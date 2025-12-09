@@ -1,4 +1,4 @@
-// v8.1 - Free AI Update
+// v8.3 - Fixed Import Error (Removed Google SDK)
 import React, { useState, useEffect } from 'react';
 import { Save, Bot, Zap, CheckCircle2, AlertCircle, MessageSquare, Loader2, Play, BookOpen, Target, Star, Brain } from 'lucide-react';
 

@@ -7,7 +7,7 @@ const DIAGNOSTICS_DATA = {
   "metadata": {
     "timestamp": new Date().toISOString(),
     "url": "https://iitgeeprep.com/",
-    "appVersion": "v8.1"
+    "appVersion": "v8.3"
   },
   "results": {
     "1. [System] Core Health": [
@@ -459,38 +459,3 @@ export const DiagnosticsScreen: React.FC = () => {
                                 <div className="w-4 h-4 rounded-full border-2 border-blue-400 border-t-transparent animate-spin"></div>
                             ) : (
                                 test.passed 
-                                  ? <CheckCircle2 className="w-4 h-4 text-green-500" />
-                                  : <XCircle className="w-4 h-4 text-red-500" />
-                            )}
-                         </div>
-                         
-                         <div className="flex-1 min-w-0">
-                            <p className={`text-sm truncate ${isPending ? 'text-slate-400' : test.passed ? 'text-slate-600' : 'text-red-700 font-medium'}`}>
-                               {test.description}
-                            </p>
-                            
-                            {showDetails && test.error && (
-                               <div className="mt-2 text-xs text-red-600 font-mono bg-red-50 p-2 rounded border border-red-100 break-all">
-                                  Error: {test.error}
-                               </div>
-                            )}
-                         </div>
-
-                         {showDetails && (
-                             <span className={`text-xs font-mono shrink-0 ${test.duration > 100 ? 'text-orange-400' : 'text-slate-300'}`}>
-                                {Math.round(test.duration)}ms
-                             </span>
-                         )}
-                      </div>
-                   ))}
-                   {Array.isArray(tests) && tests.length === 0 && (
-                       <div className="p-4 text-center text-slate-400 text-xs italic">Waiting to run dynamic tests...</div>
-                   )}
-                </div>
-             </div>
-           );
-        })}
-      </div>
-    </div>
-  );
-};

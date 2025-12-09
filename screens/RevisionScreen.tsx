@@ -1,7 +1,9 @@
+
 import React from 'react';
 import { UserProgress, Topic } from '../lib/types';
 import { SYLLABUS_DATA } from '../lib/syllabusData';
 import { formatDate } from '../lib/utils';
+import { RotateCw, Calendar, CheckCircle2, AlertCircle, Clock } from 'lucide-react';
 
 interface Props {
   progress: Record<string, UserProgress>;
@@ -30,40 +32,71 @@ export const RevisionScreen: React.FC<Props> = ({ progress, handleRevisionComple
     }) as { topic: Topic, progress: UserProgress }[];
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h2 className="text-2xl font-bold text-slate-900 mb-2">Smart Revision Manager</h2>
-        <p className="text-slate-500">Based on the 1-7-30 Spaced Repetition Algorithm</p>
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 pb-12">
+      
+      {/* Enhanced Header */}
+      <div className="bg-gradient-to-r from-blue-600 to-cyan-600 rounded-2xl p-8 text-white shadow-lg relative overflow-hidden">
+        <div className="relative z-10">
+          <h2 className="text-3xl font-bold flex items-center gap-3">
+            <div className="p-2 bg-white/20 rounded-lg backdrop-blur-sm">
+              <RotateCw className="w-6 h-6 text-white" />
+            </div>
+            Smart Revision Manager
+          </h2>
+          <p className="text-blue-50 mt-2 opacity-90 max-w-xl text-sm md:text-base">
+            Based on the <strong>1-7-30 Spaced Repetition Algorithm</strong>. We automatically schedule reviews: 
+            1 day, 7 days, and 30 days after you complete a topic to ensure long-term retention.
+          </p>
+        </div>
+        {/* Decor */}
+        <div className="absolute right-0 top-0 w-64 h-64 bg-white/10 rounded-full -mr-16 -mt-16 blur-3xl"></div>
+        <div className="absolute bottom-0 right-20 w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Due Today Column */}
-        <div>
-          <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-red-500"></span>
-            Due Today ({dueTopics.length})
-          </h3>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                <AlertCircle className="w-5 h-5 text-red-500" />
+                Due Today
+            </h3>
+            <span className="bg-red-100 text-red-700 text-xs font-bold px-2 py-1 rounded-full">{dueTopics.length} Pending</span>
+          </div>
           
           {dueTopics.length === 0 ? (
-            <div className="bg-green-50 border border-green-100 rounded-xl p-8 text-center">
-              <span className="text-4xl mb-3 block">🎉</span>
-              <h4 className="font-bold text-green-800">All caught up!</h4>
-              <p className="text-green-600 text-sm mt-1">No revisions pending for today. Great job!</p>
+            <div className="bg-green-50 border border-green-200 rounded-2xl p-8 text-center flex flex-col items-center justify-center min-h-[200px]">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4 text-3xl">
+                🎉
+              </div>
+              <h4 className="font-bold text-green-900 text-lg">All caught up!</h4>
+              <p className="text-green-700 text-sm mt-1">No revisions pending for today. Great job!</p>
             </div>
           ) : (
             <div className="space-y-3">
               {dueTopics.map(({ topic, progress }) => (
-                <div key={topic.id} className="bg-white p-4 rounded-xl border border-red-100 shadow-sm flex justify-between items-center group hover:border-red-200 transition-all">
+                <div key={topic.id} className="bg-white p-5 rounded-xl border border-red-100 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 hover:border-red-200 transition-all group">
                   <div>
-                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">{topic.subject}</span>
-                    <h4 className="font-bold text-slate-800">{topic.name}</h4>
-                    <p className="text-xs text-slate-500 mt-1">Level {progress.revisionLevel} • Last reviewed: {formatDate(progress.lastRevised)}</p>
+                    <div className="flex items-center gap-2 mb-1">
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase ${
+                            topic.subject === 'Physics' ? 'bg-purple-50 text-purple-700 border-purple-200' :
+                            topic.subject === 'Chemistry' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                            'bg-blue-50 text-blue-700 border-blue-200'
+                        }`}>
+                            {topic.subject}
+                        </span>
+                        <span className="text-[10px] font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded">Level {progress.revisionLevel}</span>
+                    </div>
+                    <h4 className="font-bold text-slate-800 text-base">{topic.name}</h4>
+                    <p className="text-xs text-slate-500 mt-1 flex items-center gap-1">
+                        <Clock className="w-3 h-3" /> Last reviewed: {formatDate(progress.lastRevised)}
+                    </p>
                   </div>
                   <button 
                     onClick={() => handleRevisionComplete(topic.id)}
-                    className="bg-red-50 text-red-600 px-4 py-2 rounded-lg text-sm font-bold hover:bg-red-100 transition-colors"
+                    className="w-full sm:w-auto bg-red-50 text-red-600 border border-red-100 px-4 py-2 rounded-lg text-sm font-bold hover:bg-red-100 hover:text-red-700 transition-colors flex items-center justify-center gap-2"
                   >
-                    Mark Done
+                    <CheckCircle2 className="w-4 h-4" /> Mark Done
                   </button>
                 </div>
               ))}
@@ -72,25 +105,34 @@ export const RevisionScreen: React.FC<Props> = ({ progress, handleRevisionComple
         </div>
 
         {/* Upcoming Column */}
-        <div>
-          <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+        <div className="space-y-4">
+          <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+            <Calendar className="w-5 h-5 text-blue-500" />
             Upcoming
           </h3>
           
-          <div className="space-y-3">
-             {upcomingTopics.length === 0 && (
-                 <p className="text-slate-400 text-sm italic">Complete more topics to see upcoming revisions.</p>
+          <div className="space-y-3 bg-slate-50 p-4 rounded-2xl border border-slate-100 min-h-[200px]">
+             {upcomingTopics.length === 0 ? (
+                 <div className="text-center py-10 text-slate-400">
+                     <p className="text-sm italic">Complete more topics to populate your revision schedule.</p>
+                 </div>
+             ) : (
+                 upcomingTopics.map(({ topic, progress }) => (
+                    <div key={topic.id} className="bg-white p-4 rounded-xl border border-slate-200 flex justify-between items-center opacity-90 hover:opacity-100 transition-opacity">
+                      <div>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">{topic.subject}</span>
+                        <h4 className="font-semibold text-slate-700 text-sm">{topic.name}</h4>
+                      </div>
+                      <div className="text-right">
+                          <span className="block text-xs font-bold text-blue-600">{formatDate(progress.nextRevisionDate)}</span>
+                          <span className="text-[10px] text-slate-400">Due Date</span>
+                      </div>
+                    </div>
+                  ))
              )}
-             {upcomingTopics.map(({ topic, progress }) => (
-                <div key={topic.id} className="bg-slate-50 p-4 rounded-xl border border-slate-200 flex justify-between items-center opacity-75">
-                  <div>
-                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">{topic.subject}</span>
-                    <h4 className="font-semibold text-slate-700">{topic.name}</h4>
-                    <p className="text-xs text-slate-500 mt-1">Due: {formatDate(progress.nextRevisionDate)}</p>
-                  </div>
-                </div>
-              ))}
+             {upcomingTopics.length > 0 && (
+                 <p className="text-center text-xs text-slate-400 mt-2">Showing next 5 scheduled items</p>
+             )}
           </div>
         </div>
       </div>

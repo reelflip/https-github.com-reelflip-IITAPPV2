@@ -1,4 +1,4 @@
-// v8.1 - Free AI Update
+// v8.3 - Fixed Import Error (Removed Google SDK)
 import React, { useState, useEffect, useRef } from 'react';
 import { Bot, X, Send, Loader2, Sparkles, ChevronDown } from 'lucide-react';
 
@@ -24,9 +24,8 @@ export const AITutorChat: React.FC = () => {
       try {
         const res = await fetch('/api/manage_settings.php?key=ai_config');
         if (!res.ok) {
-            const text = await res.text();
-            if(!text || !text.trim()) return;
-            throw new Error(text);
+            // If API fails (e.g. 404), do not throw, just return to keep app alive
+            return;
         }
         
         const text = await res.text();
