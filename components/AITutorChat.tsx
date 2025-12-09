@@ -1,4 +1,4 @@
-// v8.3 - Fixed Import Error (Removed Google SDK)
+// v8.7 - Verified No Google SDK
 import React, { useState, useEffect, useRef } from 'react';
 import { Bot, X, Send, Loader2, Sparkles, ChevronDown } from 'lucide-react';
 

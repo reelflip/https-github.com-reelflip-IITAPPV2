@@ -24,7 +24,7 @@ export const generateHtaccess = () => `
 `;
 
 export const generateSQLSchema = () => `
--- IITGEEPrep Database Schema v8.1
+-- IITGEEPrep Database Schema v8.7
 -- Target: MySQL / MariaDB (Hostinger)
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
@@ -225,8 +225,8 @@ CREATE TABLE IF NOT EXISTS \`backlogs\` (
 
 CREATE TABLE IF NOT EXISTS \`timetable_configs\` (
   \`user_id\` int(11) NOT NULL,
-  \`config_json\` text,
-  \`slots_json\` text,
+  \`config_json\` longtext,
+  \`slots_json\` longtext,
   PRIMARY KEY (\`user_id\`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -243,7 +243,7 @@ INSERT INTO \`users\` (\`name\`, \`email\`, \`password_hash\`, \`role\`) VALUES
 COMMIT;
 `;
 
-export const generateFrontendGuide = () => `# IITGEEPrep Hostinger Deployment Guide (v8.1)
+export const generateFrontendGuide = () => `# IITGEEPrep Hostinger Deployment Guide (v8.7)
 
 ## Phase 1: Preparation
 1. Run \`npm run build\` in your local terminal.
@@ -334,7 +334,7 @@ try {
         folder: 'api',
         desc: 'API Root Health Check',
         content: `${phpHeader}
-echo json_encode(["status" => "active", "message" => "IITGEEPrep API v8.1 Operational", "timestamp" => date('c')]);
+echo json_encode(["status" => "active", "message" => "IITGEEPrep API v8.7 Operational", "timestamp" => date('c')]);
 ?>`
     },
     {
@@ -646,7 +646,7 @@ elseif ($method === 'POST') {
     foreach($test->questions as $q) {
         $qStmt = $conn->prepare("INSERT INTO questions (id, test_id, subject_id, topic_id, text, options_json, correct_option, source_tag, year) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
         $qStmt->execute([
-            $q->id, $test->id, $q->subjectId, $q->topicId, $q->text, json_encode($q->options), $q->correctOptionIndex, $q->source, $q->year
+            $q.id, $test->id, $q.subjectId, $q.topicId, $q.text, json_encode($q.options), $q.correctOptionIndex, $q.source, $q.year
         ]);
     }
     echo json_encode(["message" => "Test Created"]);
