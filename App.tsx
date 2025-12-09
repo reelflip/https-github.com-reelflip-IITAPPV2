@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect } from 'react';
 import { Navigation, MobileNavigation } from './components/Navigation';
 import { AuthScreen } from './screens/AuthScreen';
@@ -24,6 +23,7 @@ import { AdminUserManagementScreen } from './screens/AdminUserManagementScreen';
 import { AdminSyllabusScreen } from './screens/AdminSyllabusScreen';
 import { AdminBlogScreen } from './screens/AdminBlogScreen';
 import { AdminInboxScreen } from './screens/AdminInboxScreen';
+import { AdminAnalyticsScreen } from './screens/AdminAnalyticsScreen';
 import { AboutUsScreen } from './screens/AboutUsScreen';
 import { ContactUsScreen } from './screens/ContactUsScreen';
 import { ExamGuideScreen } from './screens/ExamGuideScreen';
@@ -31,7 +31,7 @@ import { PrivacyPolicyScreen } from './screens/PrivacyPolicyScreen';
 import { FocusScreen } from './screens/FocusScreen';
 import { AnalyticsScreen } from './screens/AnalyticsScreen';
 import { WellnessScreen } from './screens/WellnessScreen';
-import { BacklogScreen } from './screens/BacklogScreen'; // Import new screen
+import { BacklogScreen } from './screens/BacklogScreen'; 
 import { PublicLayout } from './components/PublicLayout';
 import { User, UserProgress, TopicStatus, TestAttempt, Screen, Goal, MistakeLog, Flashcard, MemoryHack, BlogPost, VideoLesson, Question, Test, TimetableConfig, Topic, ContactMessage, BacklogItem } from './lib/types';
 import { calculateNextRevision } from './lib/utils';
@@ -568,6 +568,7 @@ export default function App() {
                 {currentScreen === 'blog_admin' && <AdminBlogScreen blogs={blogs} onAddBlog={addBlog} onDeleteBlog={(id) => deleteContent('blog', id)} />}
                 {(currentScreen === 'videos' || currentScreen === 'video_admin') && <VideoManagerScreen videoMap={videoMap} onUpdateVideo={updateVideo} />}
                 {(currentScreen === 'tests' || currentScreen === 'tests_admin') && <AdminTestManagerScreen questionBank={questionBank} tests={adminTests} onAddQuestion={addQuestion} onCreateTest={createTest} onDeleteQuestion={deleteQuestion} onDeleteTest={deleteTest} syllabus={syllabus} />}
+                {currentScreen === 'analytics' && <AdminAnalyticsScreen />}
                 {currentScreen === 'diagnostics' && <DiagnosticsScreen />}
                 {currentScreen === 'deployment' && <DeploymentScreen />}
               </>

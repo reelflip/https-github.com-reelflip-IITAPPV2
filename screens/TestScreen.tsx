@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { TestAttempt, Test, QuestionResult, User } from '../lib/types';
 import { Button } from '../components/Button';
 import { PageHeader } from '../components/PageHeader';
-import { Clock, Check, AlertCircle, PlayCircle, RotateCcw, Filter } from 'lucide-react';
+import { Clock, Check, AlertCircle, PlayCircle, RotateCcw, Filter, FileText } from 'lucide-react';
 
 interface Props {
   user?: User;
@@ -13,6 +13,7 @@ interface Props {
 }
 
 export const TestScreen: React.FC<Props> = ({ user, addTestAttempt, history, availableTests = [] }) => {
+  const isParent = user?.role === 'PARENT';
   const [activeTab, setActiveTab] = useState<'practice' | 'history'>('practice');
   const [activeTest, setActiveTest] = useState<Test | null>(null);
   
@@ -23,13 +24,14 @@ export const TestScreen: React.FC<Props> = ({ user, addTestAttempt, history, ava
   const [isManualEntry, setIsManualEntry] = useState(false);
   const [manualForm, setManualForm] = useState({ title: '', score: '', totalMarks: '300' });
 
-  // Intelligent Default Tab
+  // Intelligent Default Tab & Role Logic
   useEffect(() => {
-      // If history is empty, guide to practice
-      if (history.length === 0) {
+      if (isParent) {
+          setActiveTab('history');
+      } else if (history.length === 0) {
           setActiveTab('practice');
       }
-  }, [history.length]);
+  }, [history.length, isParent]);
 
   // Handle Manual Submit
   const handleManualSubmit = (e: React.FormEvent) => {
@@ -71,13 +73,11 @@ export const TestScreen: React.FC<Props> = ({ user, addTestAttempt, history, ava
           if (target.includes('VITEEE') && test.examType === 'VITEEE') return true;
           if (target.includes('MHT-CET') && test.examType === 'OTHER') return true; // Mapping assumption
           
-          // Fallback: If test has no type or target is vague, maybe include? 
-          // Stricter for now:
           return false;
       });
   }, [availableTests, user, showAllTests]);
 
-  const displayTests = filteredTests.length > 0 ? filteredTests : (showAllTests ? [] : availableTests); // Fallback to all if filter returns empty (UX choice)
+  const displayTests = filteredTests.length > 0 ? filteredTests : (showAllTests ? [] : availableTests); 
 
   if (activeTest) {
       return (
@@ -96,17 +96,19 @@ export const TestScreen: React.FC<Props> = ({ user, addTestAttempt, history, ava
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
       <PageHeader 
-        title="Test Center" 
-        subtitle="Attempt new mock tests or analyze your past performance."
+        title={isParent ? "Student Test Records" : "Test Center"}
+        subtitle={isParent ? "Detailed history of mock tests taken by the student." : "Attempt new mock tests or analyze your past performance."}
         action={
-            <div className="flex bg-slate-100 p-1 rounded-lg">
-                <button onClick={() => setActiveTab('practice')} className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${activeTab === 'practice' ? 'bg-white text-blue-600 shadow' : 'text-slate-500'}`}>Practice Zone</button>
-                <button onClick={() => setActiveTab('history')} className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${activeTab === 'history' ? 'bg-white text-blue-600 shadow' : 'text-slate-500'}`}>History</button>
-            </div>
+            !isParent && (
+                <div className="flex bg-slate-100 p-1 rounded-lg">
+                    <button onClick={() => setActiveTab('practice')} className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${activeTab === 'practice' ? 'bg-white text-blue-600 shadow' : 'text-slate-500'}`}>Practice Zone</button>
+                    <button onClick={() => setActiveTab('history')} className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${activeTab === 'history' ? 'bg-white text-blue-600 shadow' : 'text-slate-500'}`}>History</button>
+                </div>
+            )
         }
       />
 
-      {activeTab === 'practice' && (
+      {activeTab === 'practice' && !isParent && (
           <div className="space-y-6">
               
               {/* Filter Controls */}
@@ -171,11 +173,13 @@ export const TestScreen: React.FC<Props> = ({ user, addTestAttempt, history, ava
 
       {activeTab === 'history' && (
           <div className="space-y-6">
-              {!isManualEntry ? (
+              {!isManualEntry && !isParent && (
                   <div className="flex justify-end">
                       <Button variant="outline" size="sm" onClick={() => setIsManualEntry(true)}>+ Log Manual Result</Button>
                   </div>
-              ) : (
+              )}
+
+              {isManualEntry && (
                   <div className="bg-slate-50 p-6 rounded-xl border border-slate-200">
                       <h4 className="font-bold text-slate-800 mb-4">Log External Test Result</h4>
                       <form onSubmit={handleManualSubmit} className="flex flex-col md:flex-row gap-4 items-end">
@@ -199,19 +203,43 @@ export const TestScreen: React.FC<Props> = ({ user, addTestAttempt, history, ava
                   </div>
               )}
 
-              <div className="space-y-3">
-                  {history.length === 0 && <p className="text-center text-slate-400 py-10">No test history found.</p>}
-                  {[...history].reverse().map(attempt => (
-                      <div key={attempt.id} className="bg-white p-4 rounded-xl border border-slate-200 flex justify-between items-center hover:shadow-sm transition-all">
-                          <div>
-                              <h4 className="font-bold text-slate-800">{attempt.title}</h4>
-                              <p className="text-xs text-slate-500">{new Date(attempt.date).toLocaleDateString()}</p>
+              <div className="space-y-4">
+                  {history.length === 0 && (
+                      <div className="text-center py-16 bg-slate-50 rounded-xl border border-dashed border-slate-300">
+                          <div className="bg-white w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3 shadow-sm">
+                              <FileText className="w-6 h-6 text-slate-300" />
                           </div>
-                          <div className="text-right">
-                              <span className="block text-xl font-bold text-slate-900">{attempt.score}<span className="text-sm text-slate-400">/{attempt.totalMarks}</span></span>
-                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${attempt.accuracy_percent > 80 ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                                  {attempt.accuracy_percent}% Accuracy
-                              </span>
+                          <p className="text-slate-500 font-medium">No test history found.</p>
+                          {isParent && <p className="text-xs text-slate-400 mt-1">Once the student attempts a test, results will appear here.</p>}
+                      </div>
+                  )}
+                  {[...history].reverse().map(attempt => (
+                      <div key={attempt.id} className="bg-white p-5 rounded-xl border border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center hover:shadow-md transition-all gap-4">
+                          <div>
+                              <h4 className="font-bold text-lg text-slate-800">{attempt.title}</h4>
+                              <div className="flex items-center gap-3 text-xs text-slate-500 mt-1">
+                                  <span>📅 {new Date(attempt.date).toLocaleDateString()}</span>
+                                  <span>•</span>
+                                  <span>{attempt.totalQuestions || 0} Questions</span>
+                              </div>
+                          </div>
+                          
+                          <div className="flex items-center gap-6 w-full md:w-auto border-t md:border-t-0 border-slate-100 pt-4 md:pt-0">
+                              <div className="text-center">
+                                  <span className="block text-xs font-bold text-slate-400 uppercase tracking-wider">Score</span>
+                                  <span className="text-xl font-black text-slate-800">{attempt.score}<span className="text-sm font-normal text-slate-400">/{attempt.totalMarks}</span></span>
+                              </div>
+                              <div className="text-center">
+                                  <span className="block text-xs font-bold text-slate-400 uppercase tracking-wider">Accuracy</span>
+                                  <span className={`text-lg font-bold ${attempt.accuracy_percent > 80 ? 'text-green-600' : attempt.accuracy_percent > 50 ? 'text-yellow-600' : 'text-red-600'}`}>
+                                      {attempt.accuracy_percent}%
+                                  </span>
+                              </div>
+                              <div className="h-10 w-px bg-slate-200 hidden md:block"></div>
+                              <div className="text-center">
+                                  <span className="block text-xs font-bold text-slate-400 uppercase tracking-wider">Mistakes</span>
+                                  <span className="text-lg font-bold text-red-500">{attempt.incorrectCount}</span>
+                              </div>
                           </div>
                       </div>
                   ))}

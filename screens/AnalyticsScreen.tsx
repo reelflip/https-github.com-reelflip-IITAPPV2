@@ -3,7 +3,7 @@ import React from 'react';
 import { User, UserProgress, TestAttempt } from '../lib/types';
 import { SYLLABUS_DATA } from '../lib/syllabusData';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, RadialBarChart, RadialBar, PolarAngleAxis } from 'recharts';
-import { TrendingUp, AlertTriangle, CheckCircle2, Target } from 'lucide-react';
+import { TrendingUp, AlertTriangle, CheckCircle2, Target, BarChart3 } from 'lucide-react';
 
 interface Props {
   user?: User; // Optional now to support generic use
@@ -34,7 +34,28 @@ export const AnalyticsScreen: React.FC<Props> = ({ user, progress = {}, testAtte
       total: attempt.totalMarks
   })).slice(-10); // Last 10 tests
 
-  // --- 3. Weak Areas Logic ---
+  // --- 3. Chapter-wise Question Volume (New Section) ---
+  const getQuestionVolumeData = () => {
+      const volumes = { 'Physics': 0, 'Chemistry': 0, 'Maths': 0 };
+      
+      Object.values(progress).forEach(p => {
+          const topic = SYLLABUS_DATA.find(t => t.id === p.topicId);
+          if (topic) {
+              const solved = (p.ex1Solved || 0) + (p.ex2Solved || 0) + (p.ex3Solved || 0) + (p.ex4Solved || 0);
+              volumes[topic.subject] += solved;
+          }
+      });
+
+      return [
+          { name: 'Physics', questions: volumes['Physics'] },
+          { name: 'Chemistry', questions: volumes['Chemistry'] },
+          { name: 'Maths', questions: volumes['Maths'] }
+      ];
+  };
+  
+  const questionVolumeData = getQuestionVolumeData();
+
+  // --- 4. Weak Areas Logic ---
   const getWeakAreas = () => {
       // Aggregate incorrect answers by subject from all attempts
       const subjectErrors: Record<string, number> = { 'Physics': 0, 'Chemistry': 0, 'Maths': 0 };
@@ -59,7 +80,7 @@ export const AnalyticsScreen: React.FC<Props> = ({ user, progress = {}, testAtte
 
   const weakAreas = getWeakAreas();
 
-  // --- 4. Mock Data if Empty (for visual appeal) ---
+  // --- 5. Mock Data if Empty (for visual appeal) ---
   const showDemoData = testAttempts.length === 0;
   const displayTrendData = showDemoData ? [
       { date: 'Test 1', score: 120 }, { date: 'Test 2', score: 145 }, { date: 'Test 3', score: 132 },
@@ -70,7 +91,7 @@ export const AnalyticsScreen: React.FC<Props> = ({ user, progress = {}, testAtte
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
       <div>
         <h2 className="text-2xl font-bold text-slate-900">Performance Analytics</h2>
-        <p className="text-slate-500">Deep dive into your study metrics and test scores.</p>
+        <p className="text-slate-500">Deep dive into your study metrics, question volume, and test scores.</p>
       </div>
 
       {/* Top Row: Syllabus Radar & Score Trend */}
@@ -116,6 +137,23 @@ export const AnalyticsScreen: React.FC<Props> = ({ user, progress = {}, testAtte
           </div>
       </div>
 
+      {/* Middle Row: Question Volume Analysis */}
+      <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm h-96">
+          <h3 className="font-bold text-slate-800 mb-2 flex items-center">
+              <BarChart3 className="w-5 h-5 mr-2 text-purple-500" /> Chapter-wise Question Volume
+          </h3>
+          <p className="text-xs text-slate-500 mb-6">Total problems solved per subject (Exercises 1-4 combined).</p>
+          <ResponsiveContainer width="100%" height="80%">
+              <BarChart data={questionVolumeData} layout="horizontal" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} />
+                  <YAxis axisLine={false} tickLine={false} />
+                  <Tooltip cursor={{fill: '#f8fafc'}} />
+                  <Bar dataKey="questions" fill="#8b5cf6" radius={[4, 4, 0, 0]} barSize={50} name="Questions Solved" />
+              </BarChart>
+          </ResponsiveContainer>
+      </div>
+
       {/* Bottom Row: Weak Areas & Insights */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           
@@ -153,10 +191,10 @@ export const AnalyticsScreen: React.FC<Props> = ({ user, progress = {}, testAtte
                       • <strong>Consistency:</strong> Your test frequency is {testAttempts.length > 2 ? 'good' : 'low'}. Try to take at least one mock test every Sunday.
                   </p>
                   <p>
-                      • <strong>Syllabus Pace:</strong> At your current rate, you will complete the Physics syllabus by <span className="text-white font-bold">Jan 15th</span>.
+                      • <strong>Syllabus Pace:</strong> Based on your current completion rate, ensure you finish Mechanics by next month.
                   </p>
                   <p>
-                      • <strong>Revision Alert:</strong> You haven't revised <strong>Electrostatics</strong> in 2 weeks. It's marked as high priority.
+                      • <strong>Revision Alert:</strong> Regular revision cycles are key. Check the Revision tab for pending topics.
                   </p>
                   <div className="mt-4 pt-4 border-t border-indigo-800">
                       <p className="italic text-xs opacity-75">"Success doesn't come from what you do occasionally, it comes from what you do consistently."</p>

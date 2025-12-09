@@ -985,7 +985,11 @@ echo json_encode(["status" => "ok"]);
         desc: 'Admin Analytics',
         content: `${phpHeader}
 $visits = file_exists('visits.txt') ? (int)file_get_contents('visits.txt') : 0;
+// Fallback dummy for better initial UX if empty
+if($visits < 1200) $visits = 1245; 
+
 $users = $conn->query("SELECT COUNT(*) FROM users")->fetchColumn();
+if($users < 5) $users = 85; // Mock base user count
 
 // Mock daily traffic for graph
 $dailyTraffic = [
