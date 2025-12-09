@@ -38,11 +38,14 @@ export const AnalyticsScreen: React.FC<Props> = ({ user, progress = {}, testAtte
   const getQuestionVolumeData = () => {
       const volumes = { 'Physics': 0, 'Chemistry': 0, 'Maths': 0 };
       
-      Object.values(progress).forEach(p => {
+      Object.values(progress).forEach((p: UserProgress) => {
           const topic = SYLLABUS_DATA.find(t => t.id === p.topicId);
           if (topic) {
               const solved = (p.ex1Solved || 0) + (p.ex2Solved || 0) + (p.ex3Solved || 0) + (p.ex4Solved || 0);
-              volumes[topic.subject] += solved;
+              const subjectKey = topic.subject as keyof typeof volumes;
+              if (volumes[subjectKey] !== undefined) {
+                  volumes[subjectKey] += solved;
+              }
           }
       });
 

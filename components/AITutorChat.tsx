@@ -21,10 +21,16 @@ export const AITutorChat: React.FC = () => {
 
   // 1. Fetch Config on Mount
   useEffect(() => {
-    fetch('/api/manage_settings.php?key=ai_config')
-      .then(res => res.json())
-      .then(data => {
-        if (data.value) {
+    const fetchConfig = async () => {
+      try {
+        const res = await fetch('/api/manage_settings.php?key=ai_config');
+        if (!res.ok) return;
+        
+        const text = await res.text();
+        if (!text || !text.trim()) return;
+
+        const data = JSON.parse(text);
+        if (data && data.value) {
           try {
             const config = JSON.parse(data.value);
             if (config.enabled) {
@@ -39,11 +45,15 @@ export const AITutorChat: React.FC = () => {
               }]);
             }
           } catch (e) {
-            console.error("Failed to parse AI Config");
+            console.error("Failed to parse inner AI Config JSON");
           }
         }
-      })
-      .catch(err => console.error("Error fetching AI settings", err));
+      } catch (err) {
+        // Silent fail for offline/demo modes
+        console.debug("AI Settings fetch failed (likely offline/demo mode)");
+      }
+    };
+    fetchConfig();
   }, []);
 
   // 2. Auto-scroll to bottom

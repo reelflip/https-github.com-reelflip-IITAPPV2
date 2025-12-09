@@ -20,19 +20,29 @@ export const AdminSystemScreen: React.FC = () => {
 
   // Load Settings
   useEffect(() => {
-    fetch('/api/manage_settings.php?key=ai_config')
-      .then(res => res.json())
-      .then(data => {
-        if (data.value) {
+    const loadSettings = async () => {
+      try {
+        const res = await fetch('/api/manage_settings.php?key=ai_config');
+        if(!res.ok) return;
+        
+        const text = await res.text();
+        if(!text || !text.trim()) return;
+
+        const data = JSON.parse(text);
+        if (data && data.value) {
           try {
             setConfig(JSON.parse(data.value));
           } catch (e) {
             console.error("Invalid JSON for ai_config");
           }
         }
+      } catch (e) {
+        console.debug("AI Config fetch failed (likely offline/demo mode)");
+      } finally {
         setLoading(false);
-      })
-      .catch(() => setLoading(false));
+      }
+    };
+    loadSettings();
   }, []);
 
   // Save Settings

@@ -170,8 +170,12 @@ export default function App() {
       const initGA = async () => {
           try {
               const res = await fetch('/api/manage_settings.php?key=google_analytics_id');
-              const data = await res.json();
-              if (data.value && !window.gtag) {
+              if(!res.ok) return;
+              const text = await res.text();
+              if(!text || !text.trim()) return;
+              
+              const data = JSON.parse(text);
+              if (data && data.value && !window.gtag) {
                   setGaMeasurementId(data.value);
                   const script = document.createElement('script');
                   script.async = true;
@@ -185,7 +189,7 @@ export default function App() {
                   gtag('config', data.value);
               }
           } catch (e) {
-              console.warn("GA Init Failed (likely offline/no settings table)");
+              console.debug("GA Init Failed (likely offline/no settings table)");
           }
       };
       initGA();

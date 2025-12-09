@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect } from 'react';
 import { User } from '../lib/types';
 import { StatCard } from '../components/StatCard';
@@ -20,12 +19,21 @@ export const AdminDashboardScreen: React.FC<Props> = ({ user, onNavigate, messag
 
   useEffect(() => {
       // Fetch GA ID on mount
-      fetch('/api/manage_settings.php?key=google_analytics_id')
-          .then(res => res.json())
-          .then(data => {
-              if (data.value) setGaId(data.value);
-          })
-          .catch(err => console.error("Failed to fetch GA settings", err));
+      const fetchGA = async () => {
+          try {
+              const res = await fetch('/api/manage_settings.php?key=google_analytics_id');
+              if(!res.ok) return;
+              
+              const text = await res.text();
+              if(!text || !text.trim()) return;
+
+              const data = JSON.parse(text);
+              if (data && data.value) setGaId(data.value);
+          } catch (err) {
+              console.debug("GA Settings fetch failed (likely offline/demo mode)");
+          }
+      };
+      fetchGA();
   }, []);
 
   const handleSaveGA = async () => {
