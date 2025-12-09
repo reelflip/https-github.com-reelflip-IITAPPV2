@@ -1,7 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
 import { Save, Bot, Zap, CheckCircle2, AlertCircle, MessageSquare, Loader2, Play, BookOpen, Target, Star, Brain } from 'lucide-react';
-import { GoogleGenAI } from "@google/genai";
 
 const MODEL_METADATA: Record<string, any> = {
   'gemini-2.5-flash': {
@@ -103,7 +101,7 @@ export const AdminSystemScreen: React.FC = () => {
     }
   };
 
-  // Test Logic
+  // Test Logic (Using Pollinations Free API)
   const handleTest = async () => {
     if (!testPrompt.trim()) return;
     setTesting(true);
@@ -111,20 +109,31 @@ export const AdminSystemScreen: React.FC = () => {
     setTestError('');
 
     try {
-      // Initialize GenAI with Environment Variable
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      let systemInstruction = "You are an expert IIT JEE Tutor. Be concise and helpful.";
       
-      // If using a simulated model, fall back to gemini-2.5-flash but note it in testing
-      const isSimulated = !config.model.includes('gemini');
-      const actualModel = isSimulated ? 'gemini-2.5-flash' : config.model;
-      
-      const response = await ai.models.generateContent({
-        model: actualModel,
-        contents: isSimulated ? `[SIMULATION: Acting as ${config.model}] ${testPrompt}` : testPrompt,
-      });
+      // Inject Persona for testing
+      const SIMULATED_PERSONAS: Record<string, string> = {
+          'llama-3-70b': "You are Llama-3 70B. Provide detailed theoretical explanations.",
+          'deepseek-r1': "You are DeepSeek R1. Focus on multi-step logical derivations.",
+          'qwen-2.5-math-72b': "You are Qwen Math. Focus on pure mathematical proofs and calculation.",
+          'phi-3-medium': "You are Phi-3. Be short, fast, and punchy."
+      };
 
-      if (response.text) {
-        setTestResponse(response.text);
+      if (SIMULATED_PERSONAS[config.model]) {
+          systemInstruction = SIMULATED_PERSONAS[config.model] + " " + systemInstruction;
+      }
+
+      const fullPrompt = `${systemInstruction}\n\nUser: ${testPrompt}`;
+      const encodedPrompt = encodeURIComponent(fullPrompt);
+      
+      const response = await fetch(`https://text.pollinations.ai/${encodedPrompt}`);
+      
+      if (!response.ok) throw new Error("API Connection Failed");
+      
+      const text = await response.text();
+
+      if (text) {
+        setTestResponse(text);
       } else {
         setTestError("No text returned from model.");
       }

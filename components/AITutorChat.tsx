@@ -1,7 +1,5 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Bot, X, Send, Loader2, Sparkles, User, ChevronDown } from 'lucide-react';
-import { GoogleGenAI } from "@google/genai";
 
 interface Message {
   id: string;
@@ -86,9 +84,6 @@ export const AITutorChat: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      
-      let actualModel = modelName;
       let systemInstruction = "You are an expert IIT JEE Tutor. Be concise, encouraging, and focus on Physics, Chemistry, and Math. Use formatting like bullet points for clarity.";
 
       // Persona Injection for Simulated Models
@@ -100,22 +95,25 @@ export const AITutorChat: React.FC = () => {
       };
 
       if (SIMULATED_PERSONAS[modelName]) {
-          actualModel = 'gemini-2.5-flash'; // Use reliable engine
           systemInstruction = SIMULATED_PERSONAS[modelName] + " " + systemInstruction;
       }
       
-      const response = await ai.models.generateContent({
-        model: actualModel,
-        contents: input, 
-        config: { systemInstruction }
-      });
+      // Combine history for context (last 5 messages)
+      const conversationHistory = messages.slice(-5).map(m => `${m.role === 'user' ? 'User' : 'Tutor'}: ${m.text}`).join('\n');
+      const fullPrompt = `${systemInstruction}\n\nContext:\n${conversationHistory}\n\nUser: ${input}\nTutor:`;
 
-      const text = response.text || "I'm having trouble thinking right now. Please try again.";
+      // Use Pollinations.ai (Free, No Key)
+      const encodedPrompt = encodeURIComponent(fullPrompt);
+      const response = await fetch(`https://text.pollinations.ai/${encodedPrompt}`);
+      
+      if (!response.ok) throw new Error("Network response was not ok");
+      
+      const text = await response.text();
 
       const botMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: 'model',
-        text: text,
+        text: text || "I'm having trouble thinking right now. Please try again.",
         timestamp: new Date()
       };
       setMessages(prev => [...prev, botMsg]);
@@ -154,7 +152,7 @@ export const AITutorChat: React.FC = () => {
                 <div className="flex items-center gap-1">
                   <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></span>
                   <span className="text-[10px] opacity-80">
-                    {modelName.includes('gemini') ? modelName.replace('gemini-', '') : modelName}
+                    {modelName.includes('gemini') ? modelName.replace('gemini-', '') : modelName} (Free)
                   </span>
                 </div>
               </div>
@@ -220,7 +218,7 @@ export const AITutorChat: React.FC = () => {
             </div>
             <div className="text-center mt-2">
               <p className="text-[10px] text-slate-300 flex items-center justify-center gap-1">
-                <Sparkles className="w-3 h-3" /> Powered by {modelName.split('-')[0].toUpperCase()}
+                <Sparkles className="w-3 h-3" /> Powered by Free AI
               </p>
             </div>
           </div>
