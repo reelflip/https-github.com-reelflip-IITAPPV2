@@ -39,7 +39,7 @@ import { calculateNextRevision } from './lib/utils';
 import { SYLLABUS_DATA } from './lib/syllabusData';
 import { TrendingUp, Bell } from 'lucide-react';
 
-const APP_VERSION = '9.8';
+const APP_VERSION = '10.0';
 
 const ComingSoonScreen = ({ title, icon }: { title: string, icon: string }) => (
   <div className="flex flex-col items-center justify-center h-[70vh] text-center">
@@ -96,7 +96,7 @@ export default function App() {
   const [syllabus, setSyllabus] = useState<Topic[]>(SYLLABUS_DATA);
   const [linkedStudentData, setLinkedStudentData] = useState<{ progress: Record<string, UserProgress>; tests: TestAttempt[]; studentName: string; } | undefined>(undefined);
   
-  // Shared Content - Pre-seeded with Rich Data to ensure visibility
+  // Shared Content - Pre-seeded with Rich Data
   const [flashcards, setFlashcards] = useState<Flashcard[]>([
      { id: 1, front: "Newton's Second Law", back: "F = ma", subjectId: 'phys' },
      { id: 2, front: "Integration of sin(x)", back: "-cos(x) + C", subjectId: 'math' }
@@ -105,7 +105,7 @@ export default function App() {
      { id: 1, title: 'Trig Values', description: 'Remember SOH CAH TOA', tag: 'Maths', subjectId: 'math', trick: 'SOH CAH TOA' }
   ]);
   
-  // *** CRITICAL: RICH BLOG SEED ***
+  // 5 Rich Blog Posts
   const [blogs, setBlogs] = useState<BlogPost[]>([
      { 
        id: 1, 
@@ -163,12 +163,12 @@ export default function App() {
   const [questionBank, setQuestionBank] = useState<Question[]>([]);
   const [adminTests, setAdminTests] = useState<Test[]>([]);
 
-  // --- Version Check & Cache Busting (Fixes Stale Content) ---
+  // --- Version Check & Cache Busting ---
   useEffect(() => {
       const storedVersion = localStorage.getItem('iitjee_app_version');
       if (storedVersion !== APP_VERSION) {
           console.log(`Upgrading from ${storedVersion} to ${APP_VERSION}. Clearing content cache.`);
-          // Clear shared content caches to force fresh load/seed from our new state defaults
+          // Force clear to load new seeds
           localStorage.removeItem('iitjee_blogs');
           localStorage.removeItem('iitjee_hacks');
           localStorage.removeItem('iitjee_flashcards');
