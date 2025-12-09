@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import App from './App';
 import './index.css';
 
-// IITGEEPrep v8.1 Entry Point
+// IITGEEPrep v8.2 Entry Point
 const container = document.getElementById('root');
 if (container) {
   const root = createRoot(container);

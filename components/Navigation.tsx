@@ -94,7 +94,7 @@ export const Navigation: React.FC<NavigationProps> = ({ currentScreen, setScreen
         <h1 className="text-xl font-bold text-white tracking-tight">IIT<span className="text-blue-500">JEE</span>Prep</h1>
         <div className="flex items-center gap-2 mt-1">
           <p className="text-xs text-slate-500 uppercase tracking-wider">{user.role}</p>
-          <span className="text-xs text-slate-600">• v8.1</span>
+          <span className="text-xs text-slate-600">• v8.2</span>
         </div>
       </div>
 
@@ -127,10 +127,6 @@ export const Navigation: React.FC<NavigationProps> = ({ currentScreen, setScreen
 export const MobileNavigation: React.FC<NavigationProps> = ({ currentScreen, setScreen, logout, user }) => {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const menuItems = getMenu(user.role);
-  
-  // Logic to fit items on bottom bar:
-  // We want to show: [Item 1] [Item 2] [Item 3] [More] [Exit]
-  // Total 5 slots. If total items <= 4, we don't need 'More', just show all + Exit.
   
   const showMore = menuItems.length > 4;
   const primaryCount = showMore ? 3 : 4;
