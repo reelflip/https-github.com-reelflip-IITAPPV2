@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Database, RefreshCw, Server, Table, CheckCircle2, AlertTriangle, XCircle, Activity, Globe, Play, Loader2, Clock, Terminal, AlertCircle } from 'lucide-react';
 import { SYLLABUS_DATA } from '../lib/syllabusData';
@@ -16,7 +15,7 @@ const DIAGNOSTICS_DATA = {
   "metadata": {
     "timestamp": new Date().toISOString(),
     "url": "https://iitgeeprep.com/",
-    "appVersion": "v10.0"
+    "appVersion": "v11.0"
   },
   "results": {
     "1. [System] Core Health": [

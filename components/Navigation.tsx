@@ -94,7 +94,7 @@ export const Navigation: React.FC<NavigationProps> = ({ currentScreen, setScreen
         <h1 className="text-xl font-bold text-white tracking-tight">IIT<span className="text-blue-500">JEE</span>Prep</h1>
         <div className="flex items-center gap-2 mt-1">
           <p className="text-xs text-slate-500 uppercase tracking-wider">{user.role}</p>
-          <span className="text-xs text-slate-600">• v10.0</span>
+          <span className="text-xs text-slate-600">• v11.0</span>
         </div>
       </div>
 

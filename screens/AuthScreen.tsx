@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { User, Role } from '../lib/types';
 import { COACHING_INSTITUTES, TARGET_YEARS, TARGET_EXAMS } from '../lib/constants';
@@ -937,7 +936,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate, ena
                 <button onClick={() => onNavigate('contact')} className="hover:text-blue-600 transition-colors">Contact</button>
             </div>
             <div className="text-center text-[10px] text-slate-300 mt-4">
-                v10.3
+                v11.0
             </div>
         </div>
       </div>

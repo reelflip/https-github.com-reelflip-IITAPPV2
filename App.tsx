@@ -39,7 +39,7 @@ import { calculateNextRevision } from './lib/utils';
 import { SYLLABUS_DATA } from './lib/syllabusData';
 import { TrendingUp, Bell } from 'lucide-react';
 
-const APP_VERSION = '10.3';
+const APP_VERSION = '11.0';
 
 const ComingSoonScreen = ({ title, icon }: { title: string, icon: string }) => (
   <div className="flex flex-col items-center justify-center h-[70vh] text-center">
