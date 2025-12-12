@@ -20,7 +20,7 @@ interface NavItemProps {
 }
 
 // --- Menu Definitions ---
-const STUDENT_MENU: {id: Screen, icon: string, label: string}[] = [
+const STUDENT_MENU: {id: Screen, icon: any, label: string}[] = [
   { id: 'dashboard', icon: LayoutDashboard, label: "Home" },
   { id: 'syllabus', icon: BookOpen, label: "Syllabus" },
   { id: 'ai-tutor', icon: Bot, label: "AI Tutor" },
@@ -37,7 +37,7 @@ const STUDENT_MENU: {id: Screen, icon: string, label: string}[] = [
   { id: 'profile', icon: UserIcon, label: "Profile" },
 ];
 
-const ADMIN_MENU: {id: Screen, icon: string, label: string}[] = [
+const ADMIN_MENU: {id: Screen, icon: any, label: string}[] = [
   { id: 'overview', icon: LayoutDashboard, label: "Overview" },
   { id: 'users', icon: Users, label: "Users" },
   { id: 'inbox', icon: Inbox, label: "Inbox" },
@@ -45,12 +45,13 @@ const ADMIN_MENU: {id: Screen, icon: string, label: string}[] = [
   { id: 'tests', icon: FileText, label: "Tests" },
   { id: 'content', icon: Layers, label: "Content" },
   { id: 'blog_admin', icon: PenTool, label: "Blog" },
-  { id: 'analytics', icon: Activity, label: "Analytics" },
-  { id: 'diagnostics', icon: Terminal, label: "System" },
+  { id: 'analytics', icon: BarChart2, label: "Analytics" },
+  { id: 'diagnostics', icon: Activity, label: "Diagnostics" },
+  { id: 'system', icon: Settings, label: "System" },
   { id: 'deployment', icon: UploadCloud, label: "Deploy" },
 ];
 
-const PARENT_MENU: {id: Screen, icon: string, label: string}[] = [
+const PARENT_MENU: {id: Screen, icon: any, label: string}[] = [
   { id: 'dashboard', icon: LayoutDashboard, label: "Overview" },
   { id: 'family', icon: Users, label: "Family" },
   { id: 'analytics', icon: BarChart2, label: "Performance" },
@@ -95,7 +96,7 @@ export const Navigation: React.FC<NavigationProps> = ({ currentScreen, setScreen
         </h1>
         <div className="flex items-center gap-2 mt-1">
           <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1.5 py-0.5 bg-slate-800 rounded">{user.role}</p>
-          <span className="text-[10px] text-slate-600">• v11.1</span>
+          <span className="text-[10px] text-slate-600">• v11.3</span>
         </div>
       </div>
 
