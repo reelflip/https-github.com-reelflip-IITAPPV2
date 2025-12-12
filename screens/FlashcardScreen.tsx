@@ -101,7 +101,7 @@ export const FlashcardScreen: React.FC<Props> = ({ flashcards }) => {
 
             {/* Main Card Container */}
             <div 
-                className={`relative w-full h-full cursor-pointer transition-transform duration-500 transform-style-3d ${isFlipped ? 'rotate-y-180' : ''}`}
+                className={`relative w-full h-full cursor-pointer transition-transform duration-500 preserve-3d ${isFlipped ? 'rotate-y-180' : ''}`}
                 onClick={() => setIsFlipped(!isFlipped)}
             >
                 {/* Front Side */}
@@ -113,7 +113,7 @@ export const FlashcardScreen: React.FC<Props> = ({ flashcards }) => {
                         <RotateCw size={20} />
                     </div>
                     
-                    <h3 className="text-2xl md:text-3xl font-bold text-slate-800 leading-tight">
+                    <h3 className="text-2xl md:text-3xl font-bold text-slate-800 leading-tight select-none">
                         {currentCard.front}
                     </h3>
                     
@@ -123,12 +123,12 @@ export const FlashcardScreen: React.FC<Props> = ({ flashcards }) => {
                 </div>
 
                 {/* Back Side */}
-                <div className="absolute inset-0 backface-hidden rotate-y-180 bg-slate-900 rounded-3xl shadow-xl flex flex-col items-center justify-center p-8 text-center text-white">
+                <div className="absolute inset-0 backface-hidden rotate-y-180 bg-slate-900 rounded-3xl shadow-xl flex flex-col items-center justify-center p-8 text-center text-white border border-slate-700">
                     <div className="absolute top-6 left-6 text-xs font-bold text-emerald-400 bg-emerald-400/10 px-3 py-1 rounded-full uppercase tracking-wider">
                         Answer
                     </div>
                     
-                    <h3 className="text-xl md:text-2xl font-medium text-slate-100 leading-relaxed whitespace-pre-wrap">
+                    <h3 className="text-xl md:text-2xl font-medium text-slate-100 leading-relaxed whitespace-pre-wrap select-none">
                         {currentCard.back}
                     </h3>
                 </div>

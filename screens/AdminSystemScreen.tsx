@@ -1,6 +1,7 @@
-// v10.1 - Enhanced Model Selection (Radio Cards)
+
+// v10.1 - Enhanced Model Selection (Radio Cards) + OAuth Config
 import React, { useState, useEffect } from 'react';
-import { Save, Bot, Zap, CheckCircle2, AlertCircle, MessageSquare, Loader2, Play, BookOpen, Target, Star, Brain, Check } from 'lucide-react';
+import { Save, Bot, Zap, CheckCircle2, AlertCircle, MessageSquare, Loader2, Play, BookOpen, Check, Brain, Key } from 'lucide-react';
 
 const MODEL_METADATA: Record<string, any> = {
   'gemini-2.5-flash': { 
@@ -42,6 +43,7 @@ const MODEL_METADATA: Record<string, any> = {
 
 export const AdminSystemScreen: React.FC = () => {
   const [config, setConfig] = useState({ enabled: true, model: 'gemini-2.5-flash' });
+  const [googleClientId, setGoogleClientId] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testPrompt, setTestPrompt] = useState('');
@@ -56,22 +58,28 @@ export const AdminSystemScreen: React.FC = () => {
         const localConfig = localStorage.getItem('iitjee_ai_config');
         if (localConfig) {
             setConfig(JSON.parse(localConfig));
-            setLoading(false);
-            return;
         }
 
-        const res = await fetch('/api/manage_settings.php?key=ai_config');
-        if(!res.ok) throw new Error("API Failed");
-        const text = await res.text();
-        if(!text || !text.trim()) return;
-        const data = JSON.parse(text);
-        if (data && data.value) {
-            const parsed = JSON.parse(data.value);
-            setConfig(parsed);
-            localStorage.setItem('iitjee_ai_config', JSON.stringify(parsed));
+        // Fetch AI Config
+        const resAI = await fetch('/api/manage_settings.php?key=ai_config');
+        if(resAI.ok) {
+            const data = await resAI.json();
+            if (data && data.value) {
+                const parsed = JSON.parse(data.value);
+                setConfig(parsed);
+                localStorage.setItem('iitjee_ai_config', JSON.stringify(parsed));
+            }
         }
+
+        // Fetch Google Client ID
+        const resClient = await fetch('/api/manage_settings.php?key=google_client_id');
+        if(resClient.ok) {
+            const data = await resClient.json();
+            if (data && data.value) setGoogleClientId(data.value);
+        }
+
       } catch (e) { 
-          console.debug("AI Config fetch failed, using default"); 
+          console.debug("Config fetch failed, using defaults"); 
       } 
       finally { setLoading(false); }
     };
@@ -81,21 +89,26 @@ export const AdminSystemScreen: React.FC = () => {
   const handleSave = async () => {
     setSaving(true);
     try {
-      // 1. Save to LocalStorage (Immediate update for preview)
+      // 1. Save AI Config Locally
       localStorage.setItem('iitjee_ai_config', JSON.stringify(config));
-      
-      // 2. Trigger custom event so Chat Component updates immediately without refresh
       window.dispatchEvent(new Event('storage'));
 
-      // 3. Try Saving to API
+      // 2. Save AI Config to API
       await fetch('/api/manage_settings.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ key: 'ai_config', value: JSON.stringify(config) })
       });
+
+      // 3. Save Google Client ID
+      await fetch('/api/manage_settings.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: 'google_client_id', value: googleClientId })
+      });
+
       setTimeout(() => setSaving(false), 800);
     } catch (error) { 
-        // Even if API fails, we saved locally, so show success
         setTimeout(() => setSaving(false), 800);
     }
   };
@@ -142,6 +155,24 @@ export const AdminSystemScreen: React.FC = () => {
         {/* Left Column: Settings */}
         <div className="xl:col-span-2 space-y-6">
             
+            {/* Social Login Config */}
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+                <h3 className="text-lg font-bold text-slate-800 flex items-center mb-4"><Key className="w-5 h-5 mr-2 text-green-500" /> Authentication & OAuth</h3>
+                <div className="space-y-4">
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Google OAuth Client ID</label>
+                        <input 
+                            type="text"
+                            value={googleClientId}
+                            onChange={(e) => setGoogleClientId(e.target.value)}
+                            placeholder="784...apps.googleusercontent.com"
+                            className="w-full p-3 border border-slate-200 rounded-lg text-sm font-mono text-slate-600 focus:ring-2 focus:ring-green-100 outline-none"
+                        />
+                        <p className="text-xs text-slate-400 mt-2">Required for the "Sign in with Google" button to function.</p>
+                    </div>
+                </div>
+            </div>
+
             {/* Enable Toggle */}
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 flex flex-row items-center justify-between">
                 <div>
@@ -193,7 +224,7 @@ export const AdminSystemScreen: React.FC = () => {
                 <div className="mt-6 pt-4 border-t border-slate-100">
                     <button onClick={handleSave} disabled={saving} className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 rounded-xl shadow-md flex items-center justify-center gap-2 transition-all active:scale-95">
                         {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />} 
-                        {saving ? 'Saving...' : 'Save AI Configuration'}
+                        {saving ? 'Saving...' : 'Save System Configuration'}
                     </button>
                 </div>
             </div>

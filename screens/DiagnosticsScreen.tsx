@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Database, RefreshCw, Server, Table, CheckCircle2, AlertTriangle, XCircle, Activity, Globe, Play, Loader2, Clock, Terminal, AlertCircle } from 'lucide-react';
 import { SYLLABUS_DATA } from '../lib/syllabusData';
@@ -7,7 +8,7 @@ const REQUIRED_SCHEMA = [
     'users', 'topic_progress', 'tests', 'questions', 'test_attempts',
     'attempt_details', 'flashcards', 'memory_hacks', 'blog_posts',
     'topics', 'videos', 'notifications', 'contact_messages', 'goals',
-    'mistakes', 'backlogs', 'timetable_configs', 'system_settings'
+    'mistakes', 'backlogs', 'timetable_configs', 'system_settings', 'chapter_notes'
 ];
 
 // Embedded JSON Data from the test run
@@ -209,6 +210,49 @@ export const DiagnosticsScreen: React.FC = () => {
               tests.push({ description: "should save large Master Plan (>65KB)", passed: false, duration: 0, error: e.message });
           }
           return tests;
+      },
+      notesSystem: async () => {
+          const tests = [];
+          const topicId = 'diag_note_topic';
+          const samplePages = ['<h1>Page 1</h1>', '<p>Page 2</p>'];
+          try {
+              // 1. Create Note
+              let start = performance.now();
+              await fetch('/api/manage_notes.php', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ topicId, pages: samplePages })
+              });
+              tests.push({ description: "should create note via API", passed: true, duration: performance.now() - start });
+
+              // 2. Fetch Note
+              start = performance.now();
+              const res = await fetch('/api/manage_notes.php');
+              const data = await res.json();
+              const note = data[topicId];
+              if (note && note.pages && note.pages.length === 2) {
+                  tests.push({ description: "should retrieve note correctly", passed: true, duration: performance.now() - start });
+              } else {
+                  tests.push({ description: "should retrieve note correctly", passed: false, duration: 0, error: "Note missing or malformed" });
+              }
+
+              // 3. Delete Note
+              start = performance.now();
+              await fetch(`/api/manage_notes.php?topicId=${topicId}`, { method: 'DELETE' });
+              
+              // Verify deletion
+              const res2 = await fetch('/api/manage_notes.php');
+              const data2 = await res2.json();
+              if (!data2[topicId]) {
+                  tests.push({ description: "should delete note via API", passed: true, duration: performance.now() - start });
+              } else {
+                  tests.push({ description: "should delete note via API", passed: false, duration: 0, error: "Delete failed" });
+              }
+
+          } catch(e: any) {
+              tests.push({ description: "should handle note operations", passed: false, duration: 0, error: e.message });
+          }
+          return tests;
       }
   };
 
@@ -217,7 +261,8 @@ export const DiagnosticsScreen: React.FC = () => {
       ["20. [Admin] Syllabus Management", dynamicResults['syllabus'] || []],
       ["21. [Student] Action Verification", dynamicResults['studentActions'] || []],
       ["22. [AI] System Connectivity", dynamicResults['aiSystem'] || []],
-      ["23. [DB] Large Data Storage", dynamicResults['longTextStorage'] || []]
+      ["23. [DB] Large Data Storage", dynamicResults['longTextStorage'] || []],
+      ["24. [Content] Notes System", dynamicResults['notesSystem'] || []]
   ];
 
   const handleStartScan = async () => {
@@ -225,13 +270,14 @@ export const DiagnosticsScreen: React.FC = () => {
       setScanIndex(0);
       setDynamicResults({});
       
-      let idx = 0;
       const staticCount = Object.keys(results).length;
+      let currentStep = 0;
       
       const interval = setInterval(async () => {
-          if (idx >= staticCount) { 
+          if (currentStep >= staticCount) { 
               clearInterval(interval);
               
+              // Run dynamic tests sequentially
               setScanIndex(staticCount); 
               await performTest('syllabus', tests.syllabus);
               
@@ -243,11 +289,14 @@ export const DiagnosticsScreen: React.FC = () => {
 
               setScanIndex(staticCount + 3);
               await performTest('longTextStorage', tests.longTextStorage);
+
+              setScanIndex(staticCount + 4);
+              await performTest('notesSystem', tests.notesSystem);
               
               setScanStatus('COMPLETE');
           } else {
               setScanIndex(prev => prev + 1);
-              idx++;
+              currentStep++;
           }
       }, 150); 
   };

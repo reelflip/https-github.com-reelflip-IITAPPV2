@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { User, Role } from '../lib/types';
 import { COACHING_INSTITUTES, TARGET_YEARS, TARGET_EXAMS } from '../lib/constants';
@@ -38,6 +39,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate, ena
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [googleClientId, setGoogleClientId] = useState<string | null>(null);
   
   // Recovery State
   const [recoveryStep, setRecoveryStep] = useState<1 | 2 | 3>(1); // 1: Email, 2: Question, 3: New Pass
@@ -63,12 +65,26 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate, ena
     securityAnswer: ''
   });
 
+  // Fetch Google Client ID
+  useEffect(() => {
+      const fetchClientId = async () => {
+          try {
+              const res = await fetch('/api/manage_settings.php?key=google_client_id');
+              if(res.ok) {
+                  const data = await res.json();
+                  if(data && data.value) setGoogleClientId(data.value);
+              }
+          } catch(e) { console.debug('OAuth config fetch failed'); }
+      };
+      if(enableGoogleLogin) fetchClientId();
+  }, [enableGoogleLogin]);
+
   // Init Google Login
   useEffect(() => {
-    if (enableGoogleLogin && window.google && googleBtnRef.current && view === 'LOGIN') {
+    if (enableGoogleLogin && googleClientId && window.google && googleBtnRef.current && view === 'LOGIN') {
       try {
         window.google.accounts.id.initialize({
-          client_id: "686002394464-k4i6akgd1es0doqg6bsbskvinisvj1jk.apps.googleusercontent.com",
+          client_id: googleClientId,
           callback: handleGoogleCallback,
           auto_select: false,
         });
@@ -80,7 +96,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate, ena
         console.error("Google Sign-In Error:", e);
       }
     }
-  }, [enableGoogleLogin, view]);
+  }, [enableGoogleLogin, googleClientId, view]);
 
   const handleGoogleCallback = async (response: any) => {
       setIsLoading(true);
@@ -493,7 +509,11 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate, ena
                 {/* Google Login (Login Only) */}
                 {view === 'LOGIN' && enableGoogleLogin && (
                     <div className="mb-6">
-                        <div ref={googleBtnRef} className="w-full"></div>
+                        {googleClientId ? (
+                            <div ref={googleBtnRef} className="w-full"></div>
+                        ) : (
+                            <p className="text-center text-xs text-red-400">OAuth Client ID not configured in Admin Panel.</p>
+                        )}
                         <div className="relative mt-4 mb-2">
                             <div className="absolute inset-0 flex items-center">
                                 <div className="w-full border-t border-slate-200"></div>
@@ -505,6 +525,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate, ena
                     </div>
                 )}
 
+                {/* ... REST OF THE FILE ... */}
                 {/* ================= RECOVERY FORM ================= */}
                 {view === 'RECOVERY' ? (
                     <form onSubmit={handleRecovery} className="space-y-5 animate-in fade-in slide-in-from-right-4">
