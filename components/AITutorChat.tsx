@@ -1,3 +1,4 @@
+
 // v10.2 - Fixed Import Error (Removed Google SDK) + FullScreen Mode
 import React, { useState, useEffect, useRef } from 'react';
 import { Bot, X, Send, Loader2, Sparkles, ChevronDown, Maximize2, Minimize2 } from 'lucide-react';
@@ -37,7 +38,7 @@ export const AITutorChat: React.FC<Props> = ({ isFullScreen = false }) => {
             setEnabled(config.enabled);
             setModelName(config.model || 'gemini-2.5-flash');
             if(config.enabled && messages.length === 0) {
-                 setMessages([{ id: 'welcome', role: 'model', text: `Hi! I'm your AI Tutor (${config.model?.split('-')[0] || 'AI'}). Ask me anything about Physics, Chem, or Maths!`, timestamp: new Date() }]);
+                 setMessages([{ id: 'welcome', role: 'model', text: "Hi! I'm your AI Tutor. Ask me anything about Physics, Chem, or Maths!", timestamp: new Date() }]);
             }
             return;
         } catch(e) {}
@@ -120,7 +121,7 @@ export const AITutorChat: React.FC<Props> = ({ isFullScreen = false }) => {
                 <div className="flex items-center gap-3">
                     <div className="p-2 bg-violet-100 text-violet-700 rounded-lg"><Bot className="w-6 h-6" /></div>
                     <div>
-                        <h2 className="text-lg font-bold text-slate-800">AI Tutor <span className="text-xs font-normal text-slate-500 px-2 py-0.5 bg-slate-100 rounded-full">{modelName}</span></h2>
+                        <h2 className="text-lg font-bold text-slate-800">AI Tutor</h2>
                         <p className="text-xs text-slate-500">Immersive Learning Mode</p>
                     </div>
                 </div>
@@ -176,7 +177,7 @@ export const AITutorChat: React.FC<Props> = ({ isFullScreen = false }) => {
           <div className="bg-gradient-to-r from-violet-600 to-indigo-600 p-4 flex justify-between items-center text-white shrink-0">
             <div className="flex items-center gap-2">
               <div className="p-1.5 bg-white/20 rounded-lg"><Bot className="w-5 h-5" /></div>
-              <div><h3 className="font-bold text-sm">AI Tutor</h3><span className="text-[10px] opacity-80">{modelName}</span></div>
+              <div><h3 className="font-bold text-sm">AI Tutor</h3><span className="text-[10px] opacity-80">Always here to help</span></div>
             </div>
             <button onClick={() => setIsOpen(false)} className="p-1.5 hover:bg-white/10 rounded-full"><ChevronDown className="w-5 h-5" /></button>
           </div>
