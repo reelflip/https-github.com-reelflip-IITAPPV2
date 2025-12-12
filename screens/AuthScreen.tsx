@@ -528,7 +528,6 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate, ena
                     </div>
                 )}
 
-                {/* ... REST OF THE FILE ... */}
                 {/* ================= RECOVERY FORM ================= */}
                 {view === 'RECOVERY' ? (
                     <form onSubmit={handleRecovery} className="space-y-5 animate-in fade-in slide-in-from-right-4">
@@ -940,7 +939,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate, ena
                 <button onClick={() => onNavigate('contact')} className="hover:text-blue-600 transition-colors">Contact</button>
             </div>
             <div className="text-center text-[10px] text-slate-300 mt-4">
-                v11.0
+                v11.3
             </div>
         </div>
       </div>

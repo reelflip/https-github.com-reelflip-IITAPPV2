@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { generateSQLSchema, getBackendFiles, generateFrontendGuide, generateHtaccess, getDeploymentPhases } from '../services/generatorService';
 import { Download, Database, Code, Terminal, FileCode, BookOpen, CheckCircle, Activity, Play, AlertCircle, Server, Folder, File, Settings, Key, User as UserIcon, Package, Search, ShieldCheck, Layers, Cpu, Share2, GitBranch, ArrowRight, Layout, Box, Users, GraduationCap, Lock, Globe } from 'lucide-react';
@@ -108,7 +109,7 @@ export const DeploymentScreen: React.FC = () => {
                         <div className="flex items-center gap-3 mb-2">
                             <h2 className="text-3xl font-bold">System Center</h2>
                             <span className="px-2 py-1 rounded-md bg-slate-700 border border-slate-600 text-xs font-mono text-cyan-400 shadow-sm">
-                                v11.0 (Stable)
+                                v11.3 (Stable)
                             </span>
                         </div>
                         <p className="text-slate-400 text-lg max-w-xl">Documentation, Deployment & System Architecture.</p>
