@@ -72,7 +72,7 @@ export const generateFrontendGuide = () => `# IITGEEPrep Deployment Manual (Host
 `;
 
 export const generateSQLSchema = () => `
--- IITGEEPrep Database Schema v11.0
+-- IITGEEPrep Database Schema v11.1
 -- Target: MySQL / MariaDB (Hostinger)
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
@@ -366,7 +366,7 @@ try {
         folder: 'api',
         desc: 'API Root Health Check',
         content: `${phpHeader}
-echo json_encode(["status" => "active", "message" => "IITGEEPrep API v11.0 Operational", "timestamp" => date('c')]);
+echo json_encode(["status" => "active", "message" => "IITGEEPrep API v11.1 Operational", "timestamp" => date('c')]);
 ?>`
     },
     {

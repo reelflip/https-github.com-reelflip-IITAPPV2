@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Navigation, MobileNavigation } from './components/Navigation';
 import { AuthScreen } from './screens/AuthScreen';
@@ -37,9 +38,9 @@ import { AITutorChat } from './components/AITutorChat';
 import { User, UserProgress, TopicStatus, TestAttempt, Screen, Goal, MistakeLog, Flashcard, MemoryHack, BlogPost, VideoLesson, Question, Test, TimetableConfig, Topic, ContactMessage, BacklogItem, TopicNote, ChapterNote } from './lib/types';
 import { calculateNextRevision } from './lib/utils';
 import { SYLLABUS_DATA } from './lib/syllabusData';
-import { TrendingUp, Bell } from 'lucide-react';
+import { TrendingUp, Bell, LogOut } from 'lucide-react';
 
-const APP_VERSION = '11.0';
+const APP_VERSION = '11.1';
 
 const ComingSoonScreen = ({ title, icon }: { title: string, icon: string }) => (
   <div className="flex flex-col items-center justify-center h-[70vh] text-center">
@@ -96,24 +97,69 @@ export default function App() {
   const [syllabus, setSyllabus] = useState<Topic[]>(SYLLABUS_DATA);
   const [linkedStudentData, setLinkedStudentData] = useState<{ progress: Record<string, UserProgress>; tests: TestAttempt[]; studentName: string; } | undefined>(undefined);
   
-  // Shared Content
+  // --- Enhanced Flashcards Content ---
   const [flashcards, setFlashcards] = useState<Flashcard[]>([
-     { id: 1, front: "Newton's Second Law", back: "F = ma", subjectId: 'phys' },
-     { id: 2, front: "Integration of sin(x)", back: "-cos(x) + C", subjectId: 'math' }
+     { id: 1, front: "Newton's Second Law", back: "F = ma\n(Force equals mass times acceleration. It describes the relationship between an object's mass and the amount of force needed to accelerate it.)", subjectId: 'phys' },
+     { id: 2, front: "Integration of sin(x)", back: "-cos(x) + C", subjectId: 'math' },
+     { id: 3, front: "Escape Velocity Formula", back: "v = √(2GM/R)\nWhere G is gravitational constant, M is mass of planet, R is radius.", subjectId: 'phys' },
+     { id: 4, front: "First Order Kinetics Integrated Rate Law", back: "k = (2.303/t) * log([A]₀/[A])\n[A]₀ = Initial conc, [A] = Final conc.", subjectId: 'chem' },
+     { id: 5, front: "Lens Maker's Formula", back: "1/f = (μ - 1)(1/R₁ - 1/R₂)", subjectId: 'phys' },
+     { id: 6, front: "Sum of Roots (Quadratic Eq)", back: "α + β = -b/a\nFor equation ax² + bx + c = 0", subjectId: 'math' },
+     { id: 7, front: "Ideal Gas Equation", back: "PV = nRT", subjectId: 'chem' },
+     { id: 8, front: "Torque Formula", back: "τ = r × F\n(Cross product of position vector and force)", subjectId: 'phys' }
   ]);
+
+  // --- Enhanced Memory Hacks Content ---
   const [hacks, setHacks] = useState<MemoryHack[]>([
-     { id: 1, title: 'Trig Values', description: 'Remember SOH CAH TOA', tag: 'Maths', subjectId: 'math', trick: 'SOH CAH TOA' }
+     { id: 1, title: 'Trig Values', description: 'Remember Sine, Cosine, Tangent ratios', tag: 'Maths', subjectId: 'math', trick: 'SOH CAH TOA (Sine=Opp/Hyp, Cos=Adj/Hyp, Tan=Opp/Adj)' },
+     { id: 2, title: 'Resistor Color Codes', description: 'Sequence of colors for resistance values', tag: 'Physics', subjectId: 'phys', trick: 'BB ROY of Great Britain had a Very Good Wife (Black, Brown, Red, Orange, Yellow, Green, Blue, Violet, Grey, White)' },
+     { id: 3, title: 'Redox Reactions', description: 'Electron transfer definition', tag: 'Chemistry', subjectId: 'chem', trick: 'OIL RIG: Oxidation Is Loss, Reduction Is Gain (of electrons)' },
+     { id: 4, title: 'Periodic Table Group 1', description: 'Alkali Metals', tag: 'Chemistry', subjectId: 'chem', trick: 'LiNa Ki Ruby Se Friendship (Li, Na, K, Rb, Cs, Fr)' },
+     { id: 5, title: 'Electrochemical Series', description: 'Order of reactivity', tag: 'Chemistry', subjectId: 'chem', trick: 'Please Stop Calling Me A Careless Zebra Instead Try Learning How Copper Saves Gold' },
+     { id: 6, title: 'ASTC Rule', description: 'Sign of trig functions in quadrants', tag: 'Maths', subjectId: 'math', trick: 'All Silver Tea Cups (All, Sin, Tan, Cos are positive in 1st, 2nd, 3rd, 4th quadrants)' }
   ]);
+
+  // --- Enhanced Blog Content ---
   const [blogs, setBlogs] = useState<BlogPost[]>([
      { 
        id: 1, 
        title: 'JEE Main & Advanced 2025: Complete Roadmap', 
        excerpt: 'A strategic month-by-month guide to conquering Physics, Chemistry, and Maths while managing Board Exams.', 
-       content: '<h2>The Foundation</h2><p>Success in JEE Main and Advanced is not just about hard work; it is about <strong>smart work</strong> and consistent effort.</p><h3>1. Chemistry: The Scoring Machine</h3><p>Chemistry is the easiest subject to score in if you stick to the basics. <strong>NCERT is your Bible</strong> for Inorganic Chemistry. Do not ignore it.</p><h3>2. Physics: Concepts over Formulas</h3><p>Avoid rote memorization. Focus on Mechanics and Electrodynamics as they form the bulk of the paper. Solve Irodov for Advanced preparation.</p><h3>3. Mathematics: Practice is Key</h3><p>Calculus and Algebra require daily practice. Solve at least 30-40 problems every day to build muscle memory.</p><h3>4. Mock Tests</h3><p>Start taking full-length mock tests at least 6 months before the exam. Analyze your mistakes using the <strong>Mistake Notebook</strong> feature in this app.</p>', 
+       content: '<h2>The Foundation of Success</h2><p>Success in JEE Main and Advanced is not just about hard work; it is about <strong>smart work</strong> and consistent effort. This roadmap is designed to guide you through the chaotic journey of preparation.</p><h3>1. Chemistry: The Scoring Machine</h3><p>Chemistry is often underestimated, yet it is the easiest subject to score in if you stick to the basics. <strong>NCERT is your Bible</strong> for Inorganic Chemistry. Do not ignore it.</p><ul><li><strong>Physical Chemistry:</strong> Focus on formula application and numericals.</li><li><strong>Organic Chemistry:</strong> Understand mechanisms (GOC) rather than rote memorization.</li><li><strong>Inorganic Chemistry:</strong> Read NCERT line-by-line. Make short notes of exceptions.</li></ul><h3>2. Physics: Concepts over Formulas</h3><p>Physics requires a deep understanding of concepts. Avoid rote memorization of complex formulas without understanding their derivation.</p><ul><li>Focus on Mechanics and Electrodynamics as they form the bulk of the paper.</li><li>Solve Irodov for Advanced preparation but stick to HC Verma for building a strong base.</li><li>Practice numericals daily to improve speed and accuracy.</li></ul><h3>3. Mathematics: Practice is Key</h3><p>Calculus and Algebra require daily practice. Solve at least 30-40 problems every day to build muscle memory.</p><p><strong>Pro Tip:</strong> Coordinate Geometry is scoring but calculation intensive. Learn short tricks for finding tangents and normals.</p><h3>4. The Art of Mock Tests</h3><p>Start taking full-length mock tests at least 6 months before the exam. Analyze your mistakes using the <strong>Mistake Notebook</strong> feature in this app. Never repeat a mistake.</p>', 
        author: 'System Admin', 
        date: new Date().toISOString(),
        imageUrl: 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&q=80&w=1000',
        category: 'Strategy'
+     },
+     { 
+       id: 2, 
+       title: 'Mastering Inorganic Chemistry: The Secret to High Scores', 
+       excerpt: 'Inorganic Chemistry is often ignored but it is the highest scoring section. Here is how to master it using NCERT effectively.', 
+       content: '<h2>Why Inorganic Chemistry Matters</h2><p>In JEE Main, Chemistry is the time-saver. If you know the answer, you mark it in 10 seconds. This saved time is gold for Maths.</p><h3>The NCERT Strategy</h3><p>For Inorganic Chemistry, 90% of questions come directly from NCERT line-by-line. Read it thoroughly, including the captions of images and tables.</p><h3>Important Topics Breakdown</h3><ul><li><strong>Coordination Compounds:</strong> High weightage and conceptual (VBT, CFT, Isomerism).</li><li><strong>p-Block Elements:</strong> Extensive but rewarding. Focus on trends in properties and anomalous behavior of second-period elements.</li><li><strong>Chemical Bonding:</strong> The absolute foundation. Master MOT and Hybridization.</li><li><strong>Metallurgy:</strong> Ores and extraction processes.</li></ul><p><strong>Action Plan:</strong> Make short notes for trends in the periodic table and exceptions. Revise these notes daily before sleeping.</p>', 
+       author: 'Chemistry HOD', 
+       date: new Date(Date.now() - 86400000).toISOString(), 
+       imageUrl: 'https://images.unsplash.com/photo-1532094349884-543bc11b234d?auto=format&fit=crop&q=80&w=1000',
+       category: 'Subject-wise'
+     },
+     { 
+       id: 3, 
+       title: 'The Art of Mock Test Analysis', 
+       excerpt: 'Taking the test is only half the battle. Analyzing your mistakes is where the real improvement happens. Learn the 3-step analysis method.', 
+       content: '<h2>Post-Test Routine</h2><p>Spend at least 3 hours analyzing a 3-hour test. Do not just look at the score and move on.</p><h3>Step 1: Categorize Errors</h3><ul><li><strong>Silly Mistakes:</strong> Calculation errors, reading errors. These are the easiest to fix but cost the most. Be mindful next time.</li><li><strong>Conceptual Errors:</strong> Did not understand the theory or applied the wrong formula. Re-read the chapter notes.</li><li><strong>Time Management:</strong> Spent too long on a hard question? Learn the art of skipping.</li></ul><h3>Step 2: The Mistake Notebook</h3><p>Maintain a dedicated notebook (or use the Mistakes tab in this app). Write down the question you got wrong and the concept behind it.</p><h3>Step 3: Revise Before Next Test</h3><p>Review your mistake notebook before every subsequent test to ensure you don\'t repeat the same errors. This is how you jump from 150 to 200+.</p>', 
+       author: 'Academic Mentor', 
+       date: new Date(Date.now() - 172800000).toISOString(), 
+       imageUrl: 'https://images.unsplash.com/photo-1606326608606-aa0b62935f2b?auto=format&fit=crop&q=80&w=1000',
+       category: 'Tips'
+     },
+     { 
+       id: 4, 
+       title: 'Stay Motivated: The Marathon Mindset', 
+       excerpt: 'Burnout is real. Here is how to maintain your sanity and motivation during the grueling 2-year preparation phase.', 
+       content: '<h2>It is a Marathon, Not a Sprint</h2><p>JEE preparation is long. You will have days where you feel like you know nothing. That is normal.</p><h3>Tips for Mental Stamina</h3><ul><li><strong>Take Breaks:</strong> Use the Pomodoro technique (Focus tab). 5 minutes of rest is better than 1 hour of distracted study.</li><li><strong>Sleep:</strong> Your brain consolidates memory during sleep. Compromising on sleep is compromising on your rank.</li><li><strong>Hobbies:</strong> Keep one hobby alive. Running, music, or just walking. It resets your dopamine levels.</li></ul><blockquote>"Success consists of going from failure to failure without loss of enthusiasm." - Winston Churchill</blockquote><p>Keep pushing. The view from the top is worth the climb.</p>', 
+       author: 'Student Counselor', 
+       date: new Date(Date.now() - 372800000).toISOString(), 
+       imageUrl: 'https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&fit=crop&q=80&w=1000',
+       category: 'Motivation'
      }
   ]);
   
@@ -497,10 +543,13 @@ export default function App() {
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900 flex">
       <Navigation currentScreen={currentScreen} setScreen={setCurrentScreen} logout={handleLogout} user={user} />
       <main className="flex-1 md:ml-64 p-4 md:p-8 overflow-y-auto h-screen pb-24 md:pb-8 relative">
-        <div className="md:hidden flex justify-between items-center mb-6 sticky top-0 bg-slate-50 z-30 py-2 border-b border-slate-200">
-            <div className="flex items-center gap-2"><div className="w-8 h-8 bg-slate-900 rounded-full flex items-center justify-center text-blue-400"><TrendingUp className="w-5 h-5" /></div><span className="font-bold text-lg text-slate-800">IITGEEPrep</span></div>
+        <div className="md:hidden flex justify-between items-center mb-4 sticky top-0 bg-slate-50/90 backdrop-blur-xl z-30 py-3 border-b border-slate-200/50 -mx-4 px-4 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07)]">
+            <div className="flex items-center gap-2"><div className="w-8 h-8 bg-slate-900 rounded-full flex items-center justify-center text-blue-400 shadow-md"><TrendingUp className="w-5 h-5" /></div><span className="font-bold text-lg text-slate-800 tracking-tight">IIT<span className="text-blue-600">GEE</span>Prep</span></div>
             <div className="flex items-center gap-3">
                 {user.notifications && user.notifications.length > 0 && <div className="relative p-2"><Bell className="w-6 h-6 text-slate-600" /><span className="absolute top-1 right-2 w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse border border-white"></span></div>}
+                <button onClick={handleLogout} className="p-2 text-slate-400 hover:text-red-500 transition-colors rounded-full hover:bg-slate-100 active:scale-95">
+                    <LogOut className="w-5 h-5" />
+                </button>
                 {user.avatarUrl && <img src={user.avatarUrl} className="w-8 h-8 rounded-full border border-slate-300" alt="Avatar" />}
             </div>
         </div>
