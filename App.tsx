@@ -38,9 +38,10 @@ import { AITutorChat } from './components/AITutorChat';
 import { User, UserProgress, TopicStatus, TestAttempt, Screen, Goal, MistakeLog, Flashcard, MemoryHack, BlogPost, VideoLesson, Question, Test, TimetableConfig, Topic, ContactMessage, BacklogItem, TopicNote, ChapterNote } from './lib/types';
 import { calculateNextRevision } from './lib/utils';
 import { SYLLABUS_DATA } from './lib/syllabusData';
+import { DEFAULT_CHAPTER_NOTES } from './lib/chapterContent'; // Import default notes
 import { TrendingUp, Bell, LogOut } from 'lucide-react';
 
-const APP_VERSION = '11.1';
+const APP_VERSION = '11.2';
 
 const ComingSoonScreen = ({ title, icon }: { title: string, icon: string }) => (
   <div className="flex flex-col items-center justify-center h-[70vh] text-center">
@@ -165,7 +166,22 @@ export default function App() {
   
   const [videoMap, setVideoMap] = useState<Record<string, VideoLesson>>({});
   const [noteMap, setNoteMap] = useState<Record<string, TopicNote>>({}); // Keeping for backward compatibility
-  const [chapterNotes, setChapterNotes] = useState<Record<string, ChapterNote>>({}); // NEW
+  
+  // Updated: Initialize Chapter Notes with Default Content
+  const [chapterNotes, setChapterNotes] = useState<Record<string, ChapterNote>>(() => {
+      // 1. Convert DEFAULT_CHAPTER_NOTES to ChapterNote objects
+      const defaults: Record<string, ChapterNote> = {};
+      Object.entries(DEFAULT_CHAPTER_NOTES).forEach(([topicId, data], index) => {
+          defaults[topicId] = {
+              id: 1000 + index, // Start IDs high to avoid conflicts
+              topicId: topicId,
+              pages: data.pages,
+              lastUpdated: new Date().toISOString()
+          };
+      });
+      return defaults;
+  });
+  
   const [questionBank, setQuestionBank] = useState<Question[]>([]);
   const [adminTests, setAdminTests] = useState<Test[]>([]);
 
@@ -244,7 +260,12 @@ export default function App() {
             const notesRes = await fetch('/api/manage_notes.php');
             if (notesRes.ok) {
                 const notesData = await notesRes.json();
-                if (notesData) setChapterNotes(notesData);
+                if (notesData) {
+                    setChapterNotes(prev => ({
+                        ...prev, // Keep defaults if server returns partial/empty
+                        ...notesData // Overwrite with server data
+                    }));
+                }
             }
 
           } catch (e) {
@@ -254,7 +275,10 @@ export default function App() {
              
              // Fallback local storage for notes
              const savedChapterNotes = localStorage.getItem('iitjee_chapter_notes');
-             if (savedChapterNotes) setChapterNotes(JSON.parse(savedChapterNotes));
+             if (savedChapterNotes) {
+                 const parsed = JSON.parse(savedChapterNotes);
+                 setChapterNotes(prev => ({ ...prev, ...parsed }));
+             }
           }
       };
       fetchPublicContent();

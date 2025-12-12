@@ -72,7 +72,7 @@ export const generateFrontendGuide = () => `# IITGEEPrep Deployment Manual (Host
 `;
 
 export const generateSQLSchema = () => `
--- IITGEEPrep Database Schema v11.1
+-- IITGEEPrep Database Schema v11.2
 -- Target: MySQL / MariaDB (Hostinger)
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
@@ -122,9 +122,6 @@ CREATE TABLE IF NOT EXISTS \`users\` (
   \`created_at\` timestamp DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (\`id\`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
--- (Tables 2-8 same as previous)
--- ... [topic_progress, tests, questions, test_attempts, attempt_details, flashcards, memory_hacks] ...
 
 CREATE TABLE IF NOT EXISTS \`topic_progress\` (
   \`id\` int(11) NOT NULL AUTO_INCREMENT,
@@ -210,7 +207,6 @@ CREATE TABLE IF NOT EXISTS \`memory_hacks\` (
   PRIMARY KEY (\`id\`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- BLOG POSTS (With 5 Rich Seed Posts - SANITIZED for SQL)
 CREATE TABLE IF NOT EXISTS \`blog_posts\` (
   \`id\` int(11) NOT NULL AUTO_INCREMENT,
   \`title\` varchar(255) NOT NULL,
@@ -315,13 +311,9 @@ CREATE TABLE IF NOT EXISTS \`chapter_notes\` (
 INSERT INTO \`users\` (\`name\`, \`email\`, \`password_hash\`, \`role\`) VALUES 
 ('System Admin', 'admin@iitgeeprep.com', 'Ishika@123', 'ADMIN');
 
--- Seed Sample Blog Post (Sanitized for SQL: No single quotes)
+-- Seed Sample Blog Post
 INSERT INTO \`blog_posts\` (\`title\`, \`excerpt\`, \`content\`, \`author\`, \`category\`, \`image_url\`) VALUES
-('JEE Main & Advanced 2025: Complete Roadmap', 'A strategic month-by-month guide to conquering Physics, Chemistry, and Maths while managing Board Exams.', '<h2>The Foundation</h2><p>Success in JEE Main and Advanced is not just about hard work; it is about <strong>smart work</strong> and consistent effort.</p><h3>1. Chemistry: The Scoring Machine</h3><p>Chemistry is the easiest subject to score in if you stick to the basics. <strong>NCERT is your Bible</strong> for Inorganic Chemistry. Do not ignore it.</p><h3>2. Physics: Concepts over Formulas</h3><p>Avoid rote memorization. Focus on Mechanics and Electrodynamics as they form the bulk of the paper. Solve Irodov for Advanced preparation.</p><h3>3. Mathematics: Practice is Key</h3><p>Calculus and Algebra require daily practice. Solve at least 30-40 problems every day to build muscle memory.</p><h3>4. Mock Tests</h3><p>Start taking full-length mock tests at least 6 months before the exam. Analyze your mistakes using the <strong>Mistake Notebook</strong> feature in this app.</p>', 'System Admin', 'Strategy', 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&q=80&w=1000'),
-('The Art of Mock Analysis', 'Taking a test is only 30% of the work. The real improvement comes from the 3 hours you spend analyzing it afterward.', '<h2>Why Analyze?</h2><p>Mock tests are not for judging your intelligence; they are for identifying your gaps.</p><ul><li><strong>Silly Mistakes:</strong> Did you misread the question?</li><li><strong>Conceptual Errors:</strong> Did you apply the wrong formula?</li><li><strong>Time Management:</strong> Did you spend too long on a hard question?</li></ul><p>Use the Analytics tab in this app to track your weak areas.</p>', 'Academic Head', 'Tips', 'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&q=80&w=1000'),
-('Sleep & Performance: The Hidden Link', 'Why pulling all-nighters might be destroying your rank. Learn the science of memory consolidation during sleep.', '<h2>Sleep is Study</h2><p>During REM sleep, your brain consolidates memory. If you cut sleep to study more, you actually retain less. Aim for 7 hours of quality sleep. Use the <strong>Wellness</strong> tab to practice box breathing before bed.</p>', 'Dr. Expert', 'Wellness', 'https://images.unsplash.com/photo-1541781777621-af13943727dd?auto=format&fit=crop&q=80&w=1000'),
-('Top 10 High Weightage Topics in Physics', 'Do not study hard, study smart. Focus on these chapters first to secure 60+ marks in Physics easily.', '<h2>The Pareto Principle</h2><p>80% of the questions come from 20% of the topics. Here is the list:</p><ol><li><strong>Modern Physics:</strong> High weightage, easy questions.</li><li><strong>Heat & Thermodynamics:</strong> Formula based, easy to score.</li><li><strong>Optics:</strong> Lengthy but predictable.</li><li><strong>Current Electricity:</strong> Always 2-3 questions.</li><li><strong>Electrostatics:</strong> Conceptual but standard patterns.</li></ol><p>Master these before moving to complex mechanics problems.</p>', 'Physics HOD', 'Subject-wise', 'https://images.unsplash.com/photo-1636466497217-26a8cbeaf0aa?auto=format&fit=crop&q=80&w=1000'),
-('Balancing Boards and JEE', 'The ultimate juggling act. How to ensure 95% in Boards without derailing your IIT preparation.', '<h2>Two Birds, One Stone</h2><p>JEE and Boards are not enemies. The syllabus is the same. The difference is the <em>approach</em>.</p><p><strong>For Physics & Chem:</strong> JEE preparation automatically covers Board concepts. You just need to practice writing subjective answers 1 month before exams.</p><p><strong>For Maths:</strong> Board level calculus is much simpler. Focus on NCERT examples.</p><p><strong>English/Optional:</strong> Dedicate Sundays exclusively to these subjects starting from January.</p>', 'Alumni Mentor', 'Strategy', 'https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&q=80&w=1000');
+('JEE Main & Advanced 2025: Complete Roadmap', 'A strategic month-by-month guide to conquering Physics, Chemistry, and Maths while managing Board Exams.', '<h2>The Foundation</h2><p>Success in JEE Main and Advanced is not just about hard work; it is about <strong>smart work</strong> and consistent effort.</p>', 'System Admin', 'Strategy', 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&q=80&w=1000');
 
 COMMIT;
 `;
@@ -366,7 +358,7 @@ try {
         folder: 'api',
         desc: 'API Root Health Check',
         content: `${phpHeader}
-echo json_encode(["status" => "active", "message" => "IITGEEPrep API v11.1 Operational", "timestamp" => date('c')]);
+echo json_encode(["status" => "active", "message" => "IITGEEPrep API v11.2 Operational", "timestamp" => date('c')]);
 ?>`
     },
     {
