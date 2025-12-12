@@ -1,58 +1,19 @@
-
 import React, { useState, useEffect } from 'react';
 import { User } from '../lib/types';
 import { StatCard } from '../components/StatCard';
-import { Settings, ToggleLeft, ToggleRight, HelpCircle, BarChart3, Save, CheckCircle2, ArrowRight } from 'lucide-react';
+import { Settings, ToggleLeft, ToggleRight, HelpCircle, BarChart3, Save, CheckCircle2, ArrowRight, Shield, Users, Layers, Server, BookOpen, FileText } from 'lucide-react';
 
 interface Props {
   user: User;
   onNavigate?: (screen: any) => void;
   messageCount?: number;
+  // Props no longer needed for config, removed to clean up interface usage in App.tsx later if strict typing enforced, 
+  // but keeping them optional to avoid breaking existing calls immediately if not fully refactored.
   enableGoogleLogin?: boolean;
   onToggleGoogle?: () => void;
 }
 
-export const AdminDashboardScreen: React.FC<Props> = ({ user, onNavigate, messageCount = 0, enableGoogleLogin, onToggleGoogle }) => {
-  const [gaId, setGaId] = useState('');
-  const [gaSaving, setGaSaving] = useState(false);
-  const [gaSaved, setGaSaved] = useState(false);
-
-  useEffect(() => {
-      // Fetch GA ID on mount
-      const fetchGA = async () => {
-          try {
-              const res = await fetch('/api/manage_settings.php?key=google_analytics_id');
-              if(!res.ok) return;
-              
-              const text = await res.text();
-              if(!text || !text.trim()) return;
-
-              const data = JSON.parse(text);
-              if (data && data.value) setGaId(data.value);
-          } catch (err) {
-              console.debug("GA Settings fetch failed (likely offline/demo mode)");
-          }
-      };
-      fetchGA();
-  }, []);
-
-  const handleSaveGA = async () => {
-      setGaSaving(true);
-      try {
-          await fetch('/api/manage_settings.php', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ key: 'google_analytics_id', value: gaId })
-          });
-          setGaSaved(true);
-          setTimeout(() => setGaSaved(false), 2000);
-      } catch (err) {
-          console.error("Failed to save GA settings", err);
-      } finally {
-          setGaSaving(false);
-      }
-  };
-
+export const AdminDashboardScreen: React.FC<Props> = ({ user, onNavigate, messageCount = 0 }) => {
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
       {/* Header */}
@@ -102,96 +63,56 @@ export const AdminDashboardScreen: React.FC<Props> = ({ user, onNavigate, messag
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* System Docs Section */}
+          {/* Features Overview */}
           <div className="bg-white p-8 rounded-xl border border-slate-200 shadow-sm h-full">
+            <div className="flex items-center gap-3 mb-6">
+                <Layers className="w-6 h-6 text-slate-600" />
+                <h3 className="text-lg font-bold text-slate-800">Admin Features & Capabilities</h3>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="p-4 bg-slate-50 rounded-lg border border-slate-100 hover:border-blue-200 transition-colors">
+                    <div className="flex items-center gap-2 mb-2 text-blue-700 font-bold text-sm">
+                        <Users size={16} /> User Management
+                    </div>
+                    <p className="text-xs text-slate-500">View registered users, verify accounts, and manage roles.</p>
+                </div>
+                <div className="p-4 bg-slate-50 rounded-lg border border-slate-100 hover:border-purple-200 transition-colors">
+                    <div className="flex items-center gap-2 mb-2 text-purple-700 font-bold text-sm">
+                        <BookOpen size={16} /> Syllabus & Videos
+                    </div>
+                    <p className="text-xs text-slate-500">Manage syllabus topics, attach chapter notes, and video lessons.</p>
+                </div>
+                <div className="p-4 bg-slate-50 rounded-lg border border-slate-100 hover:border-green-200 transition-colors">
+                    <div className="flex items-center gap-2 mb-2 text-green-700 font-bold text-sm">
+                        <FileText size={16} /> Content Manager
+                    </div>
+                    <p className="text-xs text-slate-500">Update Flashcards, Memory Hacks, and publish Blog posts.</p>
+                </div>
+                <div className="p-4 bg-slate-50 rounded-lg border border-slate-100 hover:border-orange-200 transition-colors">
+                    <div className="flex items-center gap-2 mb-2 text-orange-700 font-bold text-sm">
+                        <Server size={16} /> System Settings
+                    </div>
+                    <p className="text-xs text-slate-500">Configure OAuth, Analytics, and AI Tutor parameters.</p>
+                </div>
+            </div>
+          </div>
+
+          {/* System Docs Link */}
+          <div className="bg-white p-8 rounded-xl border border-slate-200 shadow-sm h-full flex flex-col justify-center">
             <div className="flex items-center gap-3 mb-4">
                 <span className="text-2xl text-slate-600">🗄️</span>
-                <h3 className="text-lg font-bold text-slate-800">System Docs</h3>
+                <h3 className="text-lg font-bold text-slate-800">System Documentation</h3>
             </div>
-            <p className="text-slate-600 mb-4 text-sm">
+            <p className="text-slate-600 mb-6 text-sm">
                 Access SQL schemas, PHP API files, and deployment guides for Hostinger.
-                Use this section to download the latest build artifacts.
+                Use the System section to verify database connectivity and download the latest build artifacts.
             </p>
             <button 
                 onClick={() => onNavigate && onNavigate('system')}
-                className="text-blue-600 font-bold text-sm hover:underline flex items-center gap-1"
+                className="w-full bg-slate-900 text-white font-bold py-3 rounded-lg hover:bg-slate-800 transition-colors flex items-center justify-center gap-2"
             >
-                Open Documentation <span>→</span>
+                Open System Center <ArrowRight size={16} />
             </button>
-          </div>
-
-          {/* Social Login Config */}
-          <div className="bg-white p-8 rounded-xl border border-slate-200 shadow-sm h-full flex flex-col justify-between">
-             <div>
-                <div className="flex items-center gap-3 mb-4">
-                    <Settings className="w-6 h-6 text-slate-600" />
-                    <h3 className="text-lg font-bold text-slate-800">Login Configuration</h3>
-                </div>
-                
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-slate-50 rounded-lg border border-slate-100 gap-4">
-                    <div className="flex items-center gap-3">
-                       <span className="text-2xl">G</span>
-                       <div>
-                          <p className="font-bold text-sm text-slate-800">Social Login (Google)</p>
-                          <p className="text-xs text-slate-500">{enableGoogleLogin ? 'Active on Login Page' : 'Disabled'}</p>
-                       </div>
-                    </div>
-                    <button 
-                        onClick={onToggleGoogle}
-                        className={`text-2xl transition-colors ${enableGoogleLogin ? 'text-green-500' : 'text-slate-300'}`}
-                        title="Toggle Google Login"
-                    >
-                        {enableGoogleLogin ? <ToggleRight className="w-10 h-10" /> : <ToggleLeft className="w-10 h-10" />}
-                    </button>
-                </div>
-                
-                {enableGoogleLogin && (
-                    <div className="mt-4 p-3 bg-blue-50 border border-blue-100 rounded-lg text-xs text-blue-800 flex gap-2 items-start">
-                        <HelpCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                        <div>
-                            <span>To verify users, enter your Google Cloud <strong>Client ID</strong> in the System settings.</span>
-                            <button 
-                                onClick={() => onNavigate && onNavigate('system')}
-                                className="block mt-1 font-bold hover:underline flex items-center gap-1"
-                            >
-                                Configure OAuth <ArrowRight size={12} />
-                            </button>
-                        </div>
-                    </div>
-                )}
-             </div>
-          </div>
-
-          {/* Analytics Configuration */}
-          <div className="lg:col-span-2 bg-white p-8 rounded-xl border border-slate-200 shadow-sm">
-              <div className="flex items-center gap-3 mb-6">
-                  <BarChart3 className="w-6 h-6 text-orange-600" />
-                  <h3 className="text-lg font-bold text-slate-800">Analytics Configuration</h3>
-              </div>
-              
-              <div className="flex flex-col md:flex-row gap-6 items-end">
-                  <div className="flex-1 w-full">
-                      <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Google Analytics Measurement ID</label>
-                      <input 
-                          type="text" 
-                          value={gaId}
-                          onChange={(e) => setGaId(e.target.value)}
-                          placeholder="G-XXXXXXXXXX"
-                          className="w-full p-3 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-100 font-mono"
-                      />
-                      <p className="text-xs text-slate-400 mt-2">
-                          Enter your tag ID (starting with G-) to enable traffic tracking.
-                      </p>
-                  </div>
-                  <button 
-                      onClick={handleSaveGA}
-                      disabled={gaSaving}
-                      className="bg-orange-600 text-white px-6 py-3 rounded-lg font-bold shadow-md hover:bg-orange-700 transition-all flex items-center gap-2 disabled:opacity-70 h-[46px]"
-                  >
-                      {gaSaved ? <CheckCircle2 className="w-4 h-4" /> : <Save className="w-4 h-4" />}
-                      {gaSaved ? 'Saved!' : 'Save ID'}
-                  </button>
-              </div>
           </div>
       </div>
     </div>

@@ -1,7 +1,6 @@
-
-import React, { useState } from 'react';
-import { Topic, Subject, ChapterNote } from '../lib/types';
-import { Plus, Trash2, FolderPlus, FilePlus, Book, FileText, Save, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Topic, Subject, ChapterNote, VideoLesson } from '../lib/types';
+import { Plus, Trash2, FolderPlus, FilePlus, Book, FileText, Save, X, ChevronLeft, ChevronRight, Video, Youtube } from 'lucide-react';
 import { RichTextEditor } from '../components/RichTextEditor';
 
 interface Props {
@@ -10,9 +9,15 @@ interface Props {
   onDeleteTopic: (id: string) => void;
   chapterNotes?: Record<string, ChapterNote>;
   onUpdateNotes?: (topicId: string, pages: string[]) => void;
+  // New props for Video Management
+  videoMap?: Record<string, VideoLesson>;
+  onUpdateVideo?: (topicId: string, url: string, description: string) => void;
 }
 
-export const AdminSyllabusScreen: React.FC<Props> = ({ syllabus, onAddTopic, onDeleteTopic, chapterNotes = {}, onUpdateNotes }) => {
+export const AdminSyllabusScreen: React.FC<Props> = ({ 
+    syllabus, onAddTopic, onDeleteTopic, chapterNotes = {}, onUpdateNotes,
+    videoMap = {}, onUpdateVideo
+}) => {
   const [subject, setSubject] = useState<Subject>('Physics');
   const [chapter, setChapter] = useState('');
   const [topicName, setTopicName] = useState('');
@@ -21,6 +26,11 @@ export const AdminSyllabusScreen: React.FC<Props> = ({ syllabus, onAddTopic, onD
   const [editingNoteTopic, setEditingNoteTopic] = useState<{id: string, name: string} | null>(null);
   const [pages, setPages] = useState<string[]>([]);
   const [activePageIndex, setActivePageIndex] = useState(0);
+
+  // Video Editor State
+  const [editingVideoTopic, setEditingVideoTopic] = useState<{id: string, name: string} | null>(null);
+  const [videoUrl, setVideoUrl] = useState('');
+  const [videoDesc, setVideoDesc] = useState('');
 
   // Grouping for Display
   const grouped = syllabus.filter(t => t.subject === subject).reduce((acc, topic) => {
@@ -36,6 +46,7 @@ export const AdminSyllabusScreen: React.FC<Props> = ({ syllabus, onAddTopic, onD
       setTopicName('');
   };
 
+  // --- Notes Functions ---
   const openNoteEditor = (topic: Topic) => {
       const existing = chapterNotes[topic.id];
       setPages(existing ? [...existing.pages] : ['']);
@@ -45,7 +56,6 @@ export const AdminSyllabusScreen: React.FC<Props> = ({ syllabus, onAddTopic, onD
 
   const saveNotes = () => {
       if(editingNoteTopic && onUpdateNotes) {
-          // Filter out empty pages if desired, or keep them
           onUpdateNotes(editingNoteTopic.id, pages);
           setEditingNoteTopic(null);
       }
@@ -59,7 +69,7 @@ export const AdminSyllabusScreen: React.FC<Props> = ({ syllabus, onAddTopic, onD
 
   const addPage = () => {
       setPages([...pages, '']);
-      setActivePageIndex(pages.length); // Switch to new page
+      setActivePageIndex(pages.length);
   };
 
   const deletePage = (index: number) => {
@@ -72,6 +82,28 @@ export const AdminSyllabusScreen: React.FC<Props> = ({ syllabus, onAddTopic, onD
       if (activePageIndex >= newPages.length) setActivePageIndex(newPages.length - 1);
   };
 
+  // --- Video Functions ---
+  const openVideoEditor = (topic: Topic) => {
+      const existing = videoMap[topic.id];
+      setVideoUrl(existing ? existing.videoUrl : '');
+      setVideoDesc(existing ? existing.description || '' : '');
+      setEditingVideoTopic({ id: topic.id, name: topic.name });
+  };
+
+  const saveVideo = () => {
+      if (editingVideoTopic && onUpdateVideo) {
+          let finalUrl = videoUrl;
+          // Basic YouTube link converter
+          if (finalUrl.includes('watch?v=')) {
+              finalUrl = finalUrl.replace('watch?v=', 'embed/');
+          } else if (finalUrl.includes('youtu.be/')) {
+              finalUrl = finalUrl.replace('youtu.be/', 'www.youtube.com/embed/');
+          }
+          onUpdateVideo(editingVideoTopic.id, finalUrl, videoDesc);
+          setEditingVideoTopic(null);
+      }
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in relative">
         
@@ -79,7 +111,7 @@ export const AdminSyllabusScreen: React.FC<Props> = ({ syllabus, onAddTopic, onD
         {editingNoteTopic && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4">
                 <div className="bg-white rounded-2xl w-full max-w-5xl h-[85vh] flex overflow-hidden shadow-2xl animate-in zoom-in-95">
-                    {/* Sidebar: Page Manager */}
+                    {/* Sidebar */}
                     <div className="w-64 bg-slate-50 border-r border-slate-200 flex flex-col">
                         <div className="p-4 border-b border-slate-200">
                             <h3 className="font-bold text-slate-800 text-sm truncate">{editingNoteTopic.name}</h3>
@@ -98,7 +130,6 @@ export const AdminSyllabusScreen: React.FC<Props> = ({ syllabus, onAddTopic, onD
                                     <button 
                                         onClick={(e) => { e.stopPropagation(); deletePage(idx); }}
                                         className="text-slate-400 hover:text-red-500 p-1"
-                                        title="Delete Page"
                                     >
                                         <Trash2 className="w-4 h-4" />
                                     </button>
@@ -113,23 +144,13 @@ export const AdminSyllabusScreen: React.FC<Props> = ({ syllabus, onAddTopic, onD
                         </div>
                     </div>
 
-                    {/* Main Editor Area */}
+                    {/* Editor */}
                     <div className="flex-1 flex flex-col">
                         <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-white">
-                            <div className="flex items-center gap-4">
-                                <span className="text-sm font-bold text-slate-500 uppercase tracking-wider">Editing Page {activePageIndex + 1}</span>
-                            </div>
+                            <span className="text-sm font-bold text-slate-500 uppercase tracking-wider">Editing Page {activePageIndex + 1}</span>
                             <div className="flex items-center gap-2">
-                                <button 
-                                    onClick={() => setEditingNoteTopic(null)}
-                                    className="px-4 py-2 text-sm font-bold text-slate-500 hover:text-slate-800 transition-colors"
-                                >
-                                    Cancel
-                                </button>
-                                <button 
-                                    onClick={saveNotes}
-                                    className="px-6 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 shadow-md flex items-center gap-2"
-                                >
+                                <button onClick={() => setEditingNoteTopic(null)} className="px-4 py-2 text-sm font-bold text-slate-500 hover:text-slate-800">Cancel</button>
+                                <button onClick={saveNotes} className="px-6 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 shadow-md flex items-center gap-2">
                                     <Save className="w-4 h-4" /> Save All
                                 </button>
                             </div>
@@ -147,11 +168,60 @@ export const AdminSyllabusScreen: React.FC<Props> = ({ syllabus, onAddTopic, onD
             </div>
         )}
 
+        {/* Video Editor Overlay */}
+        {editingVideoTopic && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4">
+                <div className="bg-white rounded-2xl w-full max-w-lg p-6 shadow-2xl animate-in zoom-in-95">
+                    <div className="flex justify-between items-center mb-6 border-b border-slate-100 pb-4">
+                        <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                            <Youtube className="w-5 h-5 text-red-600" /> 
+                            Video Lesson: <span className="text-slate-600 font-normal">{editingVideoTopic.name}</span>
+                        </h3>
+                        <button onClick={() => setEditingVideoTopic(null)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
+                    </div>
+                    
+                    <div className="space-y-4">
+                        <div>
+                            <label className="block text-xs font-bold text-slate-500 uppercase mb-2">YouTube URL</label>
+                            <input 
+                                type="text"
+                                className="w-full p-3 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-100"
+                                placeholder="https://www.youtube.com/watch?v=..."
+                                value={videoUrl}
+                                onChange={(e) => setVideoUrl(e.target.value)}
+                            />
+                            <p className="text-[10px] text-slate-400 mt-1">Paste any YouTube link. We'll convert it automatically.</p>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Description</label>
+                            <textarea 
+                                className="w-full p-3 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-100 h-24 resize-none"
+                                placeholder="Short description of the video..."
+                                value={videoDesc}
+                                onChange={(e) => setVideoDesc(e.target.value)}
+                            />
+                        </div>
+                        <div className="pt-2 flex gap-3">
+                            <button onClick={saveVideo} className="flex-1 bg-red-600 text-white py-3 rounded-lg font-bold hover:bg-red-700 transition-colors">Save Video</button>
+                            {videoUrl && (
+                                <button 
+                                    onClick={() => { setVideoUrl(''); setVideoDesc(''); }}
+                                    className="px-4 py-3 border border-red-200 text-red-600 rounded-lg font-bold hover:bg-red-50 transition-colors"
+                                >
+                                    Clear
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        )}
+
         {/* Header */}
         <div className="bg-slate-900 rounded-xl p-8 text-white shadow-lg flex justify-between items-center">
             <div>
-                <h2 className="text-2xl font-bold mb-2">Syllabus Management</h2>
-                <p className="text-slate-400">Add topics and attach study material.</p>
+                <h2 className="text-2xl font-bold mb-2">Syllabus & Content</h2>
+                <p className="text-slate-400">Manage topics, chapter notes, and video lessons.</p>
             </div>
             <div className="p-3 bg-white/10 rounded-xl">
                 <Book className="w-8 h-8 text-blue-400" />
@@ -248,24 +318,34 @@ export const AdminSyllabusScreen: React.FC<Props> = ({ syllabus, onAddTopic, onD
                             <div className="divide-y divide-slate-100">
                                 {topics.map(t => {
                                     const hasNotes = chapterNotes && chapterNotes[t.id];
+                                    const hasVideo = videoMap && videoMap[t.id];
                                     return (
                                         <div key={t.id} className="px-4 py-3 flex justify-between items-center hover:bg-slate-50 transition-colors group">
                                             <div className="flex items-center gap-3">
                                                 <span className="text-sm text-slate-600">{t.name}</span>
-                                                {hasNotes && <span className="bg-green-100 text-green-700 text-[10px] px-2 py-0.5 rounded font-bold">Has Notes</span>}
+                                                <div className="flex gap-1">
+                                                    {hasNotes && <span className="bg-green-100 text-green-700 text-[9px] px-1.5 py-0.5 rounded font-bold uppercase">Note</span>}
+                                                    {hasVideo && <span className="bg-red-100 text-red-700 text-[9px] px-1.5 py-0.5 rounded font-bold uppercase">Video</span>}
+                                                </div>
                                             </div>
                                             <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all">
                                                 <button 
                                                     onClick={() => openNoteEditor(t)}
-                                                    className="flex items-center gap-1 bg-slate-100 hover:bg-blue-100 text-slate-600 hover:text-blue-700 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors"
+                                                    className="flex items-center gap-1 bg-white border border-slate-200 text-slate-600 hover:text-blue-700 hover:border-blue-300 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors"
                                                 >
-                                                    <FileText className="w-3 h-3" /> {hasNotes ? 'Edit Notes' : 'Add Notes'}
+                                                    <FileText className="w-3 h-3" /> Notes
+                                                </button>
+                                                <button 
+                                                    onClick={() => openVideoEditor(t)}
+                                                    className="flex items-center gap-1 bg-white border border-slate-200 text-slate-600 hover:text-red-700 hover:border-red-300 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors"
+                                                >
+                                                    <Video className="w-3 h-3" /> Video
                                                 </button>
                                                 <button 
                                                     onClick={() => {
                                                         if(confirm(`Delete topic "${t.name}"?`)) onDeleteTopic(t.id);
                                                     }}
-                                                    className="text-slate-300 hover:text-red-500 p-1.5 rounded transition-all bg-slate-50 hover:bg-red-50"
+                                                    className="text-slate-300 hover:text-red-500 p-1.5 rounded transition-all bg-white hover:bg-red-50 border border-transparent hover:border-red-200"
                                                     title="Delete Topic"
                                                 >
                                                     <Trash2 className="w-4 h-4" />

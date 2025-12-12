@@ -42,7 +42,7 @@ const ADMIN_MENU: {id: Screen, icon: string, label: string}[] = [
   { id: 'inbox', icon: Inbox, label: "Inbox" },
   { id: 'syllabus_admin', icon: BookOpen, label: "Syllabus" },
   { id: 'tests', icon: FileText, label: "Tests" },
-  { id: 'videos', icon: Video, label: "Videos" },
+  // { id: 'videos', icon: Video, label: "Videos" }, // Merged into Syllabus
   { id: 'content', icon: Layers, label: "Content" },
   { id: 'blog_admin', icon: PenTool, label: "Blog" },
   { id: 'analytics', icon: Activity, label: "Analytics" },

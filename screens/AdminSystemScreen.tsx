@@ -1,6 +1,6 @@
 // v10.1 - Enhanced Model Selection (Radio Cards) + OAuth Config
 import React, { useState, useEffect } from 'react';
-import { Save, Bot, Zap, CheckCircle2, AlertCircle, MessageSquare, Loader2, Play, BookOpen, Check, Brain, Key } from 'lucide-react';
+import { Save, Bot, Zap, CheckCircle2, AlertCircle, MessageSquare, Loader2, Play, BookOpen, Check, Brain, Key, BarChart3, ToggleLeft, ToggleRight } from 'lucide-react';
 
 const MODEL_METADATA: Record<string, any> = {
   'gemini-2.5-flash': { 
@@ -43,6 +43,9 @@ const MODEL_METADATA: Record<string, any> = {
 export const AdminSystemScreen: React.FC = () => {
   const [config, setConfig] = useState({ enabled: true, model: 'gemini-2.5-flash' });
   const [googleClientId, setGoogleClientId] = useState('');
+  const [enableGoogleLogin, setEnableGoogleLogin] = useState(false);
+  const [gaId, setGaId] = useState('');
+  
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testPrompt, setTestPrompt] = useState('');
@@ -77,6 +80,22 @@ export const AdminSystemScreen: React.FC = () => {
             if (data && data.value) setGoogleClientId(data.value);
         }
 
+        // Fetch Google Login Status
+        const resLogin = await fetch('/api/manage_settings.php?key=enable_google_login');
+        if(resLogin.ok) {
+            const data = await resLogin.json();
+            if (data && data.value !== null) {
+                setEnableGoogleLogin(data.value === 'true');
+            }
+        }
+
+        // Fetch GA ID
+        const resGA = await fetch('/api/manage_settings.php?key=google_analytics_id');
+        if(resGA.ok) {
+            const data = await resGA.json();
+            if (data && data.value) setGaId(data.value);
+        }
+
       } catch (e) { 
           console.debug("Config fetch failed, using defaults"); 
       } 
@@ -88,22 +107,34 @@ export const AdminSystemScreen: React.FC = () => {
   const handleSave = async () => {
     setSaving(true);
     try {
-      // 1. Save AI Config Locally
+      // 1. Save AI Config
       localStorage.setItem('iitjee_ai_config', JSON.stringify(config));
       window.dispatchEvent(new Event('storage'));
-
-      // 2. Save AI Config to API
       await fetch('/api/manage_settings.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ key: 'ai_config', value: JSON.stringify(config) })
       });
 
-      // 3. Save Google Client ID
+      // 2. Save Google Client ID
       await fetch('/api/manage_settings.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ key: 'google_client_id', value: googleClientId })
+      });
+
+      // 3. Save Google Login Enable
+      await fetch('/api/manage_settings.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: 'enable_google_login', value: String(enableGoogleLogin) })
+      });
+
+      // 4. Save Analytics ID
+      await fetch('/api/manage_settings.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: 'google_analytics_id', value: gaId })
       });
 
       setTimeout(() => setSaving(false), 800);
@@ -144,8 +175,8 @@ export const AdminSystemScreen: React.FC = () => {
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 pb-12">
       <div className="bg-gradient-to-r from-violet-600 to-indigo-600 rounded-2xl p-8 text-white shadow-lg relative overflow-hidden">
         <div className="relative z-10">
-          <h2 className="text-3xl font-bold flex items-center gap-3"><Bot className="w-8 h-8" /> AI System Configuration</h2>
-          <p className="text-violet-100 mt-2 opacity-90 max-w-2xl">Configure the AI Tutor engine and Auth services.</p>
+          <h2 className="text-3xl font-bold flex items-center gap-3"><Bot className="w-8 h-8" /> System Configuration</h2>
+          <p className="text-violet-100 mt-2 opacity-90 max-w-2xl">Configure AI services, Authentication, and Analytics.</p>
         </div>
       </div>
       
@@ -154,11 +185,23 @@ export const AdminSystemScreen: React.FC = () => {
         {/* Left Column: Settings */}
         <div className="xl:col-span-2 space-y-6">
             
-            {/* Social Login Config */}
+            {/* Authentication Config */}
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
-                <h3 className="text-lg font-bold text-slate-800 flex items-center mb-4"><Key className="w-5 h-5 mr-2 text-green-500" /> Authentication & OAuth</h3>
+                <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-lg font-bold text-slate-800 flex items-center"><Key className="w-5 h-5 mr-2 text-green-500" /> Login Configuration</h3>
+                    
+                    <div className="flex items-center gap-3">
+                        <span className={`text-xs font-bold ${enableGoogleLogin ? 'text-green-600' : 'text-slate-400'}`}>
+                            {enableGoogleLogin ? 'Google Login Active' : 'Google Login Disabled'}
+                        </span>
+                        <button onClick={() => setEnableGoogleLogin(!enableGoogleLogin)} className={`text-2xl transition-colors ${enableGoogleLogin ? 'text-green-500' : 'text-slate-300'}`}>
+                            {enableGoogleLogin ? <ToggleRight className="w-8 h-8" /> : <ToggleLeft className="w-8 h-8" />}
+                        </button>
+                    </div>
+                </div>
+
                 <div className="space-y-4">
-                    <div>
+                    <div className={`transition-opacity ${enableGoogleLogin ? 'opacity-100' : 'opacity-50 pointer-events-none'}`}>
                         <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Google OAuth Client ID</label>
                         <input 
                             type="text"
@@ -168,30 +211,43 @@ export const AdminSystemScreen: React.FC = () => {
                             className="w-full p-3 border border-slate-200 rounded-lg text-sm font-mono text-slate-600 focus:ring-2 focus:ring-green-100 outline-none"
                         />
                         <p className="text-xs text-slate-400 mt-2">
-                            Enter the Client ID from your Google Cloud Console. This allows users to "Sign in with Google".
-                            Value is saved permanently on server.
+                            Required for "Sign in with Google". Get this from Google Cloud Console.
                         </p>
                     </div>
                 </div>
             </div>
 
-            {/* Enable Toggle */}
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 flex flex-row items-center justify-between">
+            {/* Analytics Config */}
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+                <h3 className="text-lg font-bold text-slate-800 flex items-center mb-4"><BarChart3 className="w-5 h-5 mr-2 text-orange-500" /> Analytics Configuration</h3>
                 <div>
-                  <h3 className="text-lg font-bold text-slate-800 flex items-center"><Zap className="w-5 h-5 mr-2 text-yellow-500" /> AI Tutor Status</h3>
-                  <p className="text-slate-500 text-sm">When enabled, the chat widget appears on the student dashboard.</p>
-                </div>
-                <div className="flex items-center gap-3">
-                    <span className={`text-sm font-bold ${config.enabled ? 'text-green-600' : 'text-slate-400'}`}>{config.enabled ? 'ENABLED' : 'DISABLED'}</span>
-                    <button onClick={() => setConfig(prev => ({ ...prev, enabled: !prev.enabled }))} className={`relative w-14 h-8 rounded-full transition-colors ${config.enabled ? 'bg-green-500' : 'bg-slate-300'}`}>
-                        <div className={`absolute top-1 left-1 bg-white w-6 h-6 rounded-full shadow-sm transform transition-transform ${config.enabled ? 'translate-x-6' : 'translate-x-0'}`}></div>
-                    </button>
+                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Google Analytics Measurement ID</label>
+                    <input 
+                        type="text"
+                        value={gaId}
+                        onChange={(e) => setGaId(e.target.value)}
+                        placeholder="G-XXXXXXXXXX"
+                        className="w-full p-3 border border-slate-200 rounded-lg text-sm font-mono text-slate-600 focus:ring-2 focus:ring-orange-100 outline-none"
+                    />
+                    <p className="text-xs text-slate-400 mt-2">
+                        Enter your tag ID to enable traffic tracking.
+                    </p>
                 </div>
             </div>
 
-            {/* Model Selector Grid */}
+            {/* AI Config */}
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
-                <h3 className="text-lg font-bold text-slate-800 flex items-center mb-4"><Brain className="w-5 h-5 mr-2 text-violet-600" /> Model Selection</h3>
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-bold text-slate-800 flex items-center"><Brain className="w-5 h-5 mr-2 text-violet-600" /> AI Tutor Settings</h3>
+                    <div className="flex items-center gap-3">
+                        <span className={`text-xs font-bold ${config.enabled ? 'text-green-600' : 'text-slate-400'}`}>
+                            {config.enabled ? 'AI Tutor Active' : 'AI Tutor Disabled'}
+                        </span>
+                        <button onClick={() => setConfig(prev => ({ ...prev, enabled: !prev.enabled }))} className={`relative w-12 h-6 rounded-full transition-colors ${config.enabled ? 'bg-green-500' : 'bg-slate-300'}`}>
+                            <div className={`absolute top-1 left-1 bg-white w-4 h-4 rounded-full shadow-sm transform transition-transform ${config.enabled ? 'translate-x-6' : 'translate-x-0'}`}></div>
+                        </button>
+                    </div>
+                </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {Object.entries(MODEL_METADATA).map(([key, meta]) => (
@@ -216,26 +272,23 @@ export const AdminSystemScreen: React.FC = () => {
                             </div>
                             <h4 className="font-bold text-slate-800 text-base mb-1">{meta.name}</h4>
                             <p className="text-xs text-slate-500 leading-relaxed mb-2">{meta.description}</p>
-                            <div className="flex items-center text-[10px] text-slate-400 gap-1">
-                                <BookOpen size={10} /> <span>Best for: {meta.subjects}</span>
-                            </div>
                         </div>
                     ))}
                 </div>
+            </div>
 
-                <div className="mt-6 pt-4 border-t border-slate-100">
-                    <button onClick={handleSave} disabled={saving} className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 rounded-xl shadow-md flex items-center justify-center gap-2 transition-all active:scale-95">
-                        {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />} 
-                        {saving ? 'Saving Settings...' : 'Save All Configurations'}
-                    </button>
-                </div>
+            <div className="pt-2">
+                <button onClick={handleSave} disabled={saving} className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-4 rounded-xl shadow-md flex items-center justify-center gap-2 transition-all active:scale-95">
+                    {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />} 
+                    {saving ? 'Saving System Settings...' : 'Save All Settings'}
+                </button>
             </div>
         </div>
 
         {/* Right Column: Testing */}
         <div className="xl:col-span-1">
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 flex flex-col h-[500px] sticky top-6">
-                <h3 className="text-lg font-bold text-slate-800 flex items-center mb-4"><MessageSquare className="w-5 h-5 mr-2 text-violet-600" /> Test Sandbox</h3>
+                <h3 className="text-lg font-bold text-slate-800 flex items-center mb-4"><MessageSquare className="w-5 h-5 mr-2 text-violet-600" /> AI Sandbox</h3>
                 
                 <div className="flex-1 bg-slate-50 rounded-xl border border-slate-200 p-4 mb-4 overflow-y-auto">
                     {testing ? (
