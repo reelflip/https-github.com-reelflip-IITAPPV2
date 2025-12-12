@@ -20,7 +20,8 @@ import {
   Target,
   Key,
   Search,
-  ArrowLeft
+  ArrowLeft,
+  X
 } from 'lucide-react';
 
 interface AuthScreenProps {
@@ -42,8 +43,10 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate, ena
   const [recoveryStep, setRecoveryStep] = useState<1 | 2 | 3>(1); // 1: Email, 2: Question, 3: New Pass
   const [recoveryData, setRecoveryData] = useState({ email: '', question: '', answer: '', newPassword: '', confirmPassword: '' });
 
-  // Google Sign In Ref
+  // Google Login State
   const googleBtnRef = useRef<HTMLDivElement>(null);
+  const [showRoleModal, setShowRoleModal] = useState(false);
+  const [pendingGoogleToken, setPendingGoogleToken] = useState<string | null>(null);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -89,13 +92,18 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate, ena
               body: JSON.stringify({ token: response.credential })
           });
           const data = await res.json();
-          if (res.ok && data.user) {
+          
+          if (data.status === 'success' && data.user) {
               const user = data.user;
               onLogin({
                   ...user,
                   role: (user.role || 'STUDENT').toUpperCase(),
                   isVerified: user.is_verified === 1
               });
+          } else if (data.status === 'needs_role') {
+              // New user needs to select role
+              setPendingGoogleToken(response.credential);
+              setShowRoleModal(true);
           } else {
               throw new Error(data.message || 'Google Login failed');
           }
@@ -113,6 +121,35 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate, ena
           onLogin(mockUser);
       } finally {
           setIsLoading(false);
+      }
+  };
+
+  const finalizeGoogleLogin = async (selectedRole: Role) => {
+      if (!pendingGoogleToken) return;
+      setIsLoading(true);
+      try {
+          const res = await fetch('/api/google_login.php', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ token: pendingGoogleToken, role: selectedRole })
+          });
+          const data = await res.json();
+          if (res.ok && data.user) {
+              const user = data.user;
+              onLogin({
+                  ...user,
+                  role: (user.role || 'STUDENT').toUpperCase(),
+                  isVerified: user.is_verified === 1
+              });
+          } else {
+              throw new Error(data.message || 'Failed to create account');
+          }
+      } catch (e: any) {
+          setError(e.message);
+      } finally {
+          setIsLoading(false);
+          setShowRoleModal(false);
+          setPendingGoogleToken(null);
       }
   };
 
@@ -335,7 +372,48 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate, ena
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-inter">
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-inter relative">
+      
+      {/* Role Selection Modal */}
+      {showRoleModal && (
+          <div className="absolute inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm animate-in fade-in">
+              <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full mx-4 relative animate-in zoom-in-95">
+                  <div className="text-center mb-6">
+                      <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                          <Users className="w-8 h-8 text-blue-600" />
+                      </div>
+                      <h3 className="text-xl font-bold text-slate-800">Complete Registration</h3>
+                      <p className="text-slate-500 text-sm mt-2">Are you registering as a Student or a Parent?</p>
+                  </div>
+                  
+                  <div className="space-y-3">
+                      <button 
+                          onClick={() => finalizeGoogleLogin('STUDENT')}
+                          className="w-full flex items-center justify-center gap-3 p-4 border-2 border-slate-100 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-all group"
+                      >
+                          <UserIcon className="w-5 h-5 text-slate-400 group-hover:text-blue-600" />
+                          <span className="font-bold text-slate-700 group-hover:text-blue-700">I am a Student</span>
+                      </button>
+                      
+                      <button 
+                          onClick={() => finalizeGoogleLogin('PARENT')}
+                          className="w-full flex items-center justify-center gap-3 p-4 border-2 border-slate-100 rounded-xl hover:border-orange-500 hover:bg-orange-50 transition-all group"
+                      >
+                          <Users className="w-5 h-5 text-slate-400 group-hover:text-orange-600" />
+                          <span className="font-bold text-slate-700 group-hover:text-orange-700">I am a Parent</span>
+                      </button>
+                  </div>
+
+                  <button 
+                      onClick={() => { setShowRoleModal(false); setPendingGoogleToken(null); }}
+                      className="mt-6 w-full text-center text-xs font-bold text-slate-400 hover:text-slate-600"
+                  >
+                      Cancel Login
+                  </button>
+              </div>
+          </div>
+      )}
+
       <div className="bg-white w-full max-w-[480px] rounded-[2rem] shadow-xl overflow-hidden border border-slate-100 flex flex-col">
         
         {/* Header Section (Logo) */}
@@ -838,7 +916,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate, ena
                 <button onClick={() => onNavigate('contact')} className="hover:text-blue-600 transition-colors">Contact</button>
             </div>
             <div className="text-center text-[10px] text-slate-300 mt-4">
-                v10.0
+                v10.3
             </div>
         </div>
       </div>

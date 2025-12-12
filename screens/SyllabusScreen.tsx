@@ -1,6 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
-import { UserProgress, TopicStatus, Topic, User, VideoLesson } from '../lib/types';
+import { UserProgress, TopicStatus, Topic, User, VideoLesson, TopicNote, ChapterNote } from '../lib/types';
+import { BookReader } from '../components/BookReader';
 import { 
   Search, 
   ChevronDown, 
@@ -14,7 +15,8 @@ import {
   X,
   Youtube,
   Filter,
-  Info
+  Info,
+  StickyNote
 } from 'lucide-react';
 
 interface SyllabusTrackerProps {
@@ -24,6 +26,10 @@ interface SyllabusTrackerProps {
   onUpdateProgress: (topicId: string, updates: Partial<UserProgress>) => void;
   readOnly?: boolean;
   videoMap?: Record<string, VideoLesson>;
+  chapterNotes?: Record<string, ChapterNote>;
+  // Legacy props kept to avoid breaking changes if not removed elsewhere
+  noteMap?: any;
+  onUpdateNote?: any;
 }
 
 const statusColors: Record<TopicStatus, string> = {
@@ -44,13 +50,17 @@ const statusLabels: Record<TopicStatus, string> = {
   'BACKLOG': 'Backlog',
 };
 
-export const SyllabusScreen: React.FC<SyllabusTrackerProps> = ({ user, subjects, progress, onUpdateProgress, readOnly = false, videoMap = {} }) => {
+export const SyllabusScreen: React.FC<SyllabusTrackerProps> = ({ 
+  user, subjects, progress, onUpdateProgress, readOnly = false, videoMap = {}, 
+  chapterNotes = {}
+}) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeSubjectFilter, setActiveSubjectFilter] = useState<string>('ALL');
   const [expandedTopicId, setExpandedTopicId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [showSaveToast, setShowSaveToast] = useState(false);
   const [activeVideo, setActiveVideo] = useState<{url: string, title: string, desc?: string} | null>(null);
+  const [activeNote, setActiveNote] = useState<{title: string, pages: string[]} | null>(null);
 
   // Group flat topics into Subject -> Chapter -> Topic hierarchy
   const structuredSubjects = useMemo(() => {
@@ -138,6 +148,16 @@ export const SyllabusScreen: React.FC<SyllabusTrackerProps> = ({ user, subjects,
 
   return (
     <div className="space-y-8 font-inter animate-in fade-in slide-in-from-bottom-4 relative">
+      
+      {/* Book Reader Modal */}
+      {activeNote && (
+          <BookReader 
+              title={activeNote.title}
+              pages={activeNote.pages}
+              onClose={() => setActiveNote(null)}
+          />
+      )}
+
       {/* Header Banner */}
       <div className="bg-gradient-to-r from-blue-600 to-cyan-600 rounded-2xl p-8 text-white shadow-xl relative overflow-hidden">
           <div className="relative z-10">
@@ -254,6 +274,7 @@ export const SyllabusScreen: React.FC<SyllabusTrackerProps> = ({ user, subjects,
                       const qPercent = totalQuestions > 0 ? Math.round((solvedQuestions / totalQuestions) * 100) : 0;
                       const isExpanded = expandedTopicId === topic.id;
                       const videoLesson = videoMap[topic.id];
+                      const chapterNote = chapterNotes[topic.id];
 
                       return (
                         <div key={topic.id} className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow duration-200">
@@ -268,8 +289,10 @@ export const SyllabusScreen: React.FC<SyllabusTrackerProps> = ({ user, subjects,
                                     </span>
                                     <span className="text-[10px] text-slate-400">Est. 8 Hours</span>
                                  </div>
-                                 <div className="flex items-center gap-3">
+                                 <div className="flex items-center gap-3 flex-wrap">
                                      <h3 className="text-base font-bold text-slate-800">{topic.name}</h3>
+                                     
+                                     {/* Video Button */}
                                      {videoLesson && (
                                          <button 
                                             onClick={(e) => {
@@ -281,10 +304,28 @@ export const SyllabusScreen: React.FC<SyllabusTrackerProps> = ({ user, subjects,
                                                 });
                                             }}
                                             className="flex items-center space-x-1.5 px-2 py-1 bg-red-50 text-red-600 rounded-full hover:bg-red-100 transition-colors border border-red-100 group"
-                                            title={videoLesson.description || "Watch Video Lesson"}
+                                            title="Watch Video Lesson"
                                          >
                                              <PlayCircle className="w-3.5 h-3.5 fill-red-100 group-hover:fill-red-200" />
                                              <span className="text-[10px] font-bold uppercase tracking-wide">Watch</span>
+                                         </button>
+                                     )}
+
+                                     {/* Read Notes Button */}
+                                     {chapterNote && chapterNote.pages && chapterNote.pages.length > 0 && (
+                                         <button 
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setActiveNote({
+                                                    title: topic.name,
+                                                    pages: chapterNote.pages
+                                                });
+                                            }}
+                                            className="flex items-center space-x-1.5 px-2 py-1 bg-amber-50 text-amber-600 rounded-full hover:bg-amber-100 transition-colors border border-amber-100 group"
+                                            title="Read Chapter Notes"
+                                         >
+                                             <StickyNote className="w-3.5 h-3.5 fill-amber-100 group-hover:fill-amber-200" />
+                                             <span className="text-[10px] font-bold uppercase tracking-wide">Notes</span>
                                          </button>
                                      )}
                                  </div>

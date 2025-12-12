@@ -34,12 +34,12 @@ import { WellnessScreen } from './screens/WellnessScreen';
 import { BacklogScreen } from './screens/BacklogScreen'; 
 import { PublicLayout } from './components/PublicLayout';
 import { AITutorChat } from './components/AITutorChat';
-import { User, UserProgress, TopicStatus, TestAttempt, Screen, Goal, MistakeLog, Flashcard, MemoryHack, BlogPost, VideoLesson, Question, Test, TimetableConfig, Topic, ContactMessage, BacklogItem } from './lib/types';
+import { User, UserProgress, TopicStatus, TestAttempt, Screen, Goal, MistakeLog, Flashcard, MemoryHack, BlogPost, VideoLesson, Question, Test, TimetableConfig, Topic, ContactMessage, BacklogItem, TopicNote, ChapterNote } from './lib/types';
 import { calculateNextRevision } from './lib/utils';
 import { SYLLABUS_DATA } from './lib/syllabusData';
 import { TrendingUp, Bell } from 'lucide-react';
 
-const APP_VERSION = '10.2';
+const APP_VERSION = '10.3';
 
 const ComingSoonScreen = ({ title, icon }: { title: string, icon: string }) => (
   <div className="flex flex-col items-center justify-center h-[70vh] text-center">
@@ -83,7 +83,7 @@ const findUserById = (id: string) => getUserDB().find(u => u.id === id);
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [currentScreen, setCurrentScreen] = useState<Screen>('dashboard');
-  const [enableGoogleLogin, setEnableGoogleLogin] = useState(true);
+  const [enableGoogleLogin, setEnableGoogleLogin] = useState(false);
   const [gaMeasurementId, setGaMeasurementId] = useState<string | null>(null);
   
   // Persisted Data
@@ -96,7 +96,7 @@ export default function App() {
   const [syllabus, setSyllabus] = useState<Topic[]>(SYLLABUS_DATA);
   const [linkedStudentData, setLinkedStudentData] = useState<{ progress: Record<string, UserProgress>; tests: TestAttempt[]; studentName: string; } | undefined>(undefined);
   
-  // Shared Content - Pre-seeded with Rich Data
+  // Shared Content
   const [flashcards, setFlashcards] = useState<Flashcard[]>([
      { id: 1, front: "Newton's Second Law", back: "F = ma", subjectId: 'phys' },
      { id: 2, front: "Integration of sin(x)", back: "-cos(x) + C", subjectId: 'math' }
@@ -104,8 +104,6 @@ export default function App() {
   const [hacks, setHacks] = useState<MemoryHack[]>([
      { id: 1, title: 'Trig Values', description: 'Remember SOH CAH TOA', tag: 'Maths', subjectId: 'math', trick: 'SOH CAH TOA' }
   ]);
-  
-  // 5 Rich Blog Posts
   const [blogs, setBlogs] = useState<BlogPost[]>([
      { 
        id: 1, 
@@ -116,50 +114,12 @@ export default function App() {
        date: new Date().toISOString(),
        imageUrl: 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&q=80&w=1000',
        category: 'Strategy'
-     },
-     { 
-       id: 2, 
-       title: 'The Art of Mock Analysis', 
-       excerpt: 'Taking a test is only 30% of the work. The real improvement comes from the 3 hours you spend analyzing it afterward.', 
-       content: '<h2>Why Analyze?</h2><p>Mock tests are not for judging your intelligence; they are for identifying your gaps.</p><ul><li><strong>Silly Mistakes:</strong> Did you misread the question?</li><li><strong>Conceptual Errors:</strong> Did you apply the wrong formula?</li><li><strong>Time Management:</strong> Did you spend too long on a hard question?</li></ul><p>Use the Analytics tab in this app to track your weak areas.</p>', 
-       author: 'Academic Head', 
-       date: new Date(Date.now() - 86400000).toISOString(),
-       imageUrl: 'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&q=80&w=1000',
-       category: 'Tips'
-     },
-     { 
-       id: 3, 
-       title: 'Sleep & Performance: The Hidden Link', 
-       excerpt: 'Why pulling all-nighters might be destroying your rank. Learn the science of memory consolidation during sleep.', 
-       content: '<h2>Sleep is Study</h2><p>During REM sleep, your brain consolidates memory. If you cut sleep to study more, you actually retain less. Aim for 7 hours of quality sleep. Use the <strong>Wellness</strong> tab to practice box breathing before bed.</p>', 
-       author: 'Dr. Expert', 
-       date: new Date(Date.now() - 172800000).toISOString(),
-       imageUrl: 'https://images.unsplash.com/photo-1541781777621-af13943727dd?auto=format&fit=crop&q=80&w=1000',
-       category: 'Wellness'
-     },
-     {
-        id: 4,
-        title: 'Top 10 High Weightage Topics in Physics',
-        excerpt: 'Don\'t study hard, study smart. Focus on these chapters first to secure 60+ marks in Physics easily.',
-        content: '<h2>The Pareto Principle</h2><p>80% of the questions come from 20% of the topics. Here is the list:</p><ol><li><strong>Modern Physics:</strong> High weightage, easy questions.</li><li><strong>Heat & Thermodynamics:</strong> Formula based, easy to score.</li><li><strong>Optics:</strong> Lengthy but predictable.</li><li><strong>Current Electricity:</strong> Always 2-3 questions.</li><li><strong>Electrostatics:</strong> Conceptual but standard patterns.</li></ol><p>Master these before moving to complex mechanics problems.</p>',
-        author: 'Physics HOD',
-        date: new Date(Date.now() - 259200000).toISOString(),
-        imageUrl: 'https://images.unsplash.com/photo-1636466497217-26a8cbeaf0aa?auto=format&fit=crop&q=80&w=1000',
-        category: 'Subject-wise'
-     },
-     {
-        id: 5,
-        title: 'Balancing Boards and JEE',
-        excerpt: 'The ultimate juggling act. How to ensure 95% in Boards without derailing your IIT preparation.',
-        content: '<h2>Two Birds, One Stone</h2><p>JEE and Boards are not enemies. The syllabus is the same. The difference is the <em>approach</em>.</p><p><strong>For Physics & Chem:</strong> JEE preparation automatically covers Board concepts. You just need to practice writing subjective answers 1 month before exams.</p><p><strong>For Maths:</strong> Board level calculus is much simpler. Focus on NCERT examples.</p><p><strong>English/Optional:</strong> Dedicate Sundays exclusively to these subjects starting from January.</p>',
-        author: 'Alumni Mentor',
-        date: new Date(Date.now() - 345600000).toISOString(),
-        imageUrl: 'https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&q=80&w=1000',
-        category: 'Strategy'
      }
   ]);
   
   const [videoMap, setVideoMap] = useState<Record<string, VideoLesson>>({});
+  const [noteMap, setNoteMap] = useState<Record<string, TopicNote>>({}); // Keeping for backward compatibility
+  const [chapterNotes, setChapterNotes] = useState<Record<string, ChapterNote>>({}); // NEW
   const [questionBank, setQuestionBank] = useState<Question[]>([]);
   const [adminTests, setAdminTests] = useState<Test[]>([]);
 
@@ -167,71 +127,88 @@ export default function App() {
   useEffect(() => {
       const storedVersion = localStorage.getItem('iitjee_app_version');
       if (storedVersion !== APP_VERSION) {
-          console.log(`Upgrading from ${storedVersion} to ${APP_VERSION}. Clearing content cache.`);
-          // Force clear to load new seeds
           localStorage.removeItem('iitjee_blogs');
           localStorage.removeItem('iitjee_hacks');
           localStorage.removeItem('iitjee_flashcards');
+          localStorage.removeItem('iitjee_notes');
+          localStorage.removeItem('iitjee_chapter_notes');
           localStorage.setItem('iitjee_app_version', APP_VERSION);
       }
   }, []);
 
-  // --- 1. Init Google Analytics ---
+  // --- 1. Init System Settings (Google & GA) ---
   useEffect(() => {
-      const initGA = async () => {
+      const initSettings = async () => {
           try {
-              const res = await fetch('/api/manage_settings.php?key=google_analytics_id');
-              if(!res.ok) return;
-              const text = await res.text();
-              if(!text || !text.trim()) return;
-              const data = JSON.parse(text);
-              if (data && data.value && !window.gtag) {
-                  setGaMeasurementId(data.value);
-                  const script = document.createElement('script');
-                  script.async = true;
-                  script.src = `https://www.googletagmanager.com/gtag/js?id=${data.value}`;
-                  document.head.appendChild(script);
-                  window.dataLayer = window.dataLayer || [];
-                  function gtag(...args: any[]){window.dataLayer.push(args);}
-                  window.gtag = gtag;
-                  gtag('js', new Date());
-                  gtag('config', data.value);
+              // Fetch Google Analytics ID
+              const resGA = await fetch('/api/manage_settings.php?key=google_analytics_id');
+              if(resGA.ok) {
+                  const data = await resGA.json();
+                  if (data && data.value) setGaMeasurementId(data.value);
               }
-          } catch (e) { console.debug("GA Init Failed"); }
+
+              // Fetch Google Login Status
+              const resLogin = await fetch('/api/manage_settings.php?key=enable_google_login');
+              if(resLogin.ok) {
+                  const data = await resLogin.json();
+                  if (data && data.value !== null) {
+                      setEnableGoogleLogin(data.value === 'true');
+                  }
+              }
+          } catch (e) { console.debug("Settings Init Failed (Offline/Demo)"); }
       };
-      initGA();
+      initSettings();
   }, []);
 
-  // --- 2. Fetch Public Content (Blogs/Hacks) from API ---
+  const toggleGoogleLogin = async () => {
+      const newState = !enableGoogleLogin;
+      setEnableGoogleLogin(newState);
+      try {
+          await fetch('/api/manage_settings.php', {
+              method: 'POST',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({ key: 'enable_google_login', value: String(newState) })
+          });
+      } catch(e) { console.error("Failed to save setting"); }
+  };
+
+  // --- 2. Fetch Public Content (Blogs/Hacks/Notes) from API ---
   useEffect(() => {
       const fetchPublicContent = async () => {
           try {
-            // Fetch Blogs
             const blogRes = await fetch('/api/manage_content.php?type=blogs');
             if (blogRes.ok) {
                 const blogData = await blogRes.json();
                 if (Array.isArray(blogData) && blogData.length > 0) setBlogs(blogData);
             }
 
-            // Fetch Flashcards
             const fcRes = await fetch('/api/manage_content.php?type=flashcards');
             if (fcRes.ok) {
                 const fcData = await fcRes.json();
                 if (Array.isArray(fcData) && fcData.length > 0) setFlashcards(fcData);
             }
             
-            // Fetch Hacks
             const hacksRes = await fetch('/api/manage_content.php?type=hacks');
             if (hacksRes.ok) {
                 const hacksData = await hacksRes.json();
                 if (Array.isArray(hacksData) && hacksData.length > 0) setHacks(hacksData);
             }
 
+            // Fetch Notes (New Multi-page)
+            const notesRes = await fetch('/api/manage_notes.php');
+            if (notesRes.ok) {
+                const notesData = await notesRes.json();
+                if (notesData) setChapterNotes(notesData);
+            }
+
           } catch (e) {
              console.error("Failed to fetch public content", e);
-             // Fallback to local storage if API fails, otherwise keep seed data from useState
              const savedBlogs = localStorage.getItem('iitjee_blogs');
              if (savedBlogs) setBlogs(JSON.parse(savedBlogs));
+             
+             // Fallback local storage for notes
+             const savedChapterNotes = localStorage.getItem('iitjee_chapter_notes');
+             if (savedChapterNotes) setChapterNotes(JSON.parse(savedChapterNotes));
           }
       };
       fetchPublicContent();
@@ -244,9 +221,6 @@ export default function App() {
     const savedQuestions = localStorage.getItem('iitjee_questions');
     const savedAdminTests = localStorage.getItem('iitjee_admin_tests');
     const savedSyllabus = localStorage.getItem('iitjee_syllabus');
-    const savedGoogleConfig = localStorage.getItem('iitjee_enable_google');
-
-    if (savedGoogleConfig !== null) setEnableGoogleLogin(savedGoogleConfig === 'true');
 
     if (savedUser) {
         const u = JSON.parse(savedUser);
@@ -280,20 +254,19 @@ export default function App() {
         localStorage.setItem(`iitjee_backlogs_${user.id}`, JSON.stringify(backlogs));
         if (timetableData) localStorage.setItem(`iitjee_timetable_${user.id}`, JSON.stringify(timetableData));
     }
-    // Only persist admin content if changed locally
     localStorage.setItem('iitjee_videos', JSON.stringify(videoMap));
     localStorage.setItem('iitjee_questions', JSON.stringify(questionBank));
     localStorage.setItem('iitjee_admin_tests', JSON.stringify(adminTests));
     localStorage.setItem('iitjee_syllabus', JSON.stringify(syllabus));
-    localStorage.setItem('iitjee_enable_google', String(enableGoogleLogin));
     
-    // Cache public content
     if(blogs.length > 0) localStorage.setItem('iitjee_blogs', JSON.stringify(blogs));
     if(flashcards.length > 0) localStorage.setItem('iitjee_flashcards', JSON.stringify(flashcards));
     if(hacks.length > 0) localStorage.setItem('iitjee_hacks', JSON.stringify(hacks));
+    localStorage.setItem('iitjee_chapter_notes', JSON.stringify(chapterNotes));
 
-  }, [user, progress, testAttempts, goals, mistakes, backlogs, timetableData, videoMap, questionBank, adminTests, syllabus, enableGoogleLogin, blogs, flashcards, hacks]);
+  }, [user, progress, testAttempts, goals, mistakes, backlogs, timetableData, videoMap, questionBank, adminTests, syllabus, blogs, flashcards, hacks, chapterNotes]);
 
+  // ... (loadLocalData, fetchRemoteData, loadLinkedStudent, handleLogin, handleLogout ... same as before)
   const loadLocalData = (userId: string) => {
     const savedProgress = localStorage.getItem(`iitjee_progress_${userId}`);
     const savedTests = localStorage.getItem(`iitjee_tests_${userId}`);
@@ -379,6 +352,30 @@ export default function App() {
       saveUserToDB(updatedStudent);
       return { success: true, message: 'Invitation sent successfully!' };
   };
+
+  const searchStudents = async (query: string): Promise<User[]> => {
+      // 1. Try API
+      try {
+          const res = await fetch('/api/send_request.php', {
+              method: 'POST',
+              body: JSON.stringify({ action: 'search', query })
+          });
+          if(res.ok) {
+              const data = await res.json();
+              if(Array.isArray(data)) return data;
+          }
+      } catch(e) {}
+
+      // 2. Fallback local search (Demo mode)
+      const db = getUserDB();
+      return db.filter(u => 
+          u.role === 'STUDENT' && 
+          (u.name.toLowerCase().includes(query.toLowerCase()) || 
+           u.id.includes(query) || 
+           u.email.toLowerCase().includes(query.toLowerCase()))
+      );
+  };
+
   const acceptConnectionRequest = (notificationId: string) => {
       if(!user) return;
       const notification = user.notifications?.find(n => n.id === notificationId);
@@ -409,6 +406,18 @@ export default function App() {
     });
   };
   const updateVideo = (topicId: string, url: string, description: string) => { setVideoMap(prev => ({ ...prev, [topicId]: { topicId, videoUrl: url, description } })); };
+  
+  // Note Saver (Updated for Multi-page support)
+  const updateChapterNotes = (topicId: string, pages: string[]) => {
+      setChapterNotes(prev => ({ ...prev, [topicId]: { id: Date.now(), topicId, pages, lastUpdated: new Date().toISOString() } }));
+      // API Call
+      fetch('/api/manage_notes.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ topicId, pages })
+      }).catch(console.error);
+  };
+
   const saveTimetable = (config: TimetableConfig, slots: any[]) => { setTimetableData({ config, slots }); };
   const addQuestion = (q: Question) => setQuestionBank(prev => [...prev, q]);
   const deleteQuestion = (id: string) => setQuestionBank(prev => prev.filter(q => q.id !== id));
@@ -418,14 +427,49 @@ export default function App() {
   const addGoal = (text: string) => setGoals(prev => [...prev, { id: Date.now().toString(), text, completed: false }]);
   const toggleGoal = (id: string) => setGoals(prev => prev.map(g => g.id === id ? { ...g, completed: !g.completed } : g));
   const addMistake = (m: Omit<MistakeLog, 'id' | 'date'>) => setMistakes(prev => [{ ...m, id: Date.now().toString(), date: new Date().toISOString() }, ...prev]);
-  const addFlashcard = (card: Omit<Flashcard, 'id'>) => setFlashcards(prev => [...prev, { ...card, id: Date.now() }]);
-  const addHack = (hack: Omit<MemoryHack, 'id'>) => setHacks(prev => [...prev, { ...hack, id: Date.now() }]);
-  const addBlog = (blog: Omit<BlogPost, 'id' | 'date'>) => setBlogs(prev => [{ ...blog, id: Date.now(), date: new Date().toISOString() }, ...prev]);
+  
+  // --- Updated Content Management Functions with API Persistence ---
+  
+  const addFlashcard = (card: Omit<Flashcard, 'id'>) => {
+      const newCard = { ...card, id: Date.now() };
+      setFlashcards(prev => [...prev, newCard]);
+      fetch('/api/manage_content.php?type=flashcard', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(card)
+      }).catch(e => console.error(e));
+  };
+
+  const addHack = (hack: Omit<MemoryHack, 'id'>) => {
+      const newHack = { ...hack, id: Date.now() };
+      setHacks(prev => [...prev, newHack]);
+      fetch('/api/manage_content.php?type=hack', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(hack)
+      }).catch(e => console.error(e));
+  };
+
+  const addBlog = (blog: Omit<BlogPost, 'id' | 'date'>) => {
+      const newBlog = { ...blog, id: Date.now(), date: new Date().toISOString() };
+      setBlogs(prev => [newBlog, ...prev]);
+      fetch('/api/manage_content.php?type=blog', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(blog)
+      }).catch(e => console.error(e));
+  };
+
   const deleteContent = (type: 'flashcard' | 'hack' | 'blog', id: number) => {
     if(type === 'flashcard') setFlashcards(prev => prev.filter(i => i.id !== id));
     if(type === 'hack') setHacks(prev => prev.filter(i => i.id !== id));
     if(type === 'blog') setBlogs(prev => prev.filter(i => i.id !== id));
+    
+    fetch(`/api/manage_content.php?type=${type}&id=${id}`, {
+        method: 'DELETE'
+    }).catch(e => console.error(e));
   };
+
   const handleAddTopic = (topic: Omit<Topic, 'id'>) => { const newTopic: Topic = { ...topic, id: `${topic.subject[0].toLowerCase()}_${Date.now()}` }; setSyllabus(prev => [...prev, newTopic]); };
   const handleDeleteTopic = (id: string) => { setSyllabus(prev => prev.filter(t => t.id !== id)); };
   const addBacklog = (item: Omit<BacklogItem, 'id' | 'status'>) => { setBacklogs(prev => [...prev, { ...item, id: `bl_${Date.now()}`, status: 'PENDING' }]); };
@@ -459,7 +503,7 @@ export default function App() {
                 {currentScreen === 'analytics' && <AnalyticsScreen user={user} progress={linkedStudentData?.progress || {}} testAttempts={linkedStudentData?.tests || []} />}
                 {currentScreen === 'timetable' && <div className="p-8 text-center text-slate-500 bg-white rounded-xl border border-slate-200">Timetable viewing is available in Student account.</div>}
                 {currentScreen === 'tests' && <TestScreen user={user} history={linkedStudentData?.tests || []} addTestAttempt={()=>{}} availableTests={adminTests} />}
-                {currentScreen === 'syllabus' && <SyllabusScreen user={user} subjects={syllabus} progress={linkedStudentData?.progress || {}} onUpdateProgress={()=>{}} readOnly={true} videoMap={videoMap} />}
+                {currentScreen === 'syllabus' && <SyllabusScreen user={user} subjects={syllabus} progress={linkedStudentData?.progress || {}} onUpdateProgress={()=>{}} readOnly={true} videoMap={videoMap} chapterNotes={chapterNotes} />}
                 {currentScreen === 'profile' && <ProfileScreen user={user} onAcceptRequest={()=>{}} onUpdateUser={(u) => { const updated = { ...user, ...u }; setUser(updated); saveUserToDB(updated); }} linkedStudentName={linkedStudentData?.studentName} />} 
              </>
           )}
@@ -468,12 +512,14 @@ export default function App() {
                 <AITutorChat isFullScreen={currentScreen === 'ai-tutor'} />
                 
                 {currentScreen === 'dashboard' && <DashboardScreen user={user} progress={progress} testAttempts={testAttempts} goals={goals} addGoal={addGoal} toggleGoal={toggleGoal} setScreen={setCurrentScreen} />}
-                {currentScreen === 'syllabus' && <SyllabusScreen user={user} subjects={syllabus} progress={progress} onUpdateProgress={updateTopicProgress} videoMap={videoMap} />}
+                {currentScreen === 'syllabus' && <SyllabusScreen user={user} subjects={syllabus} progress={progress} onUpdateProgress={updateTopicProgress} videoMap={videoMap} chapterNotes={chapterNotes} />}
                 {currentScreen === 'revision' && <RevisionScreen progress={progress} handleRevisionComplete={handleRevisionComplete} />}
                 {currentScreen === 'tests' && <TestScreen user={user} history={testAttempts} addTestAttempt={addTestAttempt} availableTests={adminTests} />}
                 {currentScreen === 'timetable' && <TimetableScreen user={user} savedConfig={timetableData?.config} savedSlots={timetableData?.slots} onSave={saveTimetable} progress={progress} />}
                 {currentScreen === 'focus' && <FocusScreen />}
-                {currentScreen === 'ai-tutor' && <div className="h-full hidden md:block"></div>}
+                {currentScreen === 'ai-tutor' && (
+                   <div className="h-full hidden md:block"></div> 
+                )}
                 {currentScreen === 'flashcards' && <FlashcardScreen flashcards={flashcards} />}
                 {currentScreen === 'mistakes' && <MistakesScreen mistakes={mistakes} addMistake={addMistake} />}
                 {currentScreen === 'backlogs' && <BacklogScreen backlogs={backlogs} onAddBacklog={addBacklog} onToggleBacklog={toggleBacklog} onDeleteBacklog={deleteBacklog} />}
@@ -485,9 +531,9 @@ export default function App() {
           )}
           {user.role === 'ADMIN' && (
               <>
-                {currentScreen === 'overview' && <AdminDashboardScreen user={user} onNavigate={setCurrentScreen} enableGoogleLogin={enableGoogleLogin} onToggleGoogle={() => setEnableGoogleLogin(!enableGoogleLogin)} />}
+                {currentScreen === 'overview' && <AdminDashboardScreen user={user} onNavigate={setCurrentScreen} enableGoogleLogin={enableGoogleLogin} onToggleGoogle={toggleGoogleLogin} />}
                 {currentScreen === 'users' && <AdminUserManagementScreen />}
-                {currentScreen === 'syllabus_admin' && <AdminSyllabusScreen syllabus={syllabus} onAddTopic={handleAddTopic} onDeleteTopic={handleDeleteTopic} />}
+                {currentScreen === 'syllabus_admin' && <AdminSyllabusScreen syllabus={syllabus} onAddTopic={handleAddTopic} onDeleteTopic={handleDeleteTopic} chapterNotes={chapterNotes} onUpdateNotes={updateChapterNotes} />}
                 {(currentScreen === 'inbox' || currentScreen === 'content_admin') && <AdminInboxScreen />}
                 {currentScreen === 'content' && <ContentManagerScreen flashcards={flashcards} hacks={hacks} blogs={blogs} onAddFlashcard={addFlashcard} onAddHack={addHack} onAddBlog={addBlog} onDelete={deleteContent} initialTab='flashcards' />}
                 {currentScreen === 'blog_admin' && <AdminBlogScreen blogs={blogs} onAddBlog={addBlog} onDeleteBlog={(id) => deleteContent('blog', id)} />}

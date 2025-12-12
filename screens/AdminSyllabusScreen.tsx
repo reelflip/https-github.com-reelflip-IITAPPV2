@@ -1,18 +1,26 @@
 
 import React, { useState } from 'react';
-import { Topic, Subject } from '../lib/types';
-import { Plus, Trash2, FolderPlus, FilePlus, Book } from 'lucide-react';
+import { Topic, Subject, ChapterNote } from '../lib/types';
+import { Plus, Trash2, FolderPlus, FilePlus, Book, FileText, Save, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { RichTextEditor } from '../components/RichTextEditor';
 
 interface Props {
   syllabus: Topic[];
   onAddTopic: (topic: Omit<Topic, 'id'>) => void;
   onDeleteTopic: (id: string) => void;
+  chapterNotes?: Record<string, ChapterNote>;
+  onUpdateNotes?: (topicId: string, pages: string[]) => void;
 }
 
-export const AdminSyllabusScreen: React.FC<Props> = ({ syllabus, onAddTopic, onDeleteTopic }) => {
+export const AdminSyllabusScreen: React.FC<Props> = ({ syllabus, onAddTopic, onDeleteTopic, chapterNotes = {}, onUpdateNotes }) => {
   const [subject, setSubject] = useState<Subject>('Physics');
   const [chapter, setChapter] = useState('');
   const [topicName, setTopicName] = useState('');
+  
+  // Notes Editor State
+  const [editingNoteTopic, setEditingNoteTopic] = useState<{id: string, name: string} | null>(null);
+  const [pages, setPages] = useState<string[]>([]);
+  const [activePageIndex, setActivePageIndex] = useState(0);
 
   // Grouping for Display
   const grouped = syllabus.filter(t => t.subject === subject).reduce((acc, topic) => {
@@ -26,15 +34,124 @@ export const AdminSyllabusScreen: React.FC<Props> = ({ syllabus, onAddTopic, onD
       if(!chapter || !topicName) return;
       onAddTopic({ name: topicName, chapter, subject });
       setTopicName('');
-      // Keep chapter to allow adding multiple topics to same chapter
+  };
+
+  const openNoteEditor = (topic: Topic) => {
+      const existing = chapterNotes[topic.id];
+      setPages(existing ? [...existing.pages] : ['']);
+      setEditingNoteTopic({ id: topic.id, name: topic.name });
+      setActivePageIndex(0);
+  };
+
+  const saveNotes = () => {
+      if(editingNoteTopic && onUpdateNotes) {
+          // Filter out empty pages if desired, or keep them
+          onUpdateNotes(editingNoteTopic.id, pages);
+          setEditingNoteTopic(null);
+      }
+  };
+
+  const updateCurrentPage = (content: string) => {
+      const newPages = [...pages];
+      newPages[activePageIndex] = content;
+      setPages(newPages);
+  };
+
+  const addPage = () => {
+      setPages([...pages, '']);
+      setActivePageIndex(pages.length); // Switch to new page
+  };
+
+  const deletePage = (index: number) => {
+      if (pages.length <= 1) {
+          setPages(['']);
+          return;
+      }
+      const newPages = pages.filter((_, i) => i !== index);
+      setPages(newPages);
+      if (activePageIndex >= newPages.length) setActivePageIndex(newPages.length - 1);
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in">
+    <div className="space-y-6 animate-in fade-in relative">
+        
+        {/* Notes Editor Overlay */}
+        {editingNoteTopic && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4">
+                <div className="bg-white rounded-2xl w-full max-w-5xl h-[85vh] flex overflow-hidden shadow-2xl animate-in zoom-in-95">
+                    {/* Sidebar: Page Manager */}
+                    <div className="w-64 bg-slate-50 border-r border-slate-200 flex flex-col">
+                        <div className="p-4 border-b border-slate-200">
+                            <h3 className="font-bold text-slate-800 text-sm truncate">{editingNoteTopic.name}</h3>
+                            <p className="text-xs text-slate-500">Managing {pages.length} Pages</p>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-2 space-y-2">
+                            {pages.map((_, idx) => (
+                                <div 
+                                    key={idx} 
+                                    onClick={() => setActivePageIndex(idx)}
+                                    className={`p-3 rounded-lg border cursor-pointer flex justify-between items-center transition-all ${
+                                        activePageIndex === idx ? 'bg-blue-50 border-blue-200 shadow-sm' : 'bg-white border-slate-200 hover:border-blue-300'
+                                    }`}
+                                >
+                                    <span className={`text-sm font-bold ${activePageIndex === idx ? 'text-blue-700' : 'text-slate-600'}`}>Page {idx + 1}</span>
+                                    <button 
+                                        onClick={(e) => { e.stopPropagation(); deletePage(idx); }}
+                                        className="text-slate-400 hover:text-red-500 p-1"
+                                        title="Delete Page"
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            ))}
+                            <button 
+                                onClick={addPage}
+                                className="w-full py-3 border-2 border-dashed border-slate-300 rounded-lg text-slate-500 hover:border-blue-400 hover:text-blue-600 text-sm font-bold transition-all flex items-center justify-center gap-2"
+                            >
+                                <Plus className="w-4 h-4" /> Add Page
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Main Editor Area */}
+                    <div className="flex-1 flex flex-col">
+                        <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-white">
+                            <div className="flex items-center gap-4">
+                                <span className="text-sm font-bold text-slate-500 uppercase tracking-wider">Editing Page {activePageIndex + 1}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button 
+                                    onClick={() => setEditingNoteTopic(null)}
+                                    className="px-4 py-2 text-sm font-bold text-slate-500 hover:text-slate-800 transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button 
+                                    onClick={saveNotes}
+                                    className="px-6 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 shadow-md flex items-center gap-2"
+                                >
+                                    <Save className="w-4 h-4" /> Save All
+                                </button>
+                            </div>
+                        </div>
+                        <div className="flex-1 overflow-y-auto bg-slate-50 p-6">
+                            <RichTextEditor 
+                                content={pages[activePageIndex]} 
+                                onChange={updateCurrentPage}
+                                placeholder="Start typing your chapter notes here..."
+                                className="h-full min-h-[500px]"
+                            />
+                        </div>
+                    </div>
+                </div>
+            </div>
+        )}
+
+        {/* Header */}
         <div className="bg-slate-900 rounded-xl p-8 text-white shadow-lg flex justify-between items-center">
             <div>
                 <h2 className="text-2xl font-bold mb-2">Syllabus Management</h2>
-                <p className="text-slate-400">Add or remove chapters and topics dynamically.</p>
+                <p className="text-slate-400">Add topics and attach study material.</p>
             </div>
             <div className="p-3 bg-white/10 rounded-xl">
                 <Book className="w-8 h-8 text-blue-400" />
@@ -129,20 +246,34 @@ export const AdminSyllabusScreen: React.FC<Props> = ({ syllabus, onAddTopic, onD
                                 <span className="text-xs text-slate-400">{topics.length} Topics</span>
                             </div>
                             <div className="divide-y divide-slate-100">
-                                {topics.map(t => (
-                                    <div key={t.id} className="px-4 py-3 flex justify-between items-center hover:bg-slate-50 transition-colors group">
-                                        <span className="text-sm text-slate-600">{t.name}</span>
-                                        <button 
-                                            onClick={() => {
-                                                if(confirm(`Delete topic "${t.name}"?`)) onDeleteTopic(t.id);
-                                            }}
-                                            className="text-slate-300 hover:text-red-500 p-1 rounded opacity-0 group-hover:opacity-100 transition-all"
-                                            title="Delete Topic"
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                        </button>
-                                    </div>
-                                ))}
+                                {topics.map(t => {
+                                    const hasNotes = chapterNotes && chapterNotes[t.id];
+                                    return (
+                                        <div key={t.id} className="px-4 py-3 flex justify-between items-center hover:bg-slate-50 transition-colors group">
+                                            <div className="flex items-center gap-3">
+                                                <span className="text-sm text-slate-600">{t.name}</span>
+                                                {hasNotes && <span className="bg-green-100 text-green-700 text-[10px] px-2 py-0.5 rounded font-bold">Has Notes</span>}
+                                            </div>
+                                            <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all">
+                                                <button 
+                                                    onClick={() => openNoteEditor(t)}
+                                                    className="flex items-center gap-1 bg-slate-100 hover:bg-blue-100 text-slate-600 hover:text-blue-700 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors"
+                                                >
+                                                    <FileText className="w-3 h-3" /> {hasNotes ? 'Edit Notes' : 'Add Notes'}
+                                                </button>
+                                                <button 
+                                                    onClick={() => {
+                                                        if(confirm(`Delete topic "${t.name}"?`)) onDeleteTopic(t.id);
+                                                    }}
+                                                    className="text-slate-300 hover:text-red-500 p-1.5 rounded transition-all bg-slate-50 hover:bg-red-50"
+                                                    title="Delete Topic"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </div>
                     ))}

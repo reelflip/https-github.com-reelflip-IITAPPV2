@@ -24,7 +24,7 @@ export const generateHtaccess = () => `
 `;
 
 export const generateSQLSchema = () => `
--- IITGEEPrep Database Schema v10.0
+-- IITGEEPrep Database Schema v10.3
 -- Target: MySQL / MariaDB (Hostinger)
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
@@ -50,6 +50,7 @@ DROP TABLE IF EXISTS \`mistakes\`;
 DROP TABLE IF EXISTS \`backlogs\`;
 DROP TABLE IF EXISTS \`timetable_configs\`;
 DROP TABLE IF EXISTS \`system_settings\`;
+DROP TABLE IF EXISTS \`chapter_notes\`;
 
 -- 1. USERS
 CREATE TABLE IF NOT EXISTS \`users\` (
@@ -254,6 +255,14 @@ CREATE TABLE IF NOT EXISTS \`system_settings\` (
   PRIMARY KEY (\`setting_key\`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE IF NOT EXISTS \`chapter_notes\` (
+  \`id\` int(11) NOT NULL AUTO_INCREMENT,
+  \`topic_id\` varchar(50) NOT NULL UNIQUE,
+  \`pages_json\` longtext, -- JSON array of page content
+  \`last_updated\` timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (\`id\`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- Seed Admin
 INSERT INTO \`users\` (\`name\`, \`email\`, \`password_hash\`, \`role\`) VALUES 
 ('System Admin', 'admin@iitgeeprep.com', 'Ishika@123', 'ADMIN');
@@ -269,7 +278,7 @@ INSERT INTO \`blog_posts\` (\`title\`, \`excerpt\`, \`content\`, \`author\`, \`c
 COMMIT;
 `;
 
-export const generateFrontendGuide = () => `# IITGEEPrep Hostinger Deployment Guide (v10.0)
+export const generateFrontendGuide = () => `# IITGEEPrep Hostinger Deployment Guide (v10.2)
 
 ## Phase 1: Preparation
 1. Run \`npm run build\` in your local terminal.
@@ -360,10 +369,10 @@ try {
         folder: 'api',
         desc: 'API Root Health Check',
         content: `${phpHeader}
-echo json_encode(["status" => "active", "message" => "IITGEEPrep API v10.0 Operational", "timestamp" => date('c')]);
+echo json_encode(["status" => "active", "message" => "IITGEEPrep API v10.2 Operational", "timestamp" => date('c')]);
 ?>`
     },
-    // ... (All other PHP files implicitly updated to v10.0 logic) ...
+    // ... (All other PHP files implicitly updated to v10.2 logic) ...
     {
         name: 'manage_syllabus.php',
         folder: 'api',
@@ -453,6 +462,7 @@ if ($action === 'get_question') {
         desc: 'Google Sign-In',
         content: `${phpHeader}
 $data = json_decode(file_get_contents("php://input"));
+$selectedRole = $data->role ?? null; 
 
 if(!empty($data->token)) {
     $url = "https://oauth2.googleapis.com/tokeninfo?id_token=" . $data->token;
@@ -478,11 +488,17 @@ if(!empty($data->token)) {
             unset($user['password_hash']);
             echo json_encode(["status" => "success", "user" => $user]);
         } else {
-            // 3. Create New User
-            $stmt = $conn->prepare("INSERT INTO users (name, email, password_hash, role, google_id, is_verified) VALUES (?, ?, ?, 'STUDENT', ?, 1)");
-            // Use dummy password for social login
+            // 3. User NOT found
+            if ($selectedRole === null) {
+                // If no role provided for a new user, ask frontend to prompt
+                echo json_encode(["status" => "needs_role", "message" => "User not found, please select role"]);
+                exit();
+            }
+
+            // 4. Create New User with Selected Role
+            $stmt = $conn->prepare("INSERT INTO users (name, email, password_hash, role, google_id, is_verified) VALUES (?, ?, ?, ?, ?, 1)");
             $dummyPass = password_hash(uniqid(), PASSWORD_DEFAULT);
-            $stmt->execute([$name, $email, $dummyPass, $sub]);
+            $stmt->execute([$name, $email, $dummyPass, $selectedRole, $sub]);
             
             $id = $conn->lastInsertId();
             $stmt = $conn->prepare("SELECT * FROM users WHERE id = ?");
@@ -773,6 +789,34 @@ elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
 ?>`
     },
     {
+        name: 'manage_notes.php',
+        folder: 'api',
+        desc: 'Chapter Notes CRUD',
+        content: `${phpHeader}
+$data = json_decode(file_get_contents("php://input"));
+$method = $_SERVER['REQUEST_METHOD'];
+
+if ($method === 'GET') {
+    $stmt = $conn->query("SELECT * FROM chapter_notes");
+    $notes = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $map = [];
+    foreach($notes as $n) {
+        $n['pages'] = json_decode($n['pages_json']);
+        unset($n['pages_json']);
+        $map[$n['topic_id']] = $n;
+    }
+    echo json_encode($map);
+}
+elseif ($method === 'POST') {
+    // Upsert
+    $stmt = $conn->prepare("INSERT INTO chapter_notes (topic_id, pages_json) VALUES (?, ?) ON DUPLICATE KEY UPDATE pages_json = ?");
+    $json = json_encode($data->pages);
+    $stmt->execute([$data->topicId, $json, $json]);
+    echo json_encode(["message" => "Saved"]);
+}
+?>`
+    },
+    {
         name: 'send_request.php',
         folder: 'api',
         desc: 'Parent Connection Request',
@@ -827,6 +871,16 @@ $videos = $conn->query("SELECT * FROM videos")->fetchAll(PDO::FETCH_ASSOC);
 $vMap = [];
 foreach($videos as $v) $vMap[$v['topic_id']] = $v;
 $common['videoMap'] = $vMap;
+
+// Notes Map
+$notes = $conn->query("SELECT * FROM chapter_notes")->fetchAll(PDO::FETCH_ASSOC);
+$nMap = [];
+foreach($notes as $n) {
+    $n['pages'] = json_decode($n['pages_json']);
+    unset($n['pages_json']);
+    $nMap[$n['topic_id']] = $n;
+}
+$common['noteMap'] = $nMap;
 
 // Notifications for broadcast
 $common['notifications'] = $conn->query("SELECT * FROM notifications WHERE type='INFO'")->fetchAll(PDO::FETCH_ASSOC);

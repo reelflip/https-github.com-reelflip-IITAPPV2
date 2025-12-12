@@ -56,6 +56,22 @@ export interface VideoLesson {
   description?: string;
 }
 
+// Updated Note Interface
+export interface ChapterNote {
+  id: number;
+  topicId: string;
+  pages: string[]; // Array of HTML strings, one per page
+  lastUpdated: string;
+}
+
+// Deprecated (Keep for compatibility if needed, but we use ChapterNote now)
+export interface TopicNote {
+  id: number;
+  topicId: string;
+  content: string;
+  lastUpdated: string;
+}
+
 export interface TestAttempt {
   id: string;
   date: string;
