@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { User } from '../lib/types';
 import { StatCard } from '../components/StatCard';
-import { Settings, ToggleLeft, ToggleRight, HelpCircle, BarChart3, Save, CheckCircle2 } from 'lucide-react';
+import { Settings, ToggleLeft, ToggleRight, HelpCircle, BarChart3, Save, CheckCircle2, ArrowRight } from 'lucide-react';
 
 interface Props {
   user: User;
@@ -146,11 +146,17 @@ export const AdminDashboardScreen: React.FC<Props> = ({ user, onNavigate, messag
                 </div>
                 
                 {enableGoogleLogin && (
-                    <div className="mt-4 p-3 bg-blue-50 border border-blue-100 rounded-lg text-xs text-blue-800 flex gap-2">
-                        <HelpCircle className="w-4 h-4 shrink-0" />
-                        <span>
-                            To enable real authentication, update <code>YOUR_GOOGLE_CLIENT_ID</code> in <strong>AuthScreen.tsx</strong> with your Google Cloud credentials.
-                        </span>
+                    <div className="mt-4 p-3 bg-blue-50 border border-blue-100 rounded-lg text-xs text-blue-800 flex gap-2 items-start">
+                        <HelpCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                        <div>
+                            <span>To verify users, enter your Google Cloud <strong>Client ID</strong> in the System settings.</span>
+                            <button 
+                                onClick={() => onNavigate && onNavigate('system')}
+                                className="block mt-1 font-bold hover:underline flex items-center gap-1"
+                            >
+                                Configure OAuth <ArrowRight size={12} />
+                            </button>
+                        </div>
                     </div>
                 )}
              </div>

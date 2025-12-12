@@ -1,4 +1,3 @@
-
 // v10.1 - Enhanced Model Selection (Radio Cards) + OAuth Config
 import React, { useState, useEffect } from 'react';
 import { Save, Bot, Zap, CheckCircle2, AlertCircle, MessageSquare, Loader2, Play, BookOpen, Check, Brain, Key } from 'lucide-react';
@@ -146,7 +145,7 @@ export const AdminSystemScreen: React.FC = () => {
       <div className="bg-gradient-to-r from-violet-600 to-indigo-600 rounded-2xl p-8 text-white shadow-lg relative overflow-hidden">
         <div className="relative z-10">
           <h2 className="text-3xl font-bold flex items-center gap-3"><Bot className="w-8 h-8" /> AI System Configuration</h2>
-          <p className="text-violet-100 mt-2 opacity-90 max-w-2xl">Configure the AI Tutor engine. Select the best model suited for your students' needs.</p>
+          <p className="text-violet-100 mt-2 opacity-90 max-w-2xl">Configure the AI Tutor engine and Auth services.</p>
         </div>
       </div>
       
@@ -168,7 +167,10 @@ export const AdminSystemScreen: React.FC = () => {
                             placeholder="784...apps.googleusercontent.com"
                             className="w-full p-3 border border-slate-200 rounded-lg text-sm font-mono text-slate-600 focus:ring-2 focus:ring-green-100 outline-none"
                         />
-                        <p className="text-xs text-slate-400 mt-2">Required for the "Sign in with Google" button to function.</p>
+                        <p className="text-xs text-slate-400 mt-2">
+                            Enter the Client ID from your Google Cloud Console. This allows users to "Sign in with Google".
+                            Value is saved permanently on server.
+                        </p>
                     </div>
                 </div>
             </div>
@@ -224,7 +226,7 @@ export const AdminSystemScreen: React.FC = () => {
                 <div className="mt-6 pt-4 border-t border-slate-100">
                     <button onClick={handleSave} disabled={saving} className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 rounded-xl shadow-md flex items-center justify-center gap-2 transition-all active:scale-95">
                         {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />} 
-                        {saving ? 'Saving...' : 'Save System Configuration'}
+                        {saving ? 'Saving Settings...' : 'Save All Configurations'}
                     </button>
                 </div>
             </div>

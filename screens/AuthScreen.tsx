@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { User, Role } from '../lib/types';
 import { COACHING_INSTITUTES, TARGET_YEARS, TARGET_EXAMS } from '../lib/constants';
@@ -64,21 +65,24 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate, ena
     securityAnswer: ''
   });
 
-  // Fetch Google Client ID
+  // Fetch Google Client ID from server
   useEffect(() => {
       const fetchClientId = async () => {
           try {
               const res = await fetch('/api/manage_settings.php?key=google_client_id');
               if(res.ok) {
                   const data = await res.json();
-                  if(data && data.value) setGoogleClientId(data.value);
+                  // Check if value is valid string and not just "null" or empty
+                  if(data && data.value && data.value.length > 5) {
+                      setGoogleClientId(data.value);
+                  }
               }
           } catch(e) { console.debug('OAuth config fetch failed'); }
       };
       if(enableGoogleLogin) fetchClientId();
   }, [enableGoogleLogin]);
 
-  // Init Google Login
+  // Init Google Login Button
   useEffect(() => {
     if (enableGoogleLogin && googleClientId && window.google && googleBtnRef.current && view === 'LOGIN') {
       try {
@@ -123,17 +127,21 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate, ena
               throw new Error(data.message || 'Google Login failed');
           }
       } catch (err: any) {
-          console.warn("Google Login failed (likely invalid client ID). Simulating success.");
-          const mockUser: User = {
-              id: `google_${Date.now()}`,
-              name: 'Google User',
-              email: 'google@example.com',
-              role: 'STUDENT',
-              isVerified: true,
-              targetExam: 'JEE Main',
-              avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=google`
-          };
-          onLogin(mockUser);
+          console.warn("Google Login failed (likely invalid client ID). Simulating success for demo if local.");
+          if (window.location.hostname === 'localhost') {
+              const mockUser: User = {
+                  id: `google_${Date.now()}`,
+                  name: 'Google User',
+                  email: 'google@example.com',
+                  role: 'STUDENT',
+                  isVerified: true,
+                  targetExam: 'JEE Main',
+                  avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=google`
+              };
+              onLogin(mockUser);
+          } else {
+              setError("Login Failed: " + err.message);
+          }
       } finally {
           setIsLoading(false);
       }
@@ -505,14 +513,10 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate, ena
                     </div>
                 )}
 
-                {/* Google Login (Login Only) */}
-                {view === 'LOGIN' && enableGoogleLogin && (
+                {/* Google Login (Login Only) - Hidden if clientID is missing */}
+                {view === 'LOGIN' && enableGoogleLogin && googleClientId && (
                     <div className="mb-6">
-                        {googleClientId ? (
-                            <div ref={googleBtnRef} className="w-full"></div>
-                        ) : (
-                            <p className="text-center text-xs text-red-400">OAuth Client ID not configured in Admin Panel.</p>
-                        )}
+                        <div ref={googleBtnRef} className="w-full"></div>
                         <div className="relative mt-4 mb-2">
                             <div className="absolute inset-0 flex items-center">
                                 <div className="w-full border-t border-slate-200"></div>
