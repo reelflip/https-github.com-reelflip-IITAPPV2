@@ -1,5 +1,5 @@
 
-import { Subject, TopicStatus, Role } from '../lib/types';
+import { MOCK_TESTS_DATA } from '../lib/mockTestsData';
 
 export const getDeploymentPhases = () => [
     { title: "Build & Prep", subtitle: "Local Machine", bg: "bg-blue-50 border-blue-200", color: "text-blue-700", steps: ["Run `npm run build`", "Zip the `dist` folder"] },
@@ -64,15 +64,11 @@ export const generateFrontendGuide = () => `# IITGEEPrep Deployment Manual (Host
 2. The app should load.
 3. Try logging in (default admin credentials in \`database.sql\`).
 4. Go to Admin Dashboard -> Diagnostics to verify API connection.
-
-## Troubleshooting
-- **404 on Refresh:** Ensure \`.htaccess\` is correctly placed in \`public_html\`.
-- **API Errors:** Check \`api/config.php\` credentials. Check File Permissions (files 644, folders 755).
-- **Google Login Fails:** Add your domain to Authorized JavaScript origins in Google Cloud Console and ensure Client ID is saved in Admin Panel.
 `;
 
-export const generateSQLSchema = () => `
--- IITGEEPrep Database Schema v11.2
+export const generateSQLSchema = () => {
+    let sql = `
+-- IITGEEPrep Database Schema v11.3
 -- Target: MySQL / MariaDB (Hostinger)
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
@@ -315,8 +311,27 @@ INSERT INTO \`users\` (\`name\`, \`email\`, \`password_hash\`, \`role\`) VALUES
 INSERT INTO \`blog_posts\` (\`title\`, \`excerpt\`, \`content\`, \`author\`, \`category\`, \`image_url\`) VALUES
 ('JEE Main & Advanced 2025: Complete Roadmap', 'A strategic month-by-month guide to conquering Physics, Chemistry, and Maths while managing Board Exams.', '<h2>The Foundation</h2><p>Success in JEE Main and Advanced is not just about hard work; it is about <strong>smart work</strong> and consistent effort.</p>', 'System Admin', 'Strategy', 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&q=80&w=1000');
 
-COMMIT;
+-- SEED MOCK TESTS (10 TESTS)
 `;
+
+    // Loop through MOCK_TESTS_DATA to generate Insert Statements
+    MOCK_TESTS_DATA.forEach(test => {
+        // Escape strings for SQL
+        const safeTitle = test.title.replace(/'/g, "''");
+        sql += `INSERT INTO \`tests\` (\`id\`, \`title\`, \`duration_minutes\`, \`difficulty\`, \`exam_type\`) VALUES ('${test.id}', '${safeTitle}', ${test.durationMinutes}, '${test.difficulty}', '${test.examType}');\n`;
+        
+        test.questions.forEach(q => {
+            const safeText = q.text.replace(/'/g, "''");
+            const safeOptions = JSON.stringify(q.options).replace(/'/g, "''"); // Escape JSON quotes
+            const safeSource = q.source ? q.source.replace(/'/g, "''") : 'NULL';
+            
+            sql += `INSERT INTO \`questions\` (\`id\`, \`test_id\`, \`subject_id\`, \`topic_id\`, \`text\`, \`options_json\`, \`correct_option\`, \`source_tag\`, \`year\`) VALUES ('${q.id}', '${test.id}', '${q.subjectId}', '${q.topicId}', '${safeText}', '${safeOptions}', ${q.correctOptionIndex}, '${safeSource}', ${q.year || 'NULL'});\n`;
+        });
+    });
+
+    sql += `COMMIT;`;
+    return sql;
+};
 
 const phpHeader = `<?php
 header("Access-Control-Allow-Origin: *");
@@ -358,7 +373,7 @@ try {
         folder: 'api',
         desc: 'API Root Health Check',
         content: `${phpHeader}
-echo json_encode(["status" => "active", "message" => "IITGEEPrep API v11.2 Operational", "timestamp" => date('c')]);
+echo json_encode(["status" => "active", "message" => "IITGEEPrep API v11.3 Operational", "timestamp" => date('c')]);
 ?>`
     },
     {

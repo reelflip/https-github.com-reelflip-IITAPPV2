@@ -38,10 +38,11 @@ import { AITutorChat } from './components/AITutorChat';
 import { User, UserProgress, TopicStatus, TestAttempt, Screen, Goal, MistakeLog, Flashcard, MemoryHack, BlogPost, VideoLesson, Question, Test, TimetableConfig, Topic, ContactMessage, BacklogItem, TopicNote, ChapterNote } from './lib/types';
 import { calculateNextRevision } from './lib/utils';
 import { SYLLABUS_DATA } from './lib/syllabusData';
-import { DEFAULT_CHAPTER_NOTES } from './lib/chapterContent'; // Import default notes
+import { DEFAULT_CHAPTER_NOTES } from './lib/chapterContent';
+import { MOCK_TESTS_DATA } from './lib/mockTestsData';
 import { TrendingUp, Bell, LogOut } from 'lucide-react';
 
-const APP_VERSION = '11.2';
+const APP_VERSION = '11.3';
 
 const ComingSoonScreen = ({ title, icon }: { title: string, icon: string }) => (
   <div className="flex flex-col items-center justify-center h-[70vh] text-center">
@@ -50,21 +51,6 @@ const ComingSoonScreen = ({ title, icon }: { title: string, icon: string }) => (
     <p className="text-slate-500 max-w-md">This feature is available in the Pro version or is currently under development.</p>
   </div>
 );
-
-const DEMO_TESTS: Test[] = [
-    {
-        id: 'demo_jee_main_1',
-        title: 'JEE Main 2024 - Physics Full Mock',
-        durationMinutes: 180,
-        category: 'ADMIN',
-        difficulty: 'MAINS',
-        examType: 'JEE',
-        questions: [
-            { id: 'q1', subjectId: 'phys', topicId: 'p-kin-1d', text: 'A particle moves with velocity v = t^2 - 2t. Find distance traveled in first 3 seconds.', options: ['4m', '6m', '8m', '2m'], correctOptionIndex: 1, source: 'JEE Main', year: 2024 },
-            { id: 'q2', subjectId: 'phys', topicId: 'p-electro', text: 'Two point charges q and 4q are separated by distance r. Where should a third charge be placed for equilibrium?', options: ['r/3 from q', 'r/3 from 4q', 'r/2', '2r/3 from q'], correctOptionIndex: 0, source: 'JEE Main', year: 2023 }
-        ]
-    }
-];
 
 // --- DB Helpers ---
 const getUserDB = (): User[] => {
@@ -98,82 +84,37 @@ export default function App() {
   const [syllabus, setSyllabus] = useState<Topic[]>(SYLLABUS_DATA);
   const [linkedStudentData, setLinkedStudentData] = useState<{ progress: Record<string, UserProgress>; tests: TestAttempt[]; studentName: string; } | undefined>(undefined);
   
-  // --- Enhanced Flashcards Content ---
   const [flashcards, setFlashcards] = useState<Flashcard[]>([
-     { id: 1, front: "Newton's Second Law", back: "F = ma\n(Force equals mass times acceleration. It describes the relationship between an object's mass and the amount of force needed to accelerate it.)", subjectId: 'phys' },
+     { id: 1, front: "Newton's Second Law", back: "F = ma\n(Force equals mass times acceleration.)", subjectId: 'phys' },
      { id: 2, front: "Integration of sin(x)", back: "-cos(x) + C", subjectId: 'math' },
-     { id: 3, front: "Escape Velocity Formula", back: "v = √(2GM/R)\nWhere G is gravitational constant, M is mass of planet, R is radius.", subjectId: 'phys' },
-     { id: 4, front: "First Order Kinetics Integrated Rate Law", back: "k = (2.303/t) * log([A]₀/[A])\n[A]₀ = Initial conc, [A] = Final conc.", subjectId: 'chem' },
-     { id: 5, front: "Lens Maker's Formula", back: "1/f = (μ - 1)(1/R₁ - 1/R₂)", subjectId: 'phys' },
-     { id: 6, front: "Sum of Roots (Quadratic Eq)", back: "α + β = -b/a\nFor equation ax² + bx + c = 0", subjectId: 'math' },
-     { id: 7, front: "Ideal Gas Equation", back: "PV = nRT", subjectId: 'chem' },
-     { id: 8, front: "Torque Formula", back: "τ = r × F\n(Cross product of position vector and force)", subjectId: 'phys' }
+     { id: 3, front: "Escape Velocity Formula", back: "v = √(2GM/R)", subjectId: 'phys' },
+     { id: 4, front: "Ideal Gas Equation", back: "PV = nRT", subjectId: 'chem' }
   ]);
 
-  // --- Enhanced Memory Hacks Content ---
   const [hacks, setHacks] = useState<MemoryHack[]>([
-     { id: 1, title: 'Trig Values', description: 'Remember Sine, Cosine, Tangent ratios', tag: 'Maths', subjectId: 'math', trick: 'SOH CAH TOA (Sine=Opp/Hyp, Cos=Adj/Hyp, Tan=Opp/Adj)' },
-     { id: 2, title: 'Resistor Color Codes', description: 'Sequence of colors for resistance values', tag: 'Physics', subjectId: 'phys', trick: 'BB ROY of Great Britain had a Very Good Wife (Black, Brown, Red, Orange, Yellow, Green, Blue, Violet, Grey, White)' },
-     { id: 3, title: 'Redox Reactions', description: 'Electron transfer definition', tag: 'Chemistry', subjectId: 'chem', trick: 'OIL RIG: Oxidation Is Loss, Reduction Is Gain (of electrons)' },
-     { id: 4, title: 'Periodic Table Group 1', description: 'Alkali Metals', tag: 'Chemistry', subjectId: 'chem', trick: 'LiNa Ki Ruby Se Friendship (Li, Na, K, Rb, Cs, Fr)' },
-     { id: 5, title: 'Electrochemical Series', description: 'Order of reactivity', tag: 'Chemistry', subjectId: 'chem', trick: 'Please Stop Calling Me A Careless Zebra Instead Try Learning How Copper Saves Gold' },
-     { id: 6, title: 'ASTC Rule', description: 'Sign of trig functions in quadrants', tag: 'Maths', subjectId: 'math', trick: 'All Silver Tea Cups (All, Sin, Tan, Cos are positive in 1st, 2nd, 3rd, 4th quadrants)' }
+     { id: 1, title: 'Trig Values', description: 'Remember Sine, Cosine, Tangent ratios', tag: 'Maths', subjectId: 'math', trick: 'SOH CAH TOA' },
+     { id: 2, title: 'Resistor Color Codes', description: 'Resistance values', tag: 'Physics', subjectId: 'phys', trick: 'BB ROY of Great Britain had a Very Good Wife' }
   ]);
 
-  // --- Enhanced Blog Content ---
   const [blogs, setBlogs] = useState<BlogPost[]>([
      { 
        id: 1, 
        title: 'JEE Main & Advanced 2025: Complete Roadmap', 
-       excerpt: 'A strategic month-by-month guide to conquering Physics, Chemistry, and Maths while managing Board Exams.', 
-       content: '<h2>The Foundation of Success</h2><p>Success in JEE Main and Advanced is not just about hard work; it is about <strong>smart work</strong> and consistent effort. This roadmap is designed to guide you through the chaotic journey of preparation.</p><h3>1. Chemistry: The Scoring Machine</h3><p>Chemistry is often underestimated, yet it is the easiest subject to score in if you stick to the basics. <strong>NCERT is your Bible</strong> for Inorganic Chemistry. Do not ignore it.</p><ul><li><strong>Physical Chemistry:</strong> Focus on formula application and numericals.</li><li><strong>Organic Chemistry:</strong> Understand mechanisms (GOC) rather than rote memorization.</li><li><strong>Inorganic Chemistry:</strong> Read NCERT line-by-line. Make short notes of exceptions.</li></ul><h3>2. Physics: Concepts over Formulas</h3><p>Physics requires a deep understanding of concepts. Avoid rote memorization of complex formulas without understanding their derivation.</p><ul><li>Focus on Mechanics and Electrodynamics as they form the bulk of the paper.</li><li>Solve Irodov for Advanced preparation but stick to HC Verma for building a strong base.</li><li>Practice numericals daily to improve speed and accuracy.</li></ul><h3>3. Mathematics: Practice is Key</h3><p>Calculus and Algebra require daily practice. Solve at least 30-40 problems every day to build muscle memory.</p><p><strong>Pro Tip:</strong> Coordinate Geometry is scoring but calculation intensive. Learn short tricks for finding tangents and normals.</p><h3>4. The Art of Mock Tests</h3><p>Start taking full-length mock tests at least 6 months before the exam. Analyze your mistakes using the <strong>Mistake Notebook</strong> feature in this app. Never repeat a mistake.</p>', 
+       excerpt: 'A strategic month-by-month guide.', 
+       content: '<h2>The Foundation</h2><p>Consistency is key.</p>', 
        author: 'System Admin', 
        date: new Date().toISOString(),
-       imageUrl: 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&q=80&w=1000',
+       imageUrl: 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40',
        category: 'Strategy'
-     },
-     { 
-       id: 2, 
-       title: 'Mastering Inorganic Chemistry: The Secret to High Scores', 
-       excerpt: 'Inorganic Chemistry is often ignored but it is the highest scoring section. Here is how to master it using NCERT effectively.', 
-       content: '<h2>Why Inorganic Chemistry Matters</h2><p>In JEE Main, Chemistry is the time-saver. If you know the answer, you mark it in 10 seconds. This saved time is gold for Maths.</p><h3>The NCERT Strategy</h3><p>For Inorganic Chemistry, 90% of questions come directly from NCERT line-by-line. Read it thoroughly, including the captions of images and tables.</p><h3>Important Topics Breakdown</h3><ul><li><strong>Coordination Compounds:</strong> High weightage and conceptual (VBT, CFT, Isomerism).</li><li><strong>p-Block Elements:</strong> Extensive but rewarding. Focus on trends in properties and anomalous behavior of second-period elements.</li><li><strong>Chemical Bonding:</strong> The absolute foundation. Master MOT and Hybridization.</li><li><strong>Metallurgy:</strong> Ores and extraction processes.</li></ul><p><strong>Action Plan:</strong> Make short notes for trends in the periodic table and exceptions. Revise these notes daily before sleeping.</p>', 
-       author: 'Chemistry HOD', 
-       date: new Date(Date.now() - 86400000).toISOString(), 
-       imageUrl: 'https://images.unsplash.com/photo-1532094349884-543bc11b234d?auto=format&fit=crop&q=80&w=1000',
-       category: 'Subject-wise'
-     },
-     { 
-       id: 3, 
-       title: 'The Art of Mock Test Analysis', 
-       excerpt: 'Taking the test is only half the battle. Analyzing your mistakes is where the real improvement happens. Learn the 3-step analysis method.', 
-       content: '<h2>Post-Test Routine</h2><p>Spend at least 3 hours analyzing a 3-hour test. Do not just look at the score and move on.</p><h3>Step 1: Categorize Errors</h3><ul><li><strong>Silly Mistakes:</strong> Calculation errors, reading errors. These are the easiest to fix but cost the most. Be mindful next time.</li><li><strong>Conceptual Errors:</strong> Did not understand the theory or applied the wrong formula. Re-read the chapter notes.</li><li><strong>Time Management:</strong> Spent too long on a hard question? Learn the art of skipping.</li></ul><h3>Step 2: The Mistake Notebook</h3><p>Maintain a dedicated notebook (or use the Mistakes tab in this app). Write down the question you got wrong and the concept behind it.</p><h3>Step 3: Revise Before Next Test</h3><p>Review your mistake notebook before every subsequent test to ensure you don\'t repeat the same errors. This is how you jump from 150 to 200+.</p>', 
-       author: 'Academic Mentor', 
-       date: new Date(Date.now() - 172800000).toISOString(), 
-       imageUrl: 'https://images.unsplash.com/photo-1606326608606-aa0b62935f2b?auto=format&fit=crop&q=80&w=1000',
-       category: 'Tips'
-     },
-     { 
-       id: 4, 
-       title: 'Stay Motivated: The Marathon Mindset', 
-       excerpt: 'Burnout is real. Here is how to maintain your sanity and motivation during the grueling 2-year preparation phase.', 
-       content: '<h2>It is a Marathon, Not a Sprint</h2><p>JEE preparation is long. You will have days where you feel like you know nothing. That is normal.</p><h3>Tips for Mental Stamina</h3><ul><li><strong>Take Breaks:</strong> Use the Pomodoro technique (Focus tab). 5 minutes of rest is better than 1 hour of distracted study.</li><li><strong>Sleep:</strong> Your brain consolidates memory during sleep. Compromising on sleep is compromising on your rank.</li><li><strong>Hobbies:</strong> Keep one hobby alive. Running, music, or just walking. It resets your dopamine levels.</li></ul><blockquote>"Success consists of going from failure to failure without loss of enthusiasm." - Winston Churchill</blockquote><p>Keep pushing. The view from the top is worth the climb.</p>', 
-       author: 'Student Counselor', 
-       date: new Date(Date.now() - 372800000).toISOString(), 
-       imageUrl: 'https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&fit=crop&q=80&w=1000',
-       category: 'Motivation'
      }
   ]);
   
   const [videoMap, setVideoMap] = useState<Record<string, VideoLesson>>({});
-  const [noteMap, setNoteMap] = useState<Record<string, TopicNote>>({}); // Keeping for backward compatibility
-  
-  // Updated: Initialize Chapter Notes with Default Content
   const [chapterNotes, setChapterNotes] = useState<Record<string, ChapterNote>>(() => {
-      // 1. Convert DEFAULT_CHAPTER_NOTES to ChapterNote objects
       const defaults: Record<string, ChapterNote> = {};
       Object.entries(DEFAULT_CHAPTER_NOTES).forEach(([topicId, data], index) => {
           defaults[topicId] = {
-              id: 1000 + index, // Start IDs high to avoid conflicts
+              id: 1000 + index,
               topicId: topicId,
               pages: data.pages,
               lastUpdated: new Date().toISOString()
@@ -183,108 +124,65 @@ export default function App() {
   });
   
   const [questionBank, setQuestionBank] = useState<Question[]>([]);
-  const [adminTests, setAdminTests] = useState<Test[]>([]);
+  const [adminTests, setAdminTests] = useState<Test[]>(MOCK_TESTS_DATA);
 
-  // --- Version Check & Cache Busting ---
+  // --- Version Check ---
   useEffect(() => {
       const storedVersion = localStorage.getItem('iitjee_app_version');
       if (storedVersion !== APP_VERSION) {
-          localStorage.removeItem('iitjee_blogs');
-          localStorage.removeItem('iitjee_hacks');
-          localStorage.removeItem('iitjee_flashcards');
-          localStorage.removeItem('iitjee_notes');
-          localStorage.removeItem('iitjee_chapter_notes');
+          // Clear caches on version upgrade
+          localStorage.removeItem('iitjee_admin_tests');
           localStorage.setItem('iitjee_app_version', APP_VERSION);
+          setAdminTests(MOCK_TESTS_DATA);
       }
   }, []);
 
-  // --- 1. Init System Settings (Google & GA) ---
+  // --- 1. Init System Settings ---
   useEffect(() => {
       const initSettings = async () => {
           try {
-              // Fetch Google Analytics ID
               const resGA = await fetch('/api/manage_settings.php?key=google_analytics_id');
               if(resGA.ok) {
                   const data = await resGA.json();
                   if (data && data.value) setGaMeasurementId(data.value);
               }
-
-              // Fetch Google Login Status
               const resLogin = await fetch('/api/manage_settings.php?key=enable_google_login');
               if(resLogin.ok) {
                   const data = await resLogin.json();
-                  if (data && data.value !== null) {
-                      setEnableGoogleLogin(data.value === 'true');
-                  }
+                  if (data && data.value !== null) setEnableGoogleLogin(data.value === 'true');
               }
-          } catch (e) { console.debug("Settings Init Failed (Offline/Demo)"); }
+          } catch (e) {}
       };
       initSettings();
   }, []);
 
-  const toggleGoogleLogin = async () => {
-      const newState = !enableGoogleLogin;
-      setEnableGoogleLogin(newState);
-      try {
-          await fetch('/api/manage_settings.php', {
-              method: 'POST',
-              headers: {'Content-Type': 'application/json'},
-              body: JSON.stringify({ key: 'enable_google_login', value: String(newState) })
-          });
-      } catch(e) { console.error("Failed to save setting"); }
-  };
-
-  // --- 2. Fetch Public Content (Blogs/Hacks/Notes) from API ---
+  // --- 2. Fetch Public Content ---
   useEffect(() => {
       const fetchPublicContent = async () => {
           try {
             const blogRes = await fetch('/api/manage_content.php?type=blogs');
-            if (blogRes.ok) {
-                const blogData = await blogRes.json();
-                if (Array.isArray(blogData) && blogData.length > 0) setBlogs(blogData);
-            }
+            if (blogRes.ok) { const d = await blogRes.json(); if (Array.isArray(d)) setBlogs(d); }
 
             const fcRes = await fetch('/api/manage_content.php?type=flashcards');
-            if (fcRes.ok) {
-                const fcData = await fcRes.json();
-                if (Array.isArray(fcData) && fcData.length > 0) setFlashcards(fcData);
-            }
+            if (fcRes.ok) { const d = await fcRes.json(); if (Array.isArray(d)) setFlashcards(d); }
             
             const hacksRes = await fetch('/api/manage_content.php?type=hacks');
-            if (hacksRes.ok) {
-                const hacksData = await hacksRes.json();
-                if (Array.isArray(hacksData) && hacksData.length > 0) setHacks(hacksData);
-            }
+            if (hacksRes.ok) { const d = await hacksRes.json(); if (Array.isArray(d)) setHacks(d); }
 
-            // Fetch Notes (New Multi-page)
             const notesRes = await fetch('/api/manage_notes.php');
             if (notesRes.ok) {
                 const notesData = await notesRes.json();
-                if (notesData) {
-                    setChapterNotes(prev => ({
-                        ...prev, // Keep defaults if server returns partial/empty
-                        ...notesData // Overwrite with server data
-                    }));
-                }
+                if (notesData) setChapterNotes(prev => ({ ...prev, ...notesData }));
             }
-
           } catch (e) {
-             console.error("Failed to fetch public content", e);
-             const savedBlogs = localStorage.getItem('iitjee_blogs');
-             if (savedBlogs) setBlogs(JSON.parse(savedBlogs));
-             
-             // Fallback local storage for notes
              const savedChapterNotes = localStorage.getItem('iitjee_chapter_notes');
-             if (savedChapterNotes) {
-                 const parsed = JSON.parse(savedChapterNotes);
-                 setChapterNotes(prev => ({ ...prev, ...parsed }));
-             }
+             if (savedChapterNotes) setChapterNotes(prev => ({ ...prev, ...JSON.parse(savedChapterNotes) }));
           }
       };
       fetchPublicContent();
   }, []);
 
-  // --- 3. Initial Data Load (User & LocalStorage) ---
+  // --- 3. Initial Data Load ---
   useEffect(() => {
     const savedUser = localStorage.getItem('iitjee_user');
     const savedVideos = localStorage.getItem('iitjee_videos');
@@ -304,9 +202,9 @@ export default function App() {
     
     if (savedAdminTests) {
         const parsedTests = JSON.parse(savedAdminTests);
-        setAdminTests(parsedTests.length > 0 ? parsedTests : DEMO_TESTS);
+        setAdminTests(parsedTests.length > 0 ? parsedTests : MOCK_TESTS_DATA);
     } else {
-        setAdminTests(DEMO_TESTS);
+        setAdminTests(MOCK_TESTS_DATA);
     }
 
     if (savedSyllabus) setSyllabus(JSON.parse(savedSyllabus));
@@ -328,15 +226,10 @@ export default function App() {
     localStorage.setItem('iitjee_questions', JSON.stringify(questionBank));
     localStorage.setItem('iitjee_admin_tests', JSON.stringify(adminTests));
     localStorage.setItem('iitjee_syllabus', JSON.stringify(syllabus));
-    
-    if(blogs.length > 0) localStorage.setItem('iitjee_blogs', JSON.stringify(blogs));
-    if(flashcards.length > 0) localStorage.setItem('iitjee_flashcards', JSON.stringify(flashcards));
-    if(hacks.length > 0) localStorage.setItem('iitjee_hacks', JSON.stringify(hacks));
     localStorage.setItem('iitjee_chapter_notes', JSON.stringify(chapterNotes));
 
-  }, [user, progress, testAttempts, goals, mistakes, backlogs, timetableData, videoMap, questionBank, adminTests, syllabus, blogs, flashcards, hacks, chapterNotes]);
+  }, [user, progress, testAttempts, goals, mistakes, backlogs, timetableData, videoMap, questionBank, adminTests, syllabus, chapterNotes]);
 
-  // ... (loadLocalData, fetchRemoteData, loadLinkedStudent, handleLogin, handleLogout ... same as before)
   const loadLocalData = (userId: string) => {
     const savedProgress = localStorage.getItem(`iitjee_progress_${userId}`);
     const savedTests = localStorage.getItem(`iitjee_tests_${userId}`);
@@ -356,10 +249,8 @@ export default function App() {
   const fetchRemoteData = async (userId: string) => {
       try {
           const res = await fetch(`/api/get_dashboard.php?user_id=${userId}`);
-          if (!res.ok) throw new Error('API Error or Offline');
-          const text = await res.text();
-          if (!text) throw new Error('Empty response');
-          const data = JSON.parse(text);
+          if (!res.ok) throw new Error();
+          const data = await res.json();
           if (Array.isArray(data.progress)) {
               const progMap: Record<string, UserProgress> = {};
               data.progress.forEach((p: any) => {
@@ -376,12 +267,12 @@ export default function App() {
                   };
               });
               setProgress(progMap);
-          } else { setProgress({}); }
+          }
           if (data.attempts) setTestAttempts(data.attempts);
           if (data.goals) setGoals(data.goals);
           if (data.timetable) {
               setTimetableData({ config: data.timetable.config, slots: data.timetable.slots });
-          } else { setTimetableData(null); }
+          }
       } catch (e) { loadLocalData(userId); }
   };
 
@@ -423,29 +314,6 @@ export default function App() {
       return { success: true, message: 'Invitation sent successfully!' };
   };
 
-  const searchStudents = async (query: string): Promise<User[]> => {
-      // 1. Try API
-      try {
-          const res = await fetch('/api/send_request.php', {
-              method: 'POST',
-              body: JSON.stringify({ action: 'search', query })
-          });
-          if(res.ok) {
-              const data = await res.json();
-              if(Array.isArray(data)) return data;
-          }
-      } catch(e) {}
-
-      // 2. Fallback local search (Demo mode)
-      const db = getUserDB();
-      return db.filter(u => 
-          u.role === 'STUDENT' && 
-          (u.name.toLowerCase().includes(query.toLowerCase()) || 
-           u.id.includes(query) || 
-           u.email.toLowerCase().includes(query.toLowerCase()))
-      );
-  };
-
   const acceptConnectionRequest = (notificationId: string) => {
       if(!user) return;
       const notification = user.notifications?.find(n => n.id === notificationId);
@@ -477,10 +345,8 @@ export default function App() {
   };
   const updateVideo = (topicId: string, url: string, description: string) => { setVideoMap(prev => ({ ...prev, [topicId]: { topicId, videoUrl: url, description } })); };
   
-  // Note Saver (Updated for Multi-page support)
   const updateChapterNotes = (topicId: string, pages: string[]) => {
       setChapterNotes(prev => ({ ...prev, [topicId]: { id: Date.now(), topicId, pages, lastUpdated: new Date().toISOString() } }));
-      // API Call
       fetch('/api/manage_notes.php', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -498,55 +364,14 @@ export default function App() {
   const toggleGoal = (id: string) => setGoals(prev => prev.map(g => g.id === id ? { ...g, completed: !g.completed } : g));
   const addMistake = (m: Omit<MistakeLog, 'id' | 'date'>) => setMistakes(prev => [{ ...m, id: Date.now().toString(), date: new Date().toISOString() }, ...prev]);
   
-  // --- Updated Content Management Functions with API Persistence ---
-  
-  const addFlashcard = (card: Omit<Flashcard, 'id'>) => {
-      const newCard = { ...card, id: Date.now() };
-      setFlashcards(prev => [...prev, newCard]);
-      fetch('/api/manage_content.php?type=flashcard', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(card)
-      }).catch(e => console.error(e));
-  };
-
-  const addHack = (hack: Omit<MemoryHack, 'id'>) => {
-      const newHack = { ...hack, id: Date.now() };
-      setHacks(prev => [...prev, newHack]);
-      fetch('/api/manage_content.php?type=hack', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(hack)
-      }).catch(e => console.error(e));
-  };
-
-  const addBlog = (blog: Omit<BlogPost, 'id' | 'date'>) => {
-      const newBlog = { ...blog, id: Date.now(), date: new Date().toISOString() };
-      setBlogs(prev => [newBlog, ...prev]);
-      fetch('/api/manage_content.php?type=blog', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(blog)
-      }).catch(e => console.error(e));
-  };
-
-  const updateBlog = (blog: BlogPost) => {
-      setBlogs(prev => prev.map(b => b.id === blog.id ? blog : b));
-      fetch('/api/manage_content.php?type=blog', {
-          method: 'POST', 
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(blog)
-      }).catch(e => console.error("Update failed on server", e));
-  };
-
+  const addFlashcard = (card: Omit<Flashcard, 'id'>) => { setFlashcards(prev => [...prev, { ...card, id: Date.now() }]); };
+  const addHack = (hack: Omit<MemoryHack, 'id'>) => { setHacks(prev => [...prev, { ...hack, id: Date.now() }]); };
+  const addBlog = (blog: Omit<BlogPost, 'id' | 'date'>) => { setBlogs(prev => [{ ...blog, id: Date.now(), date: new Date().toISOString() }, ...prev]); };
+  const updateBlog = (blog: BlogPost) => { setBlogs(prev => prev.map(b => b.id === blog.id ? blog : b)); };
   const deleteContent = (type: 'flashcard' | 'hack' | 'blog', id: number) => {
     if(type === 'flashcard') setFlashcards(prev => prev.filter(i => i.id !== id));
     if(type === 'hack') setHacks(prev => prev.filter(i => i.id !== id));
     if(type === 'blog') setBlogs(prev => prev.filter(i => i.id !== id));
-    
-    fetch(`/api/manage_content.php?type=${type}&id=${id}`, {
-        method: 'DELETE'
-    }).catch(e => console.error(e));
   };
 
   const handleAddTopic = (topic: Omit<Topic, 'id'>) => { const newTopic: Topic = { ...topic, id: `${topic.subject[0].toLowerCase()}_${Date.now()}` }; setSyllabus(prev => [...prev, newTopic]); };
@@ -583,7 +408,6 @@ export default function App() {
                 {currentScreen === 'dashboard' && <DashboardScreen user={user} progress={linkedStudentData?.progress || {}} testAttempts={linkedStudentData?.tests || []} goals={[]} addGoal={()=>{}} toggleGoal={()=>{}} setScreen={setCurrentScreen} />}
                 {currentScreen === 'family' && <ParentFamilyScreen user={user} onSendRequest={sendConnectionRequest} linkedData={linkedStudentData} />}
                 {currentScreen === 'analytics' && <AnalyticsScreen user={user} progress={linkedStudentData?.progress || {}} testAttempts={linkedStudentData?.tests || []} />}
-                {currentScreen === 'timetable' && <div className="p-8 text-center text-slate-500 bg-white rounded-xl border border-slate-200">Timetable viewing is available in Student account.</div>}
                 {currentScreen === 'tests' && <TestScreen user={user} history={linkedStudentData?.tests || []} addTestAttempt={()=>{}} availableTests={adminTests} />}
                 {currentScreen === 'syllabus' && <SyllabusScreen user={user} subjects={syllabus} progress={linkedStudentData?.progress || {}} onUpdateProgress={()=>{}} readOnly={true} videoMap={videoMap} chapterNotes={chapterNotes} />}
                 {currentScreen === 'profile' && <ProfileScreen user={user} onAcceptRequest={()=>{}} onUpdateUser={(u) => { const updated = { ...user, ...u }; setUser(updated); saveUserToDB(updated); }} linkedStudentName={linkedStudentData?.studentName} />} 
