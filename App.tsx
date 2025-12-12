@@ -39,7 +39,7 @@ import { calculateNextRevision } from './lib/utils';
 import { SYLLABUS_DATA } from './lib/syllabusData';
 import { TrendingUp, Bell } from 'lucide-react';
 
-const APP_VERSION = '10.0';
+const APP_VERSION = '10.2';
 
 const ComingSoonScreen = ({ title, icon }: { title: string, icon: string }) => (
   <div className="flex flex-col items-center justify-center h-[70vh] text-center">
@@ -465,14 +465,15 @@ export default function App() {
           )}
           {user.role === 'STUDENT' && (
               <>
-                <AITutorChat />
+                <AITutorChat isFullScreen={currentScreen === 'ai-tutor'} />
+                
                 {currentScreen === 'dashboard' && <DashboardScreen user={user} progress={progress} testAttempts={testAttempts} goals={goals} addGoal={addGoal} toggleGoal={toggleGoal} setScreen={setCurrentScreen} />}
                 {currentScreen === 'syllabus' && <SyllabusScreen user={user} subjects={syllabus} progress={progress} onUpdateProgress={updateTopicProgress} videoMap={videoMap} />}
                 {currentScreen === 'revision' && <RevisionScreen progress={progress} handleRevisionComplete={handleRevisionComplete} />}
                 {currentScreen === 'tests' && <TestScreen user={user} history={testAttempts} addTestAttempt={addTestAttempt} availableTests={adminTests} />}
                 {currentScreen === 'timetable' && <TimetableScreen user={user} savedConfig={timetableData?.config} savedSlots={timetableData?.slots} onSave={saveTimetable} progress={progress} />}
                 {currentScreen === 'focus' && <FocusScreen />}
-                {currentScreen === 'ai-tutor' && <div className="p-12 text-center text-slate-500 italic">Click the AI Robot icon in the bottom right to start chatting!</div>}
+                {currentScreen === 'ai-tutor' && <div className="h-full hidden md:block"></div>}
                 {currentScreen === 'flashcards' && <FlashcardScreen flashcards={flashcards} />}
                 {currentScreen === 'mistakes' && <MistakesScreen mistakes={mistakes} addMistake={addMistake} />}
                 {currentScreen === 'backlogs' && <BacklogScreen backlogs={backlogs} onAddBacklog={addBacklog} onToggleBacklog={toggleBacklog} onDeleteBacklog={deleteBacklog} />}

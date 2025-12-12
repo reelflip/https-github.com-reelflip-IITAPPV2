@@ -1,6 +1,6 @@
-// v10.1 - Dynamic Persona based on Config
+// v10.2 - Fixed Import Error (Removed Google SDK) + FullScreen Mode
 import React, { useState, useEffect, useRef } from 'react';
-import { Bot, X, Send, Loader2, Sparkles, ChevronDown } from 'lucide-react';
+import { Bot, X, Send, Loader2, Sparkles, ChevronDown, Maximize2, Minimize2 } from 'lucide-react';
 
 interface Message {
   id: string;
@@ -9,7 +9,11 @@ interface Message {
   timestamp: Date;
 }
 
-export const AITutorChat: React.FC = () => {
+interface Props {
+    isFullScreen?: boolean;
+}
+
+export const AITutorChat: React.FC<Props> = ({ isFullScreen = false }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [enabled, setEnabled] = useState(true); 
   const [modelName, setModelName] = useState('gemini-2.5-flash');
@@ -18,8 +22,14 @@ export const AITutorChat: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // Sync open state with fullscreen mode
+  useEffect(() => {
+      if (isFullScreen) {
+          setIsOpen(true);
+      }
+  }, [isFullScreen]);
+
   const loadConfig = () => {
-    // 1. Try LocalStorage
     const localConfig = localStorage.getItem('iitjee_ai_config');
     if (localConfig) {
         try {
@@ -33,7 +43,6 @@ export const AITutorChat: React.FC = () => {
         } catch(e) {}
     }
 
-    // 2. Try API
     fetch('/api/manage_settings.php?key=ai_config')
       .then(res => res.ok ? res.text() : Promise.reject())
       .then(text => {
@@ -74,7 +83,6 @@ export const AITutorChat: React.FC = () => {
     try {
       const history = messages.slice(-5).map(m => `${m.role === 'user' ? 'User' : 'Tutor'}: ${m.text}`).join('\n');
       
-      // Dynamic System Instruction based on Model
       let systemInstruction = "You are an expert IIT JEE Tutor. Be concise, encouraging, and focus on Physics, Chemistry, and Math.";
       
       const SIMULATED_PERSONAS: Record<string, string> = {
@@ -104,6 +112,63 @@ export const AITutorChat: React.FC = () => {
 
   if (!enabled) return null;
 
+  // Render Full Screen Mode
+  if (isFullScreen) {
+      return (
+          <div className="absolute inset-0 z-10 flex flex-col bg-slate-50 h-full animate-in fade-in">
+             <div className="bg-white border-b border-slate-200 p-4 flex justify-between items-center shadow-sm">
+                <div className="flex items-center gap-3">
+                    <div className="p-2 bg-violet-100 text-violet-700 rounded-lg"><Bot className="w-6 h-6" /></div>
+                    <div>
+                        <h2 className="text-lg font-bold text-slate-800">AI Tutor <span className="text-xs font-normal text-slate-500 px-2 py-0.5 bg-slate-100 rounded-full">{modelName}</span></h2>
+                        <p className="text-xs text-slate-500">Immersive Learning Mode</p>
+                    </div>
+                </div>
+             </div>
+             
+             <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                {messages.map((msg) => (
+                    <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                        <div className={`max-w-[80%] rounded-2xl p-4 text-sm md:text-base shadow-sm ${msg.role === 'user' ? 'bg-violet-600 text-white rounded-tr-none' : 'bg-white text-slate-700 border border-slate-200 rounded-tl-none'}`}>
+                            <p className="whitespace-pre-wrap leading-relaxed">{msg.text}</p>
+                        </div>
+                    </div>
+                ))}
+                {isLoading && (
+                    <div className="flex justify-start">
+                        <div className="bg-white p-4 rounded-2xl rounded-tl-none border border-slate-200 shadow-sm flex items-center gap-2">
+                            <Bot className="w-5 h-5 text-violet-500 animate-bounce" />
+                            <span className="text-sm text-slate-500">Thinking...</span>
+                        </div>
+                    </div>
+                )}
+                <div ref={messagesEndRef} />
+             </div>
+
+             <div className="p-4 bg-white border-t border-slate-200">
+                <div className="max-w-4xl mx-auto relative">
+                    <input 
+                        type="text" 
+                        value={input} 
+                        onChange={(e) => setInput(e.target.value)} 
+                        onKeyDown={(e) => e.key === 'Enter' && handleSend()} 
+                        placeholder="Ask a question..." 
+                        className="w-full pl-6 pr-14 py-4 bg-slate-50 border border-slate-200 rounded-full text-base focus:ring-2 focus:ring-violet-200 outline-none shadow-sm" 
+                    />
+                    <button 
+                        onClick={handleSend} 
+                        disabled={!input.trim() || isLoading} 
+                        className="absolute right-3 top-3 p-2 bg-violet-600 text-white rounded-full hover:bg-violet-700 transition-all disabled:opacity-50 active:scale-95"
+                    >
+                        {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
+                    </button>
+                </div>
+             </div>
+          </div>
+      );
+  }
+
+  // Render Widget Mode (Floating)
   return (
     <div className="fixed bottom-6 right-6 z-[9999] flex flex-col items-end">
       {isOpen && (
@@ -111,7 +176,7 @@ export const AITutorChat: React.FC = () => {
           <div className="bg-gradient-to-r from-violet-600 to-indigo-600 p-4 flex justify-between items-center text-white shrink-0">
             <div className="flex items-center gap-2">
               <div className="p-1.5 bg-white/20 rounded-lg"><Bot className="w-5 h-5" /></div>
-              <div><h3 className="font-bold text-sm">AI Tutor</h3><span className="text-[10px] opacity-80">{modelName.split('-').slice(0,2).join(' ')}</span></div>
+              <div><h3 className="font-bold text-sm">AI Tutor</h3><span className="text-[10px] opacity-80">{modelName}</span></div>
             </div>
             <button onClick={() => setIsOpen(false)} className="p-1.5 hover:bg-white/10 rounded-full"><ChevronDown className="w-5 h-5" /></button>
           </div>
