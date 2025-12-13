@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Screen, User } from '../lib/types';
-import { Menu, X, MoreHorizontal, LogOut, LayoutDashboard, BookOpen, FileText, Bot, Timer, BarChart2, Calendar, RotateCw, AlertCircle, Layers, ListTodo, Lightbulb, Heart, User as UserIcon, Users, Inbox, Video, PenTool, Activity, Terminal, Settings, UploadCloud, Server, Brain } from 'lucide-react';
+import { Menu, X, MoreHorizontal, LogOut, LayoutDashboard, BookOpen, FileText, Bot, Timer, BarChart2, Calendar, RotateCw, AlertCircle, Layers, ListTodo, Lightbulb, Heart, User as UserIcon, Users, Inbox, Video, PenTool, Activity, Terminal, Settings, UploadCloud, Server, Brain, Star } from 'lucide-react';
 
 interface NavigationProps {
   currentScreen: Screen;
@@ -35,6 +35,7 @@ const STUDENT_MENU: {id: Screen, icon: any, label: string}[] = [
   { id: 'backlogs', icon: ListTodo, label: "Backlogs" },
   { id: 'hacks', icon: Lightbulb, label: "Hacks" },
   { id: 'wellness', icon: Heart, label: "Wellness" },
+  { id: 'features', icon: Star, label: "Features" }, // Added Features Link
   { id: 'profile', icon: UserIcon, label: "Profile" },
 ];
 
@@ -97,7 +98,7 @@ export const Navigation: React.FC<NavigationProps> = ({ currentScreen, setScreen
         </h1>
         <div className="flex items-center gap-2 mt-1">
           <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1.5 py-0.5 bg-slate-800 rounded">{user.role}</p>
-          <span className="text-[10px] text-slate-600">• v12.2</span>
+          <span className="text-[10px] text-slate-600">• v12.3</span>
         </div>
       </div>
 

@@ -1,6 +1,6 @@
 
-import React from 'react';
-import { TrendingUp, LogIn, ArrowLeft, Instagram, Facebook, Twitter, Youtube, Linkedin } from 'lucide-react';
+import React, { useState } from 'react';
+import { TrendingUp, LogIn, ArrowLeft, Instagram, Facebook, Twitter, Youtube, Linkedin, Menu, X } from 'lucide-react';
 import { SocialConfig } from '../lib/types';
 
 interface PublicLayoutProps {
@@ -11,6 +11,8 @@ interface PublicLayoutProps {
 }
 
 export const PublicLayout: React.FC<PublicLayoutProps> = ({ children, onNavigate, currentScreen, socialConfig }) => {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
   return (
     <div className="min-h-screen bg-slate-50 font-inter flex flex-col">
       <header className="bg-white border-b border-slate-200 sticky top-0 z-50">
@@ -22,6 +24,7 @@ export const PublicLayout: React.FC<PublicLayoutProps> = ({ children, onNavigate
              <span className="font-bold text-lg text-slate-900 tracking-tight">IIT<span className="text-blue-600">JEE</span>Prep</span>
           </div>
           
+          {/* Desktop Nav */}
           <div className="hidden md:flex items-center space-x-8 text-sm font-medium text-slate-600">
               <button onClick={() => onNavigate('about')} className={`hover:text-blue-600 transition-colors ${currentScreen === 'about' ? 'text-blue-600 font-bold' : ''}`}>About</button>
               <button onClick={() => onNavigate('features')} className={`hover:text-blue-600 transition-colors ${currentScreen === 'features' ? 'text-blue-600 font-bold' : ''}`}>Features</button>
@@ -33,7 +36,7 @@ export const PublicLayout: React.FC<PublicLayoutProps> = ({ children, onNavigate
           <div className="flex items-center gap-4">
             <button 
                 onClick={() => onNavigate('dashboard')}
-                className="text-sm font-bold text-slate-600 hover:text-slate-900 flex items-center"
+                className="hidden md:flex text-sm font-bold text-slate-600 hover:text-slate-900 items-center"
             >
                 <ArrowLeft className="w-4 h-4 mr-1" /> Back
             </button>
@@ -43,8 +46,32 @@ export const PublicLayout: React.FC<PublicLayoutProps> = ({ children, onNavigate
             >
                 <LogIn className="w-4 h-4 mr-1.5" /> Login
             </button>
+            
+            {/* Mobile Menu Toggle */}
+            <button 
+              className="md:hidden p-2 text-slate-600"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            >
+              {mobileMenuOpen ? <X /> : <Menu />}
+            </button>
           </div>
         </div>
+
+        {/* Mobile Menu Dropdown */}
+        {mobileMenuOpen && (
+          <div className="md:hidden bg-white border-t border-slate-100 absolute w-full left-0 top-16 shadow-xl animate-in slide-in-from-top-2 p-4 flex flex-col space-y-4">
+              <button onClick={() => { onNavigate('about'); setMobileMenuOpen(false); }} className="text-left font-medium text-slate-700 py-2 border-b border-slate-50">About Us</button>
+              <button onClick={() => { onNavigate('features'); setMobileMenuOpen(false); }} className="text-left font-medium text-slate-700 py-2 border-b border-slate-50">Features</button>
+              <button onClick={() => { onNavigate('exams'); setMobileMenuOpen(false); }} className="text-left font-medium text-slate-700 py-2 border-b border-slate-50">Exam Guide</button>
+              <button onClick={() => { onNavigate('blog'); setMobileMenuOpen(false); }} className="text-left font-medium text-slate-700 py-2 border-b border-slate-50">Blog</button>
+              <button onClick={() => { onNavigate('contact'); setMobileMenuOpen(false); }} className="text-left font-medium text-slate-700 py-2 border-b border-slate-50">Contact</button>
+              
+              <div className="flex gap-2 pt-2">
+                 <button onClick={() => onNavigate('dashboard')} className="flex-1 bg-slate-100 text-slate-700 py-3 rounded-lg font-bold">Back</button>
+                 <button onClick={() => onNavigate('dashboard')} className="flex-1 bg-blue-600 text-white py-3 rounded-lg font-bold">Login</button>
+              </div>
+          </div>
+        )}
       </header>
 
       <main className="flex-1 w-full">

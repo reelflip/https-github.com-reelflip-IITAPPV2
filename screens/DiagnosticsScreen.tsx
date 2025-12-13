@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Database, RefreshCw, Server, Table, CheckCircle2, AlertTriangle, XCircle, Activity, Globe, Play, Loader2, Clock, Terminal, AlertCircle, FileText } from 'lucide-react';
 import { SYLLABUS_DATA } from '../lib/syllabusData';
 
-// Full List of Required Tables based on schema v12.1
+// Full List of Required Tables based on schema v12.3
 const REQUIRED_SCHEMA = [
     'users', 'topic_progress', 'tests', 'questions', 'test_attempts',
     'attempt_details', 'flashcards', 'memory_hacks', 'blog_posts',
@@ -17,7 +17,7 @@ const DIAGNOSTICS_DATA = {
   "metadata": {
     "timestamp": new Date().toISOString(),
     "url": "https://iitgeeprep.com/",
-    "appVersion": "v12.1"
+    "appVersion": "v12.3"
   },
   "results": {
     "1. [System] Core Health": [
