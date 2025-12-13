@@ -44,7 +44,7 @@ import { DEFAULT_CHAPTER_NOTES } from './lib/chapterContent';
 import { MOCK_TESTS_DATA, generateInitialQuestionBank } from './lib/mockTestsData';
 import { TrendingUp, Bell, LogOut } from 'lucide-react';
 
-const APP_VERSION = '12.9';
+const APP_VERSION = '12.10';
 
 const ComingSoonScreen = ({ title, icon }: { title: string, icon: string }) => (
   <div className="flex flex-col items-center justify-center h-[70vh] text-center">
@@ -71,7 +71,6 @@ const saveUserToDB = (user: User) => {
 const findUserById = (id: string) => getUserDB().find(u => u.id === id);
 
 // --- Screen Validation Helper ---
-// Prevents blank pages by ensuring the current screen exists for the given role
 const validateScreen = (role: string, screen: Screen): Screen => {
     const studentScreens: Screen[] = [
         'dashboard', 'syllabus', 'ai-tutor', 'tests', 'psychometric', 'focus', 
@@ -102,7 +101,6 @@ const validateScreen = (role: string, screen: Screen): Screen => {
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   
-  // Initialize screen from local storage with validation logic inside useEffect later
   const [currentScreen, setCurrentScreen] = useState<Screen>(() => {
       const saved = localStorage.getItem('iitjee_last_screen');
       return (saved as Screen) || 'dashboard';
@@ -168,12 +166,13 @@ export default function App() {
   useEffect(() => {
       const storedVersion = localStorage.getItem('iitjee_app_version');
       if (storedVersion !== APP_VERSION) {
-          // Clear caches on version upgrade
           localStorage.removeItem('iitjee_admin_tests');
-          // Update version
           localStorage.setItem('iitjee_app_version', APP_VERSION);
           setAdminTests(MOCK_TESTS_DATA);
       }
+      
+      // Track visit
+      fetch('/api/track_visit.php').catch(() => {});
   }, []);
 
   // --- Safety Check for Screen on User Load ---
@@ -186,14 +185,12 @@ export default function App() {
       }
   }, [user, currentScreen]);
 
-  // --- Persist Current Screen ---
   useEffect(() => {
       if (user) {
           localStorage.setItem('iitjee_last_screen', currentScreen);
       }
   }, [currentScreen, user]);
 
-  // --- 1. Init System Settings ---
   useEffect(() => {
       const initSettings = async () => {
           try {
@@ -219,7 +216,6 @@ export default function App() {
       initSettings();
   }, []);
 
-  // --- 2. Fetch Public Content ---
   useEffect(() => {
       const fetchPublicContent = async () => {
           try {
@@ -245,7 +241,6 @@ export default function App() {
       fetchPublicContent();
   }, []);
 
-  // --- 3. Initial Data Load ---
   useEffect(() => {
     const savedUser = localStorage.getItem('iitjee_user');
     const savedVideos = localStorage.getItem('iitjee_videos');
@@ -262,7 +257,6 @@ export default function App() {
     
     if (savedVideos) setVideoMap(JSON.parse(savedVideos));
     
-    // Initialize Question Bank
     if (savedQuestions) {
         const parsed = JSON.parse(savedQuestions);
         setQuestionBank(parsed.length > 0 ? parsed : generateInitialQuestionBank());
@@ -280,7 +274,6 @@ export default function App() {
     if (savedSyllabus) setSyllabus(JSON.parse(savedSyllabus));
   }, []);
 
-  // --- 4. Persist User Data ---
   useEffect(() => {
     if (user) {
         localStorage.setItem('iitjee_user', JSON.stringify(user));
@@ -330,7 +323,7 @@ export default function App() {
                       lastRevised: p.last_revised,
                       revisionLevel: p.revision_level,
                       nextRevisionDate: p.next_revision_date,
-                      solvedQuestions: p.solvedQuestions || [] // Assume backend might send this eventually
+                      solvedQuestions: p.solvedQuestions || [] 
                   };
               });
               setProgress(progMap);
@@ -363,7 +356,6 @@ export default function App() {
     if (existingUser) { newUser = { ...existingUser, ...userData, id: existingUser.id }; } 
     else { newUser = { ...userData, id: userData.id || Math.floor(100000 + Math.random() * 900000).toString(), notifications: [] }; }
     
-    // Ensure screen is valid for new role
     const safeScreen = validateScreen(newUser.role, currentScreen);
     setCurrentScreen(safeScreen);
     setUser(newUser);
@@ -418,7 +410,6 @@ export default function App() {
               ? solved.filter(id => id !== questionId)
               : [...solved, questionId];
           
-          // Auto-update status if started
           let status = current.status;
           if (newSolved.length > 0 && status === 'NOT_STARTED') status = 'IN_PROGRESS';
           
@@ -454,7 +445,6 @@ export default function App() {
   
   const addTestAttempt = (attempt: TestAttempt) => {
       setTestAttempts(prev => [...prev, attempt]);
-      // Persist to Server
       if (user) {
           fetch('/api/save_attempt.php', {
               method: 'POST',

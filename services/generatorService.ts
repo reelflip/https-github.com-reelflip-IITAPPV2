@@ -42,7 +42,7 @@ try {
         folder: 'deployment/api',
         desc: 'API Root Health Check',
         content: `${phpHeader}
-echo json_encode(["status" => "active", "message" => "IITGEEPrep API v12.9 Operational", "timestamp" => date('c')]);
+echo json_encode(["status" => "active", "message" => "IITGEEPrep API v12.10 Operational", "timestamp" => date('c')]);
 ?>`
     },
     {
@@ -216,6 +216,33 @@ if(!empty($data->name) && !empty($data->email) && !empty($data->password)) {
     } else {
         http_response_code(500);
         echo json_encode(["message" => "Registration failed"]);
+    }
+}
+?>`
+    },
+    {
+        name: 'update_profile.php',
+        folder: 'deployment/api',
+        content: `${phpHeader}
+$data = json_decode(file_get_contents("php://input"));
+if($data->id) {
+    $allowed_fields = ['name', 'target_exam', 'target_year', 'school', 'phone', 'avatar_url', 'notifications_json'];
+    $updates = [];
+    $params = [];
+    foreach($data as $key => $val) {
+        if(in_array($key, $allowed_fields)) {
+            $updates[] = "$key = ?";
+            $params[] = $val;
+        }
+    }
+    if(!empty($updates)) {
+        $params[] = $data->id;
+        $sql = "UPDATE users SET " . implode(', ', $updates) . " WHERE id = ?";
+        $stmt = $conn->prepare($sql);
+        $stmt->execute($params);
+        echo json_encode(["message" => "Profile Updated"]);
+    } else {
+        echo json_encode(["message" => "No valid fields to update"]);
     }
 }
 ?>`
@@ -586,7 +613,6 @@ try {
 }
 ?>`
     },
-    // --- NEW FILES ---
     {
         name: 'manage_settings.php',
         folder: 'deployment/api',
@@ -730,6 +756,118 @@ if($user_id) {
     }
 }
 ?>`
+    },
+    // --- RESTORED FILES ---
+    {
+        name: 'manage_broadcasts.php',
+        folder: 'deployment/api',
+        content: `${phpHeader}
+$data = json_decode(file_get_contents("php://input"));
+$method = $_SERVER['REQUEST_METHOD'];
+
+if ($method === 'GET') {
+    $stmt = $conn->query("SELECT * FROM notifications WHERE type = 'BROADCAST' OR type = 'INFO' ORDER BY created_at DESC");
+    echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
+} elseif ($method === 'POST') {
+    $stmt = $conn->prepare("INSERT INTO notifications (id, title, message, type) VALUES (?, ?, ?, 'BROADCAST')");
+    $id = uniqid('notif_');
+    $stmt->execute([$id, $data->title, $data->message]);
+    echo json_encode(["message" => "Broadcast Sent"]);
+} elseif ($method === 'DELETE') {
+     $id = $_GET['id'];
+     $conn->prepare("DELETE FROM notifications WHERE id = ?")->execute([$id]);
+     echo json_encode(["message" => "Deleted"]);
+}
+?>`
+    },
+    {
+        name: 'manage_goals.php',
+        folder: 'deployment/api',
+        content: `${phpHeader}
+$data = json_decode(file_get_contents("php://input"));
+$method = $_SERVER['REQUEST_METHOD'];
+$user_id = $_GET['user_id'] ?? $data->user_id ?? null;
+
+if ($method === 'GET' && $user_id) {
+    $stmt = $conn->prepare("SELECT * FROM goals WHERE user_id = ? AND date(created_at) = CURDATE()");
+    $stmt->execute([$user_id]);
+    echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
+} elseif ($method === 'POST') {
+    $stmt = $conn->prepare("INSERT INTO goals (id, user_id, text, completed) VALUES (?, ?, ?, 0)");
+    $stmt->execute([$data->id, $data->user_id, $data->text]);
+    echo json_encode(["message" => "Goal Added"]);
+} elseif ($method === 'PUT') {
+    $stmt = $conn->prepare("UPDATE goals SET completed = ? WHERE id = ?");
+    $stmt->execute([$data->completed ? 1 : 0, $data->id]);
+    echo json_encode(["message" => "Updated"]);
+}
+?>`
+    },
+    {
+        name: 'manage_mistakes.php',
+        folder: 'deployment/api',
+        content: `${phpHeader}
+$data = json_decode(file_get_contents("php://input"));
+$method = $_SERVER['REQUEST_METHOD'];
+$user_id = $_GET['user_id'] ?? $data->user_id ?? null;
+
+if ($method === 'GET' && $user_id) {
+    $stmt = $conn->prepare("SELECT * FROM mistakes WHERE user_id = ? ORDER BY date DESC");
+    $stmt->execute([$user_id]);
+    echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
+} elseif ($method === 'POST') {
+    $stmt = $conn->prepare("INSERT INTO mistakes (id, user_id, question, subject, note, date) VALUES (?, ?, ?, ?, ?, ?)");
+    $stmt->execute([$data->id, $data->user_id, $data->question, $data->subject, $data->note, $data->date ?? date('Y-m-d H:i:s')]);
+    echo json_encode(["message" => "Logged"]);
+} elseif ($method === 'DELETE') {
+     $id = $_GET['id'];
+     $conn->prepare("DELETE FROM mistakes WHERE id = ?")->execute([$id]);
+     echo json_encode(["message" => "Deleted"]);
+}
+?>`
+    },
+    {
+        name: 'track_visit.php',
+        folder: 'deployment/api',
+        content: `${phpHeader}
+$stmt = $conn->query("SELECT setting_value FROM system_settings WHERE setting_key = 'total_visits'");
+$row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+if ($row) {
+    $newVal = intval($row['setting_value']) + 1;
+    $conn->prepare("UPDATE system_settings SET setting_value = ? WHERE setting_key = 'total_visits'")->execute([$newVal]);
+} else {
+    $conn->prepare("INSERT INTO system_settings (setting_key, setting_value) VALUES ('total_visits', '1')")->execute();
+}
+echo json_encode(["status" => "tracked"]);
+?>`
+    },
+    {
+        name: 'update_profile.php',
+        folder: 'deployment/api',
+        content: `${phpHeader}
+$data = json_decode(file_get_contents("php://input"));
+if($data->id) {
+    $allowed_fields = ['name', 'target_exam', 'target_year', 'school', 'phone', 'avatar_url', 'notifications_json'];
+    $updates = [];
+    $params = [];
+    foreach($data as $key => $val) {
+        if(in_array($key, $allowed_fields)) {
+            $updates[] = "$key = ?";
+            $params[] = $val;
+        }
+    }
+    if(!empty($updates)) {
+        $params[] = $data->id;
+        $sql = "UPDATE users SET " . implode(', ', $updates) . " WHERE id = ?";
+        $stmt = $conn->prepare($sql);
+        $stmt->execute($params);
+        echo json_encode(["message" => "Profile Updated"]);
+    } else {
+        echo json_encode(["message" => "No valid fields to update"]);
+    }
+}
+?>`
     }
 ];
 
@@ -751,6 +889,9 @@ CREATE TABLE IF NOT EXISTS users (
     google_id VARCHAR(255),
     parent_id VARCHAR(255),
     linked_student_id VARCHAR(255),
+    school VARCHAR(255),
+    phone VARCHAR(50),
+    avatar_url VARCHAR(500),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

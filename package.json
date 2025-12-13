@@ -2,7 +2,7 @@
 {
   "name": "iit-app",
   "private": true,
-  "version": "12.9.0",
+  "version": "12.10.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
