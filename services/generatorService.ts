@@ -29,7 +29,7 @@ try {
         folder: 'deployment/api',
         desc: 'API Root Health Check',
         content: `${phpHeader}
-echo json_encode(["status" => "active", "message" => "IITGEEPrep API v12.1 Operational", "timestamp" => date('c')]);
+echo json_encode(["status" => "active", "message" => "IITGEEPrep API v12.2 Operational", "timestamp" => date('c')]);
 ?>`
     },
     // ... (All logic files mapped to deployment/api)
@@ -308,7 +308,7 @@ if ($method === 'GET') {
 elseif ($method === 'POST') {
     $test = $data;
     $stmt = $conn->prepare("INSERT INTO tests (id, title, duration_minutes, difficulty, exam_type) VALUES (?, ?, ?, ?, ?)");
-    $stmt->execute([$test.id, $test.title, $test.durationMinutes, $test->difficulty, $test->examType]);
+    $stmt->execute([$test.id, $test.title, $test.durationMinutes, $test.difficulty, $test.examType]);
     foreach($test.questions as $q) {
         $qStmt = $conn->prepare("INSERT INTO questions (id, test_id, subject_id, topic_id, text, options_json, correct_option, source_tag, year) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
         $qStmt->execute([
@@ -514,18 +514,40 @@ echo json_encode($common);
         folder: 'deployment/api',
         content: `${phpHeader}
 try {
+    // 1. Table Stats
     $tables = [];
     $res = $conn->query("SHOW TABLES");
     while($row = $res->fetch(PDO::FETCH_NUM)) {
         $count = $conn->query("SELECT COUNT(*) FROM " . $row[0])->fetchColumn();
         $tables[] = ["name" => $row[0], "rows" => $count];
     }
+
+    // 2. Content Stats (Topics with Questions/Notes)
+    $contentStats = [];
+    
+    // Check if topics table exists first to avoid error on fresh DB
+    $check = $conn->query("SHOW TABLES LIKE 'topics'");
+    if($check->rowCount() > 0) {
+        $sql = "SELECT 
+            t.name as topic, 
+            t.subject, 
+            (SELECT COUNT(*) FROM questions q WHERE q.topic_id = t.id) as question_count,
+            (SELECT COUNT(*) FROM chapter_notes n WHERE n.topic_id = t.id) as note_count
+        FROM topics t
+        HAVING question_count > 0 OR note_count > 0
+        ORDER BY t.subject, t.name";
+        
+        $stmt = $conn->query($sql);
+        $contentStats = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
     echo json_encode([
         "status" => "CONNECTED",
         "db_host" => $host,
         "db_name" => $db_name,
         "server_info" => $conn->getAttribute(PDO::ATTR_SERVER_INFO),
-        "tables" => $tables
+        "tables" => $tables,
+        "content_stats" => $contentStats
     ]);
 } catch(Exception $e) {
     echo json_encode(["status" => "ERROR", "message" => $e->getMessage()]);
@@ -863,7 +885,7 @@ export const generateFrontendGuide = () => `# IITGEEPrep Deployment Manual (Host
 
 export const generateSQLSchema = () => {
     let sql = `
--- IITGEEPrep Database Schema v12.1
+-- IITGEEPrep Database Schema v12.2
 -- Target: MySQL / MariaDB (Hostinger)
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";

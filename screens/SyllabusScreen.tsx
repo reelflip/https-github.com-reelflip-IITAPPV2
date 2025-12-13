@@ -1,22 +1,11 @@
 
 import React, { useState, useMemo } from 'react';
-import { UserProgress, TopicStatus, Topic, User, VideoLesson, TopicNote, ChapterNote } from '../lib/types';
+import { UserProgress, TopicStatus, Topic, User, VideoLesson, ChapterNote, Question, TestAttempt } from '../lib/types';
 import { BookReader } from '../components/BookReader';
 import { 
-  Search, 
-  ChevronDown, 
-  Clock, 
-  CheckCircle2, 
-  LayoutGrid,
-  BookOpen,
-  Save,
-  Loader2,
-  PlayCircle,
-  X,
-  Youtube,
-  Filter,
-  Info,
-  StickyNote
+  Search, ChevronDown, CheckCircle2, LayoutGrid, BookOpen, 
+  Save, Loader2, PlayCircle, X, Youtube, Filter, Info, StickyNote, 
+  ArrowLeft, List, CheckSquare, Target, BarChart2, Video, FileText, Check, AlertCircle
 } from 'lucide-react';
 
 interface SyllabusTrackerProps {
@@ -27,9 +16,9 @@ interface SyllabusTrackerProps {
   readOnly?: boolean;
   videoMap?: Record<string, VideoLesson>;
   chapterNotes?: Record<string, ChapterNote>;
-  // Legacy props kept to avoid breaking changes if not removed elsewhere
-  noteMap?: any;
-  onUpdateNote?: any;
+  questionBank?: Question[];
+  onToggleQuestion?: (topicId: string, questionId: string) => void;
+  addTestAttempt?: (attempt: TestAttempt) => void;
 }
 
 const statusColors: Record<TopicStatus, string> = {
@@ -51,15 +40,16 @@ const statusLabels: Record<TopicStatus, string> = {
 };
 
 export const SyllabusScreen: React.FC<SyllabusTrackerProps> = ({ 
-  user, subjects, progress, onUpdateProgress, readOnly = false, videoMap = {}, 
-  chapterNotes = {}
+  user, subjects, progress, onUpdateProgress, readOnly = false, 
+  videoMap = {}, chapterNotes = {}, questionBank = [], onToggleQuestion, addTestAttempt
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeSubjectFilter, setActiveSubjectFilter] = useState<string>('ALL');
-  const [expandedTopicId, setExpandedTopicId] = useState<string | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
-  const [showSaveToast, setShowSaveToast] = useState(false);
-  const [activeVideo, setActiveVideo] = useState<{url: string, title: string, desc?: string} | null>(null);
+  
+  // Topic Detail View State
+  const [activeTopic, setActiveTopic] = useState<Topic | null>(null);
+  
+  // Modals
   const [activeNote, setActiveNote] = useState<{title: string, pages: string[]} | null>(null);
 
   // Group flat topics into Subject -> Chapter -> Topic hierarchy
@@ -86,35 +76,12 @@ export const SyllabusScreen: React.FC<SyllabusTrackerProps> = ({
       }));
   }, [subjects]);
 
-  const handleSave = () => {
-      if (readOnly) return;
-      setIsSaving(true);
-      setTimeout(() => {
-          setIsSaving(false);
-          setShowSaveToast(true);
-          setTimeout(() => setShowSaveToast(false), 2000);
-      }, 800);
-  };
-
   const stats = useMemo(() => {
     const totalTopics = subjects.length;
     const completed = subjects.filter(t => progress[t.id]?.status === 'COMPLETED').length;
-    
-    const targetDate = new Date(user.targetYear ? `${user.targetYear}-06-01` : '2025-06-01');
-    const today = new Date();
-    const diffTime = Math.abs(targetDate.getTime() - today.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    const years = Math.floor(diffDays / 365);
-    const months = Math.floor((diffDays % 365) / 30);
-    const remainingDays = Math.floor((diffDays % 365) % 30);
-
-    return {
-      total: totalTopics,
-      completed,
-      percent: totalTopics > 0 ? Math.round((completed / totalTopics) * 100) : 0,
-      timeRemaining: `${years} Yr ${months} Mo ${remainingDays} Days`
-    };
-  }, [subjects, progress, user.targetYear]);
+    const percent = totalTopics > 0 ? Math.round((completed / totalTopics) * 100) : 0;
+    return { total: totalTopics, completed, percent };
+  }, [subjects, progress]);
 
   // Filtering
   const filteredData = useMemo(() => {
@@ -141,14 +108,384 @@ export const SyllabusScreen: React.FC<SyllabusTrackerProps> = ({
       lastRevised: null,
       revisionLevel: 0,
       nextRevisionDate: null,
-      ex1Solved: 0, ex1Total: 30, ex2Solved: 0, ex2Total: 20,
-      ex3Solved: 0, ex3Total: 15, ex4Solved: 0, ex4Total: 10
+      solvedQuestions: []
     };
+  };
+
+  // --- TOPIC DETAIL VIEW COMPONENT ---
+  const TopicDetailView = ({ topic, onClose }: { topic: Topic, onClose: () => void }) => {
+      const [tab, setTab] = useState<'OVERVIEW' | 'PRACTICE'>('PRACTICE');
+      const topicData = getProgress(topic.id);
+      
+      // Test State
+      const [isTesting, setIsTesting] = useState(false);
+      const [testAnswers, setTestAnswers] = useState<Record<string, number>>({});
+      const [testSubmitted, setTestSubmitted] = useState(false);
+      const [testScore, setTestScore] = useState(0);
+      const [difficultyFilter, setDifficultyFilter] = useState<'ALL' | 'EASY' | 'MEDIUM' | 'HARD'>('ALL');
+
+      const topicQuestions = useMemo(() => 
+          questionBank.filter(q => q.topicId === topic.id), 
+      [topic.id]);
+
+      const filteredQuestions = topicQuestions.filter(q => difficultyFilter === 'ALL' || q.difficulty === difficultyFilter);
+      
+      const solvedCount = topicData.solvedQuestions?.length || 0;
+      const totalCount = topicQuestions.length;
+      const solvedPercent = totalCount > 0 ? Math.round((solvedCount / totalCount) * 100) : 0;
+
+      const videoLesson = videoMap[topic.id];
+      const chapterNote = chapterNotes[topic.id];
+
+      // Auto-switch to overview if no questions
+      if (topicQuestions.length === 0 && tab === 'PRACTICE') setTab('OVERVIEW');
+
+      const startTest = () => {
+          setIsTesting(true);
+          setTestSubmitted(false);
+          setTestAnswers({});
+          setTestScore(0);
+      };
+
+      const submitTest = () => {
+          if(!isTesting) return;
+          let correct = 0;
+          let incorrect = 0;
+          let unattempted = 0;
+          const total = filteredQuestions.length;
+
+          filteredQuestions.forEach(q => {
+              const ans = testAnswers[q.id];
+              if(ans === undefined) {
+                  unattempted++;
+              } else if (ans === q.correctOptionIndex) {
+                  correct++;
+                  // Mark as solved in progress
+                  if (onToggleQuestion && (!topicData.solvedQuestions || !topicData.solvedQuestions.includes(q.id))) {
+                      onToggleQuestion(topic.id, q.id);
+                  }
+              } else {
+                  incorrect++;
+              }
+          });
+
+          // Calculate score (JEE Pattern: +4, -1)
+          const score = (correct * 4) - (incorrect * 1);
+          setTestScore(score);
+          setTestSubmitted(true);
+
+          // Save Attempt
+          if(addTestAttempt) {
+              addTestAttempt({
+                  id: Date.now().toString(),
+                  date: new Date().toISOString(),
+                  title: `Chapter Practice: ${topic.name}`,
+                  testId: `chapter_${topic.id}_${Date.now()}`,
+                  score: score,
+                  totalMarks: total * 4,
+                  accuracy: 0,
+                  accuracy_percent: correct + incorrect > 0 ? Math.round((correct / (correct + incorrect)) * 100) : 0,
+                  totalQuestions: total,
+                  correctCount: correct,
+                  incorrectCount: incorrect,
+                  unattemptedCount: unattempted
+              });
+          }
+      };
+
+      return (
+          <div className="fixed inset-0 z-50 bg-slate-50 flex flex-col animate-in slide-in-from-bottom-10 duration-200">
+              {/* Header */}
+              <div className="bg-white border-b border-slate-200 px-4 py-4 flex items-center justify-between shadow-sm sticky top-0 z-10">
+                  <div className="flex items-center gap-4">
+                      <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
+                          <ArrowLeft className="w-6 h-6 text-slate-600" />
+                      </button>
+                      <div>
+                          <div className="flex items-center gap-2">
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase border ${
+                                  topic.subject === 'Physics' ? 'bg-purple-50 text-purple-700 border-purple-200' : 
+                                  topic.subject === 'Chemistry' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-blue-50 text-blue-700 border-blue-200'
+                              }`}>
+                                  {topic.subject}
+                              </span>
+                              <span className="text-[10px] text-slate-400 font-medium tracking-wide uppercase">{topic.chapter}</span>
+                          </div>
+                          <h2 className="text-xl font-bold text-slate-800 leading-tight">{topic.name}</h2>
+                      </div>
+                  </div>
+                  
+                  {/* Status Dropdown */}
+                  <div className="relative hidden md:block">
+                      <select 
+                          value={topicData.status || 'PENDING'}
+                          onChange={(e) => onUpdateProgress(topic.id, { status: e.target.value as TopicStatus })}
+                          className={`appearance-none pl-4 pr-10 py-2 rounded-lg text-sm font-bold border outline-none cursor-pointer transition-colors ${statusColors[topicData.status || 'PENDING']} ${readOnly ? 'opacity-70 pointer-events-none' : ''}`}
+                          disabled={readOnly}
+                      >
+                          {Object.entries(statusLabels).map(([key, label]) => (
+                              <option key={key} value={key}>{label}</option>
+                          ))}
+                      </select>
+                      <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 opacity-50" />
+                  </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto">
+                  <div className="max-w-5xl mx-auto p-4 md:p-8 space-y-8">
+                      
+                      {/* Hero Stats */}
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                              <div className="flex items-center gap-3 mb-2">
+                                  <div className="p-2 bg-blue-100 text-blue-600 rounded-lg"><Target className="w-5 h-5" /></div>
+                                  <h3 className="font-bold text-slate-700">Question Bank</h3>
+                              </div>
+                              <div className="flex items-end gap-2">
+                                  <span className="text-3xl font-black text-slate-800">{totalCount}</span>
+                                  <span className="text-sm text-slate-500 mb-1">Total Questions</span>
+                              </div>
+                          </div>
+                          
+                          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                              <div className="flex items-center gap-3 mb-2">
+                                  <div className="p-2 bg-green-100 text-green-600 rounded-lg"><CheckSquare className="w-5 h-5" /></div>
+                                  <h3 className="font-bold text-slate-700">Completion</h3>
+                              </div>
+                              <div className="flex items-end gap-2">
+                                  <span className="text-3xl font-black text-slate-800">{solvedCount}</span>
+                                  <span className="text-sm text-slate-500 mb-1">Solved</span>
+                              </div>
+                              <div className="w-full bg-slate-100 h-1.5 rounded-full mt-3 overflow-hidden">
+                                  <div className="bg-green-500 h-full rounded-full transition-all" style={{ width: `${solvedPercent}%` }}></div>
+                              </div>
+                          </div>
+
+                          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-center gap-3">
+                              {videoLesson ? (
+                                  <a href={videoLesson.videoUrl} target="_blank" rel="noreferrer" className="flex items-center gap-3 p-3 bg-red-50 text-red-700 rounded-xl hover:bg-red-100 transition-colors border border-red-100">
+                                      <Youtube className="w-6 h-6" />
+                                      <span className="font-bold text-sm">Watch Video Lesson</span>
+                                  </a>
+                              ) : (
+                                  <div className="flex items-center gap-3 p-3 bg-slate-50 text-slate-400 rounded-xl border border-slate-100">
+                                      <Video className="w-6 h-6" />
+                                      <span className="font-bold text-sm">No Video Assigned</span>
+                                  </div>
+                              )}
+                              
+                              {chapterNote ? (
+                                  <button onClick={() => setActiveNote({title: topic.name, pages: chapterNote.pages})} className="flex items-center gap-3 p-3 bg-amber-50 text-amber-700 rounded-xl hover:bg-amber-100 transition-colors border border-amber-100">
+                                      <StickyNote className="w-6 h-6" />
+                                      <span className="font-bold text-sm">Read Chapter Notes</span>
+                                  </button>
+                              ) : (
+                                  <div className="flex items-center gap-3 p-3 bg-slate-50 text-slate-400 rounded-xl border border-slate-100">
+                                      <BookOpen className="w-6 h-6" />
+                                      <span className="font-bold text-sm">No Notes Available</span>
+                                  </div>
+                              )}
+                          </div>
+                      </div>
+
+                      {/* Content Tabs */}
+                      <div>
+                          <div className="flex border-b border-slate-200 mb-6">
+                              <button 
+                                  onClick={() => setTab('PRACTICE')}
+                                  className={`px-6 py-3 text-sm font-bold border-b-2 transition-colors ${tab === 'PRACTICE' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-800'}`}
+                              >
+                                  Practice Problems
+                              </button>
+                              <button 
+                                  onClick={() => setTab('OVERVIEW')}
+                                  className={`px-6 py-3 text-sm font-bold border-b-2 transition-colors ${tab === 'OVERVIEW' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-800'}`}
+                              >
+                                  Chapter Overview
+                              </button>
+                          </div>
+
+                          {tab === 'OVERVIEW' && (
+                              <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm animate-in fade-in">
+                                  <h3 className="font-bold text-lg text-slate-800 mb-4">About this Chapter</h3>
+                                  <div className="prose prose-slate prose-sm max-w-none">
+                                      <p className="text-slate-600 leading-relaxed">
+                                          This chapter covers fundamental concepts essential for JEE preparation. 
+                                          Mastery of {topic.name} requires understanding both the theoretical underpinnings and their application in complex problem-solving scenarios.
+                                      </p>
+                                      {videoLesson && videoLesson.description && (
+                                          <div className="mt-6 bg-blue-50 p-4 rounded-xl border border-blue-100">
+                                              <h4 className="text-blue-800 font-bold mb-2 text-xs uppercase">Video Lesson Summary</h4>
+                                              <p className="text-blue-700">{videoLesson.description}</p>
+                                          </div>
+                                      )}
+                                  </div>
+                              </div>
+                          )}
+
+                          {tab === 'PRACTICE' && (
+                              <div className="space-y-6 animate-in fade-in">
+                                  {!isTesting && !testSubmitted && (
+                                      <div className="bg-white p-12 rounded-2xl border border-slate-200 text-center shadow-sm">
+                                          <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                                              <FileText className="w-10 h-10 text-blue-600" />
+                                          </div>
+                                          <h3 className="text-2xl font-bold text-slate-800 mb-2">Start Chapter Test</h3>
+                                          <p className="text-slate-500 mb-8 max-w-md mx-auto">
+                                              Test your knowledge with {filteredQuestions.length} practice questions. 
+                                              Answers are hidden until you submit. Results will be saved to your analytics.
+                                          </p>
+                                          
+                                          <div className="flex justify-center gap-4 mb-8">
+                                               {['ALL', 'EASY', 'MEDIUM', 'HARD'].map(d => (
+                                                  <button
+                                                      key={d}
+                                                      onClick={() => setDifficultyFilter(d as any)}
+                                                      className={`px-4 py-2 rounded-lg text-xs font-bold transition-all border ${
+                                                          difficultyFilter === d 
+                                                          ? 'bg-slate-800 text-white border-slate-800 shadow-md' 
+                                                          : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                                                      }`}
+                                                  >
+                                                      {d.charAt(0) + d.slice(1).toLowerCase()}
+                                                  </button>
+                                              ))}
+                                          </div>
+
+                                          <button 
+                                              onClick={startTest}
+                                              disabled={filteredQuestions.length === 0}
+                                              className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-blue-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                          >
+                                              Begin Test ({filteredQuestions.length} Qs)
+                                          </button>
+                                      </div>
+                                  )}
+
+                                  {(isTesting || testSubmitted) && (
+                                      <div className="space-y-6">
+                                          {testSubmitted && (
+                                              <div className="bg-slate-900 text-white p-6 rounded-xl shadow-lg mb-6 flex flex-col md:flex-row justify-between items-center gap-6">
+                                                  <div>
+                                                      <h3 className="text-2xl font-bold mb-1">Test Completed!</h3>
+                                                      <p className="text-slate-400 text-sm">Your results have been saved to Analytics.</p>
+                                                  </div>
+                                                  <div className="flex gap-8 text-center">
+                                                      <div>
+                                                          <div className="text-3xl font-black text-blue-400">{testScore}</div>
+                                                          <div className="text-xs font-bold uppercase tracking-wider text-slate-500">Score</div>
+                                                      </div>
+                                                      <div className="w-px bg-slate-700 h-10"></div>
+                                                      <div>
+                                                          <div className="text-3xl font-black text-green-400">
+                                                              {Math.round((Object.entries(testAnswers).filter(([id, ans]) => 
+                                                                  filteredQuestions.find(q => q.id === id)?.correctOptionIndex === ans
+                                                              ).length / filteredQuestions.length) * 100)}%
+                                                          </div>
+                                                          <div className="text-xs font-bold uppercase tracking-wider text-slate-500">Accuracy</div>
+                                                      </div>
+                                                  </div>
+                                                  <button onClick={() => { setIsTesting(false); setTestSubmitted(false); }} className="bg-white/10 hover:bg-white/20 px-6 py-2 rounded-lg font-bold text-sm transition-colors">
+                                                      Close
+                                                  </button>
+                                              </div>
+                                          )}
+
+                                          <div className="space-y-6">
+                                              {filteredQuestions.map((q, idx) => {
+                                                  const selected = testAnswers[q.id];
+                                                  const isCorrect = testSubmitted && selected === q.correctOptionIndex;
+                                                  const isWrong = testSubmitted && selected !== undefined && selected !== q.correctOptionIndex;
+                                                  
+                                                  return (
+                                                      <div key={q.id} className={`bg-white p-6 rounded-xl border transition-all ${
+                                                          isCorrect ? 'border-green-300 bg-green-50/20' : 
+                                                          isWrong ? 'border-red-300 bg-red-50/20' : 'border-slate-200'
+                                                      }`}>
+                                                          <div className="flex items-start gap-4">
+                                                              <div className="bg-slate-100 w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs text-slate-500 shrink-0">
+                                                                  {idx + 1}
+                                                              </div>
+                                                              <div className="flex-1">
+                                                                  <div className="flex flex-wrap items-center gap-2 mb-3">
+                                                                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
+                                                                          q.difficulty === 'HARD' ? 'bg-red-50 text-red-700 border-red-100' :
+                                                                          q.difficulty === 'EASY' ? 'bg-green-50 text-green-700 border-green-100' :
+                                                                          'bg-orange-50 text-orange-700 border-orange-100'
+                                                                      }`}>
+                                                                          {q.difficulty}
+                                                                      </span>
+                                                                      {testSubmitted && isCorrect && <span className="text-green-600 text-xs font-bold flex items-center"><CheckCircle2 className="w-3 h-3 mr-1"/> Correct</span>}
+                                                                      {testSubmitted && isWrong && <span className="text-red-600 text-xs font-bold flex items-center"><AlertCircle className="w-3 h-3 mr-1"/> Incorrect</span>}
+                                                                  </div>
+                                                                  
+                                                                  <p className="text-slate-800 font-medium mb-4 leading-relaxed">{q.text}</p>
+                                                                  
+                                                                  <div className="space-y-2">
+                                                                      {q.options.map((opt, i) => {
+                                                                          let optionClass = "border-slate-200 bg-white hover:bg-slate-50";
+                                                                          
+                                                                          if (testSubmitted) {
+                                                                              if (i === q.correctOptionIndex) optionClass = "border-green-500 bg-green-50 text-green-800 font-bold ring-1 ring-green-500";
+                                                                              else if (i === selected && i !== q.correctOptionIndex) optionClass = "border-red-300 bg-red-50 text-red-800";
+                                                                              else optionClass = "border-slate-100 bg-slate-50 opacity-60";
+                                                                          } else if (selected === i) {
+                                                                              optionClass = "border-blue-500 bg-blue-50 text-blue-800 ring-1 ring-blue-500";
+                                                                          }
+
+                                                                          return (
+                                                                              <div 
+                                                                                  key={i} 
+                                                                                  onClick={() => !testSubmitted && setTestAnswers(prev => ({ ...prev, [q.id]: i }))}
+                                                                                  className={`p-3 rounded-lg border text-sm transition-all cursor-pointer flex items-center ${optionClass}`}
+                                                                              >
+                                                                                  <div className={`w-5 h-5 rounded-full border mr-3 flex items-center justify-center text-[10px] ${
+                                                                                      selected === i || (testSubmitted && i === q.correctOptionIndex) 
+                                                                                      ? 'border-current' : 'border-slate-300'
+                                                                                  }`}>
+                                                                                      {String.fromCharCode(65+i)}
+                                                                                  </div>
+                                                                                  {opt}
+                                                                              </div>
+                                                                          );
+                                                                      })}
+                                                                  </div>
+                                                              </div>
+                                                          </div>
+                                                      </div>
+                                                  );
+                                              })}
+                                          </div>
+
+                                          {!testSubmitted && (
+                                              <div className="sticky bottom-4 z-20 flex justify-center pt-4">
+                                                  <button 
+                                                      onClick={submitTest}
+                                                      className="bg-slate-900 text-white font-bold py-3 px-12 rounded-full shadow-xl hover:bg-slate-800 hover:scale-105 transition-all active:scale-95"
+                                                  >
+                                                      Submit Test
+                                                  </button>
+                                              </div>
+                                          )}
+                                      </div>
+                                  )}
+                              </div>
+                          )}
+                      </div>
+                  </div>
+              </div>
+          </div>
+      );
   };
 
   return (
     <div className="space-y-8 font-inter animate-in fade-in slide-in-from-bottom-4 relative">
       
+      {/* Detail Overlay */}
+      {activeTopic && (
+          <TopicDetailView topic={activeTopic} onClose={() => setActiveTopic(null)} />
+      )}
+
       {/* Book Reader Modal */}
       {activeNote && (
           <BookReader 
@@ -163,9 +500,9 @@ export const SyllabusScreen: React.FC<SyllabusTrackerProps> = ({
           <div className="relative z-10">
               <div className="flex items-center space-x-3 mb-2">
                  <BookOpen className="w-8 h-8 text-white" />
-                 <h1 className="text-3xl font-bold">Comprehensive Syllabus Tracker</h1>
+                 <h1 className="text-3xl font-bold">Detailed Syllabus Tracker</h1>
               </div>
-              <p className="text-blue-100 text-lg opacity-90 max-w-2xl">Track your completion status, exercise progress, and revision cycles chapter by chapter.</p>
+              <p className="text-blue-100 text-lg opacity-90 max-w-2xl">Track completion, watch lectures, and solve chapter-wise problems.</p>
           </div>
           <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 rounded-full bg-white opacity-10"></div>
           <div className="absolute bottom-0 right-20 w-32 h-32 rounded-full bg-white opacity-10"></div>
@@ -173,25 +510,14 @@ export const SyllabusScreen: React.FC<SyllabusTrackerProps> = ({
 
       {/* Stats Overview */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="md:col-span-1 bg-white p-5 rounded-2xl shadow-[0_2px_10px_-4px_rgba(0,0,0,0.1)] border border-slate-100 flex flex-col justify-center">
+        <div className="md:col-span-1 bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex flex-col justify-center">
           <h3 className="text-sm font-semibold text-slate-900 mb-1">Student Overview: <span className="text-blue-600">{user.name.split(' ')[0]}</span></h3>
           <p className="text-xs text-slate-500">
             {user.name.split(' ')[0]} has completed <span className="font-bold text-slate-700">{stats.completed}</span> out of <span className="font-bold text-slate-700">{stats.total}</span> major topics.
           </p>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl shadow-[0_2px_10px_-4px_rgba(0,0,0,0.1)] border border-slate-100 flex items-center justify-between">
-           <div>
-             <div className="flex items-center space-x-2 text-slate-400 mb-1">
-               <Clock className="w-3.5 h-3.5" />
-               <span className="text-[10px] font-bold uppercase tracking-wider">Time Remaining</span>
-             </div>
-             <div className="text-xl font-bold text-slate-800">{stats.timeRemaining}</div>
-             <div className="text-[10px] text-slate-400">Target: {user.targetExam || 'IIT JEE'} {user.targetYear || 2025}</div>
-           </div>
-        </div>
-
-        <div className="bg-white p-5 rounded-2xl shadow-[0_2px_10px_-4px_rgba(0,0,0,0.1)] border border-slate-100 flex flex-col justify-center">
+        <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex flex-col justify-center">
            <div className="flex justify-between items-end mb-2">
              <div>
                <h3 className="text-sm font-semibold text-slate-900">Overall Progress</h3>
@@ -202,7 +528,6 @@ export const SyllabusScreen: React.FC<SyllabusTrackerProps> = ({
            <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
               <div className="bg-blue-600 h-full rounded-full transition-all duration-1000" style={{ width: `${stats.percent}%` }}></div>
            </div>
-           <p className="text-[10px] text-slate-400 mt-2 text-right">based on syllabus completion</p>
         </div>
       </div>
 
@@ -219,8 +544,7 @@ export const SyllabusScreen: React.FC<SyllabusTrackerProps> = ({
           />
         </div>
         
-        <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto">
-            <div className="flex space-x-1 w-full md:w-auto overflow-x-auto no-scrollbar">
+        <div className="flex space-x-1 w-full md:w-auto overflow-x-auto no-scrollbar">
             {['ALL', 'phys', 'chem', 'math'].map((filter) => {
                 const labels: Record<string, string> = { 'ALL': 'All', 'phys': 'Physics', 'chem': 'Chemistry', 'math': 'Maths' };
                 return (
@@ -237,18 +561,6 @@ export const SyllabusScreen: React.FC<SyllabusTrackerProps> = ({
                 </button>
                 );
             })}
-            </div>
-            
-            {!readOnly && (
-                <button
-                    onClick={handleSave}
-                    disabled={isSaving}
-                    className="hidden md:flex items-center justify-center space-x-2 px-6 py-1.5 bg-green-600 text-white rounded-lg text-xs font-bold hover:bg-green-700 active:scale-95 transition-all shadow-md shadow-green-200 disabled:opacity-70 disabled:cursor-not-allowed min-w-[120px]"
-                >
-                    {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                    <span>{isSaving ? 'Saving...' : 'Save Progress'}</span>
-                </button>
-            )}
         </div>
       </div>
 
@@ -266,153 +578,55 @@ export const SyllabusScreen: React.FC<SyllabusTrackerProps> = ({
                      <h2 className="text-sm font-bold text-slate-700 uppercase tracking-wide">{chapter.name}</h2>
                   </div>
 
-                  <div className="grid grid-cols-1 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {chapter.topics.map(topic => {
                       const topicData = getProgress(topic.id);
-                      const totalQuestions = (topicData.ex1Total||0) + (topicData.ex2Total||0) + (topicData.ex3Total||0) + (topicData.ex4Total||0);
-                      const solvedQuestions = (topicData.ex1Solved||0) + (topicData.ex2Solved||0) + (topicData.ex3Solved||0) + (topicData.ex4Solved||0);
-                      const qPercent = totalQuestions > 0 ? Math.round((solvedQuestions / totalQuestions) * 100) : 0;
-                      const isExpanded = expandedTopicId === topic.id;
-                      const videoLesson = videoMap[topic.id];
-                      const chapterNote = chapterNotes[topic.id];
+                      const qCount = questionBank.filter(q => q.topicId === topic.id).length;
+                      const solvedCount = topicData.solvedQuestions?.length || 0;
+                      const qPercent = qCount > 0 ? Math.round((solvedCount / qCount) * 100) : 0;
 
                       return (
-                        <div key={topic.id} className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow duration-200">
-                           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                              <div className="flex-1">
-                                 <div className="flex items-center space-x-2 mb-1">
-                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-                                        subject.id === 'phys' ? 'bg-purple-100 text-purple-700' : 
-                                        subject.id === 'chem' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'
-                                    }`}>
-                                        {subject.name}
-                                    </span>
-                                    <span className="text-[10px] text-slate-400">Est. 8 Hours</span>
-                                 </div>
-                                 <div className="flex items-center gap-3 flex-wrap">
-                                     <h3 className="text-base font-bold text-slate-800">{topic.name}</h3>
-                                     
-                                     {/* Video Button */}
-                                     {videoLesson && (
-                                         <button 
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setActiveVideo({ 
-                                                    url: videoLesson.videoUrl, 
-                                                    title: topic.name,
-                                                    desc: videoLesson.description 
-                                                });
-                                            }}
-                                            className="flex items-center space-x-1.5 px-2 py-1 bg-red-50 text-red-600 rounded-full hover:bg-red-100 transition-colors border border-red-100 group"
-                                            title="Watch Video Lesson"
-                                         >
-                                             <PlayCircle className="w-3.5 h-3.5 fill-red-100 group-hover:fill-red-200" />
-                                             <span className="text-[10px] font-bold uppercase tracking-wide">Watch</span>
-                                         </button>
-                                     )}
-
-                                     {/* Read Notes Button */}
-                                     {chapterNote && chapterNote.pages && chapterNote.pages.length > 0 && (
-                                         <button 
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setActiveNote({
-                                                    title: topic.name,
-                                                    pages: chapterNote.pages
-                                                });
-                                            }}
-                                            className="flex items-center space-x-1.5 px-2 py-1 bg-amber-50 text-amber-600 rounded-full hover:bg-amber-100 transition-colors border border-amber-100 group"
-                                            title="Read Chapter Notes"
-                                         >
-                                             <StickyNote className="w-3.5 h-3.5 fill-amber-100 group-hover:fill-amber-200" />
-                                             <span className="text-[10px] font-bold uppercase tracking-wide">Notes</span>
-                                         </button>
-                                     )}
-                                 </div>
-                                 
-                                 <div className="mt-3 flex items-center space-x-3 w-full md:w-64">
-                                    <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                                       <div className="h-full bg-slate-400 rounded-full" style={{ width: `${qPercent}%` }}></div>
-                                    </div>
-                                    <span className="text-xs text-slate-500 font-medium">{qPercent}% Questions</span>
-                                 </div>
-                              </div>
-
-                              <div className="flex items-center space-x-3 self-end md:self-center">
-                                 <div className="relative">
-                                    <select 
-                                      value={topicData.status || 'PENDING'}
-                                      onChange={(e) => onUpdateProgress(topic.id, { status: e.target.value as TopicStatus })}
-                                      className={`appearance-none pl-3 pr-8 py-1.5 rounded-lg text-xs font-bold border outline-none cursor-pointer transition-colors ${statusColors[topicData.status || 'PENDING']} ${readOnly ? 'opacity-70 pointer-events-none' : ''}`}
-                                      disabled={readOnly}
-                                    >
-                                      {Object.entries(statusLabels).map(([key, label]) => (
-                                        <option key={key} value={key}>{label}</option>
-                                      ))}
-                                    </select>
-                                    <ChevronDown className={`absolute right-2 top-1/2 transform -translate-y-1/2 w-3 h-3 pointer-events-none ${
-                                        topicData.status === 'NOT_STARTED' ? 'text-slate-400' : 'text-current opacity-60'
-                                    }`} />
-                                 </div>
-                                 
-                                 <button 
-                                   onClick={() => setExpandedTopicId(isExpanded ? null : topic.id)}
-                                   className="text-xs font-medium text-blue-600 hover:text-blue-800 hover:underline px-2"
-                                 >
-                                   {isExpanded ? 'Close' : 'Details'}
-                                 </button>
-                              </div>
+                        <div 
+                            key={topic.id} 
+                            onClick={() => setActiveTopic(topic)}
+                            className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm hover:shadow-lg hover:border-blue-300 transition-all duration-200 cursor-pointer group relative overflow-hidden"
+                        >
+                           <div className="flex justify-between items-start mb-4">
+                               <div>
+                                   <div className="flex items-center gap-2 mb-1">
+                                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                                            subject.id === 'phys' ? 'bg-purple-100 text-purple-700' : 
+                                            subject.id === 'chem' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'
+                                        }`}>
+                                            {subject.name}
+                                        </span>
+                                        {topicData.status === 'COMPLETED' && <CheckCircle2 className="w-4 h-4 text-green-500" />}
+                                   </div>
+                                   <h3 className="text-base font-bold text-slate-800 group-hover:text-blue-700 transition-colors">{topic.name}</h3>
+                               </div>
                            </div>
 
-                           {isExpanded && (
-                             <div className="mt-4 pt-4 border-t border-slate-100 animate-in fade-in slide-in-from-top-1">
-                                <h4 className="text-xs font-bold text-slate-500 uppercase mb-3 flex items-center">
-                                    <BookOpen className="w-3 h-3 mr-1.5" /> Exercise Tracking
-                                </h4>
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                   {[1, 2, 3, 4].map(num => {
-                                      const solvedKey = `ex${num}Solved` as keyof UserProgress;
-                                      const totalKey = `ex${num}Total` as keyof UserProgress;
-                                      return (
-                                        <div key={num} className="bg-slate-50 p-2 rounded-lg border border-slate-100">
-                                            <div className="flex justify-between items-center mb-1">
-                                                <span className="text-[10px] font-bold text-slate-400">EXERCISE {num}</span>
-                                            </div>
-                                            <div className="flex items-center space-x-1">
-                                                <input 
-                                                  type="number" 
-                                                  value={topicData[solvedKey] as number || 0}
-                                                  onChange={(e) => onUpdateProgress(topic.id, { [solvedKey]: parseInt(e.target.value) || 0 })}
-                                                  className="w-full text-xs p-1 rounded border border-slate-200 focus:border-blue-400 focus:ring-0 outline-none text-center font-medium text-slate-700"
-                                                  disabled={readOnly}
-                                                />
-                                                <span className="text-slate-300">/</span>
-                                                <input 
-                                                  type="number" 
-                                                  value={topicData[totalKey] as number || 0}
-                                                  onChange={(e) => onUpdateProgress(topic.id, { [totalKey]: parseInt(e.target.value) || 0 })}
-                                                  className="w-full text-xs p-1 rounded border border-slate-200 focus:border-blue-400 focus:ring-0 outline-none text-center font-medium text-slate-500 bg-slate-100"
-                                                  disabled={readOnly}
-                                                />
-                                            </div>
-                                        </div>
-                                      );
-                                   })}
-                                </div>
-                                {!readOnly && (
-                                    <div className="flex justify-end mt-4">
-                                        <button 
-                                            onClick={handleSave}
-                                            disabled={isSaving}
-                                            className="text-xs font-bold text-green-600 hover:text-green-700 flex items-center bg-green-50 px-3 py-1.5 rounded-lg border border-green-200 hover:bg-green-100 transition-colors"
-                                        >
-                                            {isSaving ? <Loader2 className="w-3 h-3 mr-1 animate-spin"/> : <CheckCircle2 className="w-3 h-3 mr-1" />}
-                                            {isSaving ? 'Saving' : 'Save'}
-                                        </button>
-                                    </div>
-                                )}
-                             </div>
-                           )}
+                           <div className="space-y-3">
+                               <div className="flex items-center justify-between text-xs text-slate-500">
+                                   <span>{qCount} Questions</span>
+                                   <span className="font-bold">{solvedCount} Solved</span>
+                               </div>
+                               <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                                   <div className="h-full bg-blue-500 rounded-full" style={{ width: `${qPercent}%` }}></div>
+                               </div>
+                           </div>
+
+                           <div className="mt-4 pt-4 border-t border-slate-100 flex justify-between items-center">
+                               <span className={`text-[10px] font-bold uppercase tracking-wider ${
+                                   topicData.status === 'COMPLETED' ? 'text-green-600' : 
+                                   topicData.status === 'IN_PROGRESS' ? 'text-blue-600' : 'text-slate-400'
+                               }`}>
+                                   {statusLabels[topicData.status || 'NOT_STARTED']}
+                               </span>
+                               <span className="text-xs font-bold text-blue-600 flex items-center group-hover:underline">
+                                   View Chapter <ArrowLeft className="w-3 h-3 ml-1 rotate-180" />
+                               </span>
+                           </div>
                         </div>
                       );
                     })}
@@ -430,51 +644,6 @@ export const SyllabusScreen: React.FC<SyllabusTrackerProps> = ({
             </div>
         )}
       </div>
-
-      {showSaveToast && (
-          <div className="fixed bottom-24 md:bottom-10 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-6 py-3 rounded-full shadow-xl flex items-center space-x-2 animate-in fade-in slide-in-from-bottom-2 z-50">
-              <CheckCircle2 className="w-5 h-5 text-green-400" />
-              <span className="font-bold text-sm">Progress Saved!</span>
-          </div>
-      )}
-
-      {activeVideo && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm animate-in fade-in duration-300">
-              <div className="w-full max-w-5xl bg-black rounded-2xl overflow-hidden shadow-2xl relative border border-slate-800">
-                  <div className="flex justify-between items-center p-4 bg-slate-900 text-white border-b border-slate-800">
-                      <div className="flex items-center space-x-3">
-                          <Youtube className="w-6 h-6 text-red-600" />
-                          <div>
-                              <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Video Lesson</p>
-                              <h3 className="font-bold text-lg">{activeVideo.title}</h3>
-                          </div>
-                      </div>
-                      <button 
-                        onClick={() => setActiveVideo(null)}
-                        className="text-slate-400 hover:text-white transition-colors bg-white/10 p-2 rounded-full hover:bg-white/20"
-                      >
-                          <X className="w-5 h-5" />
-                      </button>
-                  </div>
-                  <div className="relative pt-[56.25%] bg-black">
-                      <iframe 
-                        className="absolute inset-0 w-full h-full"
-                        src={activeVideo.url} 
-                        title={activeVideo.title}
-                        frameBorder="0" 
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-                        allowFullScreen
-                      ></iframe>
-                  </div>
-                  <div className="p-4 bg-slate-900 text-slate-300 text-xs border-t border-slate-800 flex items-start gap-2">
-                      <Info className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
-                      <p className="leading-relaxed">
-                          <strong>About this lesson:</strong> {activeVideo.desc || "No detailed description available."}
-                      </p>
-                  </div>
-              </div>
-          </div>
-      )}
     </div>
   );
 };

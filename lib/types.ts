@@ -48,7 +48,7 @@ export interface UserProgress {
   revisionLevel: number; // 0 to 4
   nextRevisionDate: string | null; // ISO Date string
   revisionCount?: number;
-  // Exercise Tracking
+  // Exercise Tracking - Deprecated in favor of Question Bank
   ex1Solved?: number;
   ex1Total?: number;
   ex2Solved?: number;
@@ -57,6 +57,8 @@ export interface UserProgress {
   ex3Total?: number;
   ex4Solved?: number;
   ex4Total?: number;
+  // New Question Bank Tracking
+  solvedQuestions?: string[];
 }
 
 export interface VideoLesson {
@@ -227,6 +229,7 @@ export interface Question {
     correctOptionIndex: number;
     source?: string; // e.g. 'JEE Advanced', 'PYQ'
     year?: number;   // e.g. 2022
+    difficulty?: 'EASY' | 'MEDIUM' | 'HARD';
 }
 
 export interface Test {
@@ -310,4 +313,4 @@ export type Screen =
   | 'overview' | 'users' | 'videos' | 'content' | 'diagnostics' | 'system' | 'deployment' 
   | 'tests_admin' | 'content_admin' | 'video_admin' | 'admin_analytics' | 'syllabus_admin'
   | 'inbox' | 'blog_admin'
-  | 'family' | 'public-blog' | 'about' | 'blog' | 'exams' | 'privacy' | 'contact';
+  | 'family' | 'public-blog' | 'about' | 'blog' | 'exams' | 'privacy' | 'contact' | 'features';

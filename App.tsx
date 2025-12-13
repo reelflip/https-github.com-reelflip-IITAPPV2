@@ -29,6 +29,7 @@ import { AboutUsScreen } from './screens/AboutUsScreen';
 import { ContactUsScreen } from './screens/ContactUsScreen';
 import { ExamGuideScreen } from './screens/ExamGuideScreen';
 import { PrivacyPolicyScreen } from './screens/PrivacyPolicyScreen';
+import { FeaturesScreen } from './screens/FeaturesScreen';
 import { FocusScreen } from './screens/FocusScreen';
 import { AnalyticsScreen } from './screens/AnalyticsScreen';
 import { WellnessScreen } from './screens/WellnessScreen';
@@ -40,10 +41,10 @@ import { User, UserProgress, TopicStatus, TestAttempt, Screen, Goal, MistakeLog,
 import { calculateNextRevision } from './lib/utils';
 import { SYLLABUS_DATA } from './lib/syllabusData';
 import { DEFAULT_CHAPTER_NOTES } from './lib/chapterContent';
-import { MOCK_TESTS_DATA } from './lib/mockTestsData';
+import { MOCK_TESTS_DATA, generateInitialQuestionBank } from './lib/mockTestsData';
 import { TrendingUp, Bell, LogOut } from 'lucide-react';
 
-const APP_VERSION = '12.1';
+const APP_VERSION = '12.2';
 
 const ComingSoonScreen = ({ title, icon }: { title: string, icon: string }) => (
   <div className="flex flex-col items-center justify-center h-[70vh] text-center">
@@ -134,6 +135,7 @@ export default function App() {
       if (storedVersion !== APP_VERSION) {
           // Clear caches on version upgrade
           localStorage.removeItem('iitjee_admin_tests');
+          // Question bank will be regenerated on init
           localStorage.setItem('iitjee_app_version', APP_VERSION);
           setAdminTests(MOCK_TESTS_DATA);
       }
@@ -207,7 +209,14 @@ export default function App() {
     }
     
     if (savedVideos) setVideoMap(JSON.parse(savedVideos));
-    if (savedQuestions) setQuestionBank(JSON.parse(savedQuestions));
+    
+    // Initialize Question Bank
+    if (savedQuestions) {
+        const parsed = JSON.parse(savedQuestions);
+        setQuestionBank(parsed.length > 0 ? parsed : generateInitialQuestionBank());
+    } else {
+        setQuestionBank(generateInitialQuestionBank());
+    }
     
     if (savedAdminTests) {
         const parsedTests = JSON.parse(savedAdminTests);
@@ -269,10 +278,7 @@ export default function App() {
                       lastRevised: p.last_revised,
                       revisionLevel: p.revision_level,
                       nextRevisionDate: p.next_revision_date,
-                      ex1Solved: p.ex1_solved, ex1Total: p.ex1_total,
-                      ex2Solved: p.ex2_solved, ex2Total: p.ex2_total,
-                      ex3Solved: p.ex3_solved, ex3Total: p.ex3_total,
-                      ex4Solved: p.ex4_solved, ex4Total: p.ex4_total
+                      solvedQuestions: p.solvedQuestions || [] // Assume backend might send this eventually
                   };
               });
               setProgress(progMap);
@@ -335,7 +341,7 @@ export default function App() {
   };
   const updateTopicProgress = (topicId: string, updates: Partial<UserProgress>) => {
     setProgress(prev => {
-      const current = prev[topicId] || { topicId, status: 'NOT_STARTED', lastRevised: null, revisionLevel: 0, nextRevisionDate: null };
+      const current = prev[topicId] || { topicId, status: 'NOT_STARTED', lastRevised: null, revisionLevel: 0, nextRevisionDate: null, solvedQuestions: [] };
       if (updates.status === 'COMPLETED' && current.status !== 'COMPLETED') {
         const now = new Date().toISOString();
         updates.lastRevised = now; updates.nextRevisionDate = calculateNextRevision(0, now); updates.revisionLevel = 0;
@@ -343,6 +349,23 @@ export default function App() {
       return { ...prev, [topicId]: { ...current, ...updates } };
     });
   };
+  
+  const toggleQuestionSolved = (topicId: string, questionId: string) => {
+      setProgress(prev => {
+          const current = prev[topicId] || { topicId, status: 'NOT_STARTED', lastRevised: null, revisionLevel: 0, nextRevisionDate: null, solvedQuestions: [] };
+          const solved = current.solvedQuestions || [];
+          const newSolved = solved.includes(questionId) 
+              ? solved.filter(id => id !== questionId)
+              : [...solved, questionId];
+          
+          // Auto-update status if started
+          let status = current.status;
+          if (newSolved.length > 0 && status === 'NOT_STARTED') status = 'IN_PROGRESS';
+          
+          return { ...prev, [topicId]: { ...current, solvedQuestions: newSolved, status } };
+      });
+  };
+
   const handleRevisionComplete = (topicId: string) => {
     setProgress(prev => {
       const current = prev[topicId];
@@ -368,7 +391,19 @@ export default function App() {
   const deleteQuestion = (id: string) => setQuestionBank(prev => prev.filter(q => q.id !== id));
   const createTest = (t: Test) => setAdminTests(prev => [...prev, t]);
   const deleteTest = (id: string) => setAdminTests(prev => prev.filter(t => t.id !== id));
-  const addTestAttempt = (attempt: TestAttempt) => setTestAttempts(prev => [...prev, attempt]);
+  
+  const addTestAttempt = (attempt: TestAttempt) => {
+      setTestAttempts(prev => [...prev, attempt]);
+      // Persist to Server
+      if (user) {
+          fetch('/api/save_attempt.php', {
+              method: 'POST',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({ ...attempt, user_id: user.id })
+          }).catch(console.error);
+      }
+  };
+
   const addGoal = (text: string) => setGoals(prev => [...prev, { id: Date.now().toString(), text, completed: false }]);
   const toggleGoal = (id: string) => setGoals(prev => prev.map(g => g.id === id ? { ...g, completed: !g.completed } : g));
   const addMistake = (m: Omit<MistakeLog, 'id' | 'date'>) => setMistakes(prev => [{ ...m, id: Date.now().toString(), date: new Date().toISOString() }, ...prev]);
@@ -445,6 +480,7 @@ export default function App() {
   if (currentScreen === 'contact') return <PublicLayout onNavigate={handleNavigation} currentScreen="contact" socialConfig={socialConfig}><ContactUsScreen /></PublicLayout>;
   if (currentScreen === 'exams') return <PublicLayout onNavigate={handleNavigation} currentScreen="exams" socialConfig={socialConfig}><ExamGuideScreen /></PublicLayout>;
   if (currentScreen === 'privacy') return <PublicLayout onNavigate={handleNavigation} currentScreen="privacy" socialConfig={socialConfig}><PrivacyPolicyScreen /></PublicLayout>;
+  if (currentScreen === 'features') return <PublicLayout onNavigate={handleNavigation} currentScreen="features" socialConfig={socialConfig}><FeaturesScreen /></PublicLayout>;
 
   if (!user) { return <AuthScreen onLogin={handleLogin} onNavigate={handleNavigation} enableGoogleLogin={enableGoogleLogin} socialConfig={socialConfig} />; }
 
@@ -469,7 +505,7 @@ export default function App() {
                 {currentScreen === 'family' && <ParentFamilyScreen user={user} onSendRequest={sendConnectionRequest} linkedData={linkedStudentData} />}
                 {currentScreen === 'analytics' && <AnalyticsScreen user={user} progress={linkedStudentData?.progress || {}} testAttempts={linkedStudentData?.tests || []} />}
                 {currentScreen === 'tests' && <TestScreen user={user} history={linkedStudentData?.tests || []} addTestAttempt={()=>{}} availableTests={adminTests} />}
-                {currentScreen === 'syllabus' && <SyllabusScreen user={user} subjects={syllabus} progress={linkedStudentData?.progress || {}} onUpdateProgress={()=>{}} readOnly={true} videoMap={videoMap} chapterNotes={chapterNotes} />}
+                {currentScreen === 'syllabus' && <SyllabusScreen user={user} subjects={syllabus} progress={linkedStudentData?.progress || {}} onUpdateProgress={()=>{}} readOnly={true} videoMap={videoMap} chapterNotes={chapterNotes} questionBank={questionBank} addTestAttempt={()=>{}} />}
                 {currentScreen === 'profile' && <ProfileScreen user={user} onAcceptRequest={()=>{}} onUpdateUser={(u) => { const updated = { ...user, ...u }; setUser(updated); saveUserToDB(updated); }} linkedStudentName={linkedStudentData?.studentName} />} 
              </>
           )}
@@ -478,7 +514,7 @@ export default function App() {
                 <AITutorChat isFullScreen={currentScreen === 'ai-tutor'} />
                 
                 {currentScreen === 'dashboard' && <DashboardScreen user={user} progress={progress} testAttempts={testAttempts} goals={goals} addGoal={addGoal} toggleGoal={toggleGoal} setScreen={setCurrentScreen} />}
-                {currentScreen === 'syllabus' && <SyllabusScreen user={user} subjects={syllabus} progress={progress} onUpdateProgress={updateTopicProgress} videoMap={videoMap} chapterNotes={chapterNotes} />}
+                {currentScreen === 'syllabus' && <SyllabusScreen user={user} subjects={syllabus} progress={progress} onUpdateProgress={updateTopicProgress} videoMap={videoMap} chapterNotes={chapterNotes} questionBank={questionBank} onToggleQuestion={toggleQuestionSolved} addTestAttempt={addTestAttempt} />}
                 {currentScreen === 'revision' && <RevisionScreen progress={progress} handleRevisionComplete={handleRevisionComplete} />}
                 {currentScreen === 'tests' && <TestScreen user={user} history={testAttempts} addTestAttempt={addTestAttempt} availableTests={adminTests} />}
                 {currentScreen === 'psychometric' && <PsychometricScreen user={user} />}

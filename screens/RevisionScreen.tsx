@@ -3,7 +3,7 @@ import React from 'react';
 import { UserProgress, Topic } from '../lib/types';
 import { SYLLABUS_DATA } from '../lib/syllabusData';
 import { formatDate } from '../lib/utils';
-import { RotateCw, Calendar, CheckCircle2, AlertCircle, Clock } from 'lucide-react';
+import { RotateCw, Calendar, CheckCircle2, AlertCircle, Clock, Info, HelpCircle } from 'lucide-react';
 
 interface Props {
   progress: Record<string, UserProgress>;
@@ -34,20 +34,42 @@ export const RevisionScreen: React.FC<Props> = ({ progress, handleRevisionComple
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 pb-12">
       
-      {/* Enhanced Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-cyan-600 rounded-2xl p-8 text-white shadow-lg relative overflow-hidden">
+      {/* Enhanced Header with Explainer */}
+      <div className="bg-gradient-to-r from-blue-600 to-cyan-600 rounded-2xl p-6 md:p-8 text-white shadow-lg relative overflow-hidden">
         <div className="relative z-10">
-          <h2 className="text-3xl font-bold flex items-center gap-3">
+          <h2 className="text-3xl font-bold flex items-center gap-3 mb-3">
             <div className="p-2 bg-white/20 rounded-lg backdrop-blur-sm">
               <RotateCw className="w-6 h-6 text-white" />
             </div>
             Smart Revision Manager
           </h2>
-          <p className="text-blue-50 mt-2 opacity-90 max-w-xl text-sm md:text-base">
-            Based on the <strong>1-7-30 Spaced Repetition Algorithm</strong>. We automatically schedule reviews: 
-            1 day, 7 days, and 30 days after you complete a topic to ensure long-term retention.
+          <p className="text-blue-50 opacity-90 max-w-xl text-sm md:text-base leading-relaxed">
+            Beat the "Forgetting Curve" using the <strong>1-7-30 Spaced Repetition Rule</strong>. 
+            We automatically schedule reviews to move concepts from short-term to long-term memory.
           </p>
+
+          {/* Usage Guide Box */}
+          <div className="mt-6 bg-white/10 p-4 rounded-xl border border-white/20 backdrop-blur-md max-w-3xl">
+              <h4 className="font-bold text-white text-sm mb-3 flex items-center gap-2">
+                  <HelpCircle className="w-4 h-4 text-yellow-300" /> How to use this tab:
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs md:text-sm text-blue-50">
+                  <div className="flex gap-3">
+                      <span className="bg-white/20 w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs shrink-0">1</span>
+                      <p>Mark a topic as <strong className="text-white">Completed</strong> in the Syllabus Tracker.</p>
+                  </div>
+                  <div className="flex gap-3">
+                      <span className="bg-white/20 w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs shrink-0">2</span>
+                      <p>The system automatically adds it here when due (Day 1, Day 7, Day 30).</p>
+                  </div>
+                  <div className="flex gap-3">
+                      <span className="bg-white/20 w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs shrink-0">3</span>
+                      <p>Revise the topic, then click <strong className="text-white">Mark Done</strong> to schedule the next review.</p>
+                  </div>
+              </div>
+          </div>
         </div>
+        
         {/* Decor */}
         <div className="absolute right-0 top-0 w-64 h-64 bg-white/10 rounded-full -mr-16 -mt-16 blur-3xl"></div>
         <div className="absolute bottom-0 right-20 w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
@@ -70,7 +92,7 @@ export const RevisionScreen: React.FC<Props> = ({ progress, handleRevisionComple
                 🎉
               </div>
               <h4 className="font-bold text-green-900 text-lg">All caught up!</h4>
-              <p className="text-green-700 text-sm mt-1">No revisions pending for today. Great job!</p>
+              <p className="text-green-700 text-sm mt-1">No revisions pending for today. Go learn something new!</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -108,13 +130,13 @@ export const RevisionScreen: React.FC<Props> = ({ progress, handleRevisionComple
         <div className="space-y-4">
           <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
             <Calendar className="w-5 h-5 text-blue-500" />
-            Upcoming
+            Upcoming Schedule
           </h3>
           
           <div className="space-y-3 bg-slate-50 p-4 rounded-2xl border border-slate-100 min-h-[200px]">
              {upcomingTopics.length === 0 ? (
                  <div className="text-center py-10 text-slate-400">
-                     <p className="text-sm italic">Complete more topics to populate your revision schedule.</p>
+                     <p className="text-sm italic">Complete more topics in the Syllabus tab to populate your revision schedule.</p>
                  </div>
              ) : (
                  upcomingTopics.map(({ topic, progress }) => (

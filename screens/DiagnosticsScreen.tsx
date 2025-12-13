@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Database, RefreshCw, Server, Table, CheckCircle2, AlertTriangle, XCircle, Activity, Globe, Play, Loader2, Clock, Terminal, AlertCircle } from 'lucide-react';
+import { Database, RefreshCw, Server, Table, CheckCircle2, AlertTriangle, XCircle, Activity, Globe, Play, Loader2, Clock, Terminal, AlertCircle, FileText } from 'lucide-react';
 import { SYLLABUS_DATA } from '../lib/syllabusData';
 
 // Full List of Required Tables based on schema v12.1
@@ -363,7 +363,7 @@ export const DiagnosticsScreen: React.FC = () => {
                   <h3 className="text-xl font-bold flex items-center gap-2">
                       <Database className="w-6 h-6" /> Live Database Inspector
                   </h3>
-                  <p className="text-blue-100 text-sm mt-1">Scan database tables and verify entry counts in real-time.</p>
+                  <p className="text-blue-100 text-sm mt-1">Scan database tables and verify content availability in real-time.</p>
               </div>
               <button 
                   onClick={runLiveDbCheck}
@@ -427,7 +427,7 @@ export const DiagnosticsScreen: React.FC = () => {
                               <h5 className="text-xs font-bold text-slate-500 uppercase mb-3 flex items-center">
                                   <Table className="w-3 h-3 mr-2" /> Schema Validation
                               </h5>
-                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
                                   {REQUIRED_SCHEMA.map((tableName) => {
                                       const existing = dbStatus.tables.find((t: any) => t.name === tableName);
                                       return (
@@ -453,6 +453,48 @@ export const DiagnosticsScreen: React.FC = () => {
                                       </div>
                                   ))}
                               </div>
+                          </div>
+                      )}
+
+                      {/* Content Coverage Section */}
+                      {dbStatus.content_stats && dbStatus.content_stats.length > 0 && (
+                          <div className="mt-6 border-t border-slate-200 pt-6">
+                              <h5 className="text-xs font-bold text-slate-500 uppercase mb-3 flex items-center">
+                                  <FileText className="w-3 h-3 mr-2" /> Content Coverage Audit
+                              </h5>
+                              <div className="overflow-x-auto bg-white border border-slate-200 rounded-lg shadow-sm">
+                                  <table className="w-full text-sm text-left">
+                                      <thead className="text-xs text-slate-500 uppercase bg-slate-100 border-b border-slate-200">
+                                          <tr>
+                                              <th className="px-4 py-3">Subject</th>
+                                              <th className="px-4 py-3">Topic</th>
+                                              <th className="px-4 py-3 text-center">Questions</th>
+                                              <th className="px-4 py-3 text-center">Notes</th>
+                                          </tr>
+                                      </thead>
+                                      <tbody className="divide-y divide-slate-100">
+                                          {dbStatus.content_stats.map((item: any, idx: number) => (
+                                              <tr key={idx} className="hover:bg-slate-50">
+                                                  <td className="px-4 py-2 font-bold text-slate-600 text-xs">{item.subject}</td>
+                                                  <td className="px-4 py-2 text-slate-800 font-medium">{item.topic}</td>
+                                                  <td className="px-4 py-2 text-center">
+                                                      <span className={`px-2 py-0.5 rounded text-xs font-bold ${item.question_count > 0 ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-400'}`}>
+                                                          {item.question_count}
+                                                      </span>
+                                                  </td>
+                                                  <td className="px-4 py-2 text-center">
+                                                      <span className={`px-2 py-0.5 rounded text-xs font-bold ${item.note_count > 0 ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-400'}`}>
+                                                          {item.note_count > 0 ? 'Yes' : 'No'}
+                                                      </span>
+                                                  </td>
+                                              </tr>
+                                          ))}
+                                      </tbody>
+                                  </table>
+                              </div>
+                              <p className="text-xs text-slate-400 mt-2 text-right">
+                                  Only topics with content (questions or notes) are listed here.
+                              </p>
                           </div>
                       )}
                   </div>

@@ -1028,6 +1028,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate, ena
             <div className="mt-8 text-center space-x-4 text-xs text-slate-400 font-medium flex flex-wrap justify-center gap-y-2">
                 <button onClick={() => onNavigate('about')} className="hover:text-blue-600 transition-colors">About Us</button>
                 <span>•</span>
+                <button onClick={() => onNavigate('features')} className="hover:text-blue-600 transition-colors">Features</button>
+                <span>•</span>
                 <button onClick={() => onNavigate('blog')} className="hover:text-blue-600 transition-colors">Blog</button>
                 <span>•</span>
                 <button onClick={() => onNavigate('exams')} className="hover:text-blue-600 transition-colors">Exams Guide</button>
@@ -1037,7 +1039,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate, ena
                 <button onClick={() => onNavigate('contact')} className="hover:text-blue-600 transition-colors">Contact</button>
             </div>
             <div className="text-center text-[10px] text-slate-300 mt-4">
-                v12.1
+                v12.2
             </div>
         </div>
       </div>

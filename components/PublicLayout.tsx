@@ -24,6 +24,7 @@ export const PublicLayout: React.FC<PublicLayoutProps> = ({ children, onNavigate
           
           <div className="hidden md:flex items-center space-x-8 text-sm font-medium text-slate-600">
               <button onClick={() => onNavigate('about')} className={`hover:text-blue-600 transition-colors ${currentScreen === 'about' ? 'text-blue-600 font-bold' : ''}`}>About</button>
+              <button onClick={() => onNavigate('features')} className={`hover:text-blue-600 transition-colors ${currentScreen === 'features' ? 'text-blue-600 font-bold' : ''}`}>Features</button>
               <button onClick={() => onNavigate('exams')} className={`hover:text-blue-600 transition-colors ${currentScreen === 'exams' ? 'text-blue-600 font-bold' : ''}`}>Exam Guide</button>
               <button onClick={() => onNavigate('blog')} className={`hover:text-blue-600 transition-colors ${currentScreen === 'blog' || currentScreen === 'public-blog' ? 'text-blue-600 font-bold' : ''}`}>Blog</button>
               <button onClick={() => onNavigate('contact')} className={`hover:text-blue-600 transition-colors ${currentScreen === 'contact' ? 'text-blue-600 font-bold' : ''}`}>Contact</button>
@@ -75,6 +76,7 @@ export const PublicLayout: React.FC<PublicLayoutProps> = ({ children, onNavigate
                  <h4 className="text-white font-bold mb-4 uppercase tracking-wider text-xs">Platform</h4>
                  <ul className="space-y-2 text-sm">
                      <li><button onClick={() => onNavigate('about')} className="hover:text-blue-400 transition-colors">About Us</button></li>
+                     <li><button onClick={() => onNavigate('features')} className="hover:text-blue-400 transition-colors">Features</button></li>
                      <li><button onClick={() => onNavigate('exams')} className="hover:text-blue-400 transition-colors">Exam Guide</button></li>
                      <li><button onClick={() => onNavigate('blog')} className="hover:text-blue-400 transition-colors">Blog & Insights</button></li>
                  </ul>
