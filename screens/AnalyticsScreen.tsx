@@ -3,7 +3,7 @@ import React from 'react';
 import { User, UserProgress, TestAttempt } from '../lib/types';
 import { SYLLABUS_DATA } from '../lib/syllabusData';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, RadialBarChart, RadialBar, PolarAngleAxis } from 'recharts';
-import { TrendingUp, AlertTriangle, CheckCircle2, Target, BarChart3 } from 'lucide-react';
+import { TrendingUp, AlertTriangle, CheckCircle2, Target, BarChart3, ListChecks } from 'lucide-react';
 
 interface Props {
   user?: User; // Optional now to support generic use
@@ -41,7 +41,7 @@ export const AnalyticsScreen: React.FC<Props> = ({ user, progress = {}, testAtte
       Object.values(progress).forEach((p: UserProgress) => {
           const topic = SYLLABUS_DATA.find(t => t.id === p.topicId);
           if (topic) {
-              const solved = (p.ex1Solved || 0) + (p.ex2Solved || 0) + (p.ex3Solved || 0) + (p.ex4Solved || 0);
+              const solved = (p.ex1Solved || 0) + (p.ex2Solved || 0) + (p.ex3Solved || 0) + (p.ex4Solved || 0) + (p.solvedQuestions?.length || 0);
               const subjectKey = topic.subject as keyof typeof volumes;
               if (volumes[subjectKey] !== undefined) {
                   volumes[subjectKey] += solved;
@@ -58,32 +58,60 @@ export const AnalyticsScreen: React.FC<Props> = ({ user, progress = {}, testAtte
   
   const questionVolumeData = getQuestionVolumeData();
 
-  // --- 4. Weak Areas Logic ---
+  // --- 4. Weak Areas Logic (Updated to use Chapter Tests) ---
   const getWeakAreas = () => {
-      // Aggregate incorrect answers by subject from all attempts
-      const subjectErrors: Record<string, number> = { 'Physics': 0, 'Chemistry': 0, 'Maths': 0 };
+      const errorCounts: Record<string, number> = {};
       
       testAttempts.forEach(attempt => {
+          // If detailed results available
           if(attempt.detailedResults) {
               attempt.detailedResults.forEach(res => {
                   if(res.status === 'INCORRECT' || res.status === 'UNATTEMPTED') {
-                      // Map subjectId 'phys' to 'Physics' etc
-                      const sub = res.subjectId === 'phys' ? 'Physics' : res.subjectId === 'chem' ? 'Chemistry' : 'Maths';
-                      subjectErrors[sub] = (subjectErrors[sub] || 0) + 1;
+                      let label = res.subjectId;
+                      // Try to resolve topic name if topicId is present
+                      if (res.topicId) {
+                          const t = SYLLABUS_DATA.find(x => x.id === res.topicId);
+                          if (t) label = t.name;
+                      } else {
+                          // Fallback to subject mapping
+                          label = res.subjectId === 'phys' ? 'Physics' : res.subjectId === 'chem' ? 'Chemistry' : 'Maths';
+                      }
+                      errorCounts[label] = (errorCounts[label] || 0) + 1;
                   }
               });
           }
+          // Also check chapter tests specifically if they have low scores
+          if (attempt.topicId && attempt.accuracy_percent < 50) {
+               const t = SYLLABUS_DATA.find(x => x.id === attempt.topicId);
+               if (t) {
+                   // Weight whole chapter test failure heavily
+                   errorCounts[t.name] = (errorCounts[t.name] || 0) + 5; 
+               }
+          }
       });
 
-      return Object.entries(subjectErrors)
+      return Object.entries(errorCounts)
           .sort((a, b) => b[1] - a[1])
-          .slice(0, 3) // Top 3 weak subjects
+          .slice(0, 3) // Top 3 weak areas
           .map(([name, count]) => ({ name, count }));
   };
 
   const weakAreas = getWeakAreas();
 
-  // --- 5. Mock Data if Empty (for visual appeal) ---
+  // --- 5. Chapter Mastery (New) ---
+  const chapterMastery = testAttempts
+      .filter(a => a.topicId) // Only chapter tests
+      .slice(-5) // Last 5
+      .map(a => {
+          const t = SYLLABUS_DATA.find(x => x.id === a.topicId);
+          return {
+              name: t ? t.name : 'Unknown',
+              score: a.accuracy_percent,
+              difficulty: a.difficulty || 'MIXED'
+          };
+      });
+
+  // --- 6. Mock Data if Empty (for visual appeal) ---
   const showDemoData = testAttempts.length === 0;
   const displayTrendData = showDemoData ? [
       { date: 'Test 1', score: 120 }, { date: 'Test 2', score: 145 }, { date: 'Test 3', score: 132 },
@@ -163,15 +191,15 @@ export const AnalyticsScreen: React.FC<Props> = ({ user, progress = {}, testAtte
           {/* Weak Areas Card */}
           <div className="md:col-span-1 bg-red-50 border border-red-100 rounded-xl p-6">
               <h3 className="font-bold text-red-800 mb-4 flex items-center">
-                  <AlertTriangle className="w-5 h-5 mr-2" /> Attention Required
+                  <AlertTriangle className="w-5 h-5 mr-2" /> Weak Areas
               </h3>
-              <p className="text-xs text-red-600 mb-4">Based on incorrect answers in recent tests.</p>
+              <p className="text-xs text-red-600 mb-4">Top chapters needing revision based on test errors.</p>
               
               <div className="space-y-3">
                   {weakAreas.length > 0 ? weakAreas.map((area, idx) => (
                       <div key={idx} className="bg-white p-3 rounded-lg border border-red-100 flex justify-between items-center shadow-sm">
-                          <span className="font-bold text-slate-700">{area.name}</span>
-                          <span className="bg-red-100 text-red-700 px-2 py-1 rounded text-xs font-bold">{area.count} Errors</span>
+                          <span className="font-bold text-slate-700 text-sm">{area.name}</span>
+                          <span className="bg-red-100 text-red-700 px-2 py-1 rounded text-xs font-bold">{area.count} Issues</span>
                       </div>
                   )) : (
                       <div className="text-center py-4 text-red-400 text-sm">No error data available yet.</div>
@@ -179,8 +207,33 @@ export const AnalyticsScreen: React.FC<Props> = ({ user, progress = {}, testAtte
               </div>
           </div>
 
+          {/* Chapter Mastery - New Section */}
+          <div className="md:col-span-1 bg-white border border-slate-200 rounded-xl p-6">
+              <h3 className="font-bold text-slate-800 mb-4 flex items-center">
+                  <ListChecks className="w-5 h-5 mr-2 text-indigo-600" /> Recent Chapter Tests
+              </h3>
+              <div className="space-y-3">
+                  {chapterMastery.length > 0 ? chapterMastery.map((test, idx) => (
+                      <div key={idx} className="flex justify-between items-center p-3 bg-slate-50 rounded-lg border border-slate-100">
+                          <div>
+                              <p className="font-bold text-slate-700 text-sm truncate w-32">{test.name}</p>
+                              <span className="text-[10px] text-slate-500 uppercase">{test.difficulty}</span>
+                          </div>
+                          <div className="text-right">
+                              <span className={`block font-bold ${test.score > 80 ? 'text-green-600' : test.score > 50 ? 'text-yellow-600' : 'text-red-600'}`}>
+                                  {test.score}%
+                              </span>
+                              <span className="text-[10px] text-slate-400">Score</span>
+                          </div>
+                      </div>
+                  )) : (
+                      <p className="text-sm text-slate-400 text-center py-4">No chapter tests taken recently.</p>
+                  )}
+              </div>
+          </div>
+
           {/* AI Insights */}
-          <div className="md:col-span-2 bg-gradient-to-br from-indigo-900 to-slate-900 text-white rounded-xl p-6 shadow-xl relative overflow-hidden">
+          <div className="md:col-span-1 bg-gradient-to-br from-indigo-900 to-slate-900 text-white rounded-xl p-6 shadow-xl relative overflow-hidden">
               <div className="absolute top-0 right-0 p-8 opacity-10">
                   <Target className="w-32 h-32" />
               </div>

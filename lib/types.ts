@@ -1,5 +1,5 @@
 
-// Add global window type definition
+// Add global type definition
 declare global {
   interface Window {
     IITJEE_CONFIG: {
@@ -99,6 +99,9 @@ export interface TestAttempt {
   unattemptedCount: number;
   accuracy_percent: number;
   detailedResults?: QuestionResult[];
+  // Chapter Test Specifics
+  topicId?: string; 
+  difficulty?: 'EASY' | 'MEDIUM' | 'HARD' | 'ALL';
 }
 
 export interface QuestionResult {

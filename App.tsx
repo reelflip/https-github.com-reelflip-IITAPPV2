@@ -44,7 +44,7 @@ import { DEFAULT_CHAPTER_NOTES } from './lib/chapterContent';
 import { MOCK_TESTS_DATA, generateInitialQuestionBank } from './lib/mockTestsData';
 import { TrendingUp, Bell, LogOut } from 'lucide-react';
 
-const APP_VERSION = '12.6';
+const APP_VERSION = '12.7';
 
 const ComingSoonScreen = ({ title, icon }: { title: string, icon: string }) => (
   <div className="flex flex-col items-center justify-center h-[70vh] text-center">
@@ -565,7 +565,7 @@ export default function App() {
                 {currentScreen === 'family' && <ParentFamilyScreen user={user} onSendRequest={sendConnectionRequest} linkedData={linkedStudentData} />}
                 {currentScreen === 'analytics' && <AnalyticsScreen user={user} progress={linkedStudentData?.progress || {}} testAttempts={linkedStudentData?.tests || []} />}
                 {currentScreen === 'tests' && <TestScreen user={user} history={linkedStudentData?.tests || []} addTestAttempt={()=>{}} availableTests={adminTests} />}
-                {currentScreen === 'syllabus' && <SyllabusScreen user={user} subjects={syllabus} progress={linkedStudentData?.progress || {}} onUpdateProgress={()=>{}} readOnly={true} videoMap={videoMap} chapterNotes={chapterNotes} questionBank={questionBank} addTestAttempt={()=>{}} />}
+                {currentScreen === 'syllabus' && <SyllabusScreen user={user} subjects={syllabus} progress={linkedStudentData?.progress || {}} onUpdateProgress={()=>{}} readOnly={true} videoMap={videoMap} chapterNotes={chapterNotes} questionBank={questionBank} addTestAttempt={()=>{}} testAttempts={linkedStudentData?.tests || []} />}
                 {currentScreen === 'profile' && <ProfileScreen user={user} onAcceptRequest={()=>{}} onUpdateUser={(u) => { const updated = { ...user, ...u }; setUser(updated); saveUserToDB(updated); }} linkedStudentName={linkedStudentData?.studentName} />} 
              </>
           )}
@@ -574,7 +574,7 @@ export default function App() {
                 <AITutorChat isFullScreen={currentScreen === 'ai-tutor'} />
                 
                 {currentScreen === 'dashboard' && <DashboardScreen user={user} progress={progress} testAttempts={testAttempts} goals={goals} addGoal={addGoal} toggleGoal={toggleGoal} setScreen={setCurrentScreen} />}
-                {currentScreen === 'syllabus' && <SyllabusScreen user={user} subjects={syllabus} progress={progress} onUpdateProgress={updateTopicProgress} videoMap={videoMap} chapterNotes={chapterNotes} questionBank={questionBank} onToggleQuestion={toggleQuestionSolved} addTestAttempt={addTestAttempt} />}
+                {currentScreen === 'syllabus' && <SyllabusScreen user={user} subjects={syllabus} progress={progress} onUpdateProgress={updateTopicProgress} videoMap={videoMap} chapterNotes={chapterNotes} questionBank={questionBank} onToggleQuestion={toggleQuestionSolved} addTestAttempt={addTestAttempt} testAttempts={testAttempts} />}
                 {currentScreen === 'revision' && <RevisionScreen progress={progress} handleRevisionComplete={handleRevisionComplete} />}
                 {currentScreen === 'tests' && <TestScreen user={user} history={testAttempts} addTestAttempt={addTestAttempt} availableTests={adminTests} />}
                 {currentScreen === 'psychometric' && <PsychometricScreen user={user} />}
