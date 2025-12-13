@@ -8,8 +8,10 @@ export default defineConfig({
   build: {
     // Disable minification to make the output code readable and easier to modify
     minify: false,
-    // Do not append hash to filenames
     rollupOptions: {
+      // Required setting when preserveModules is true to avoid build errors.
+      // Vite sets this to false by default, which conflicts with preserveModules.
+      preserveEntrySignatures: 'exports-only',
       output: {
         // This setting forces Rollup to generate separate files for each module
         // instead of bundling them into one file.
