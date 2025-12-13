@@ -585,6 +585,151 @@ try {
     echo json_encode(["status" => "ERROR", "message" => $e->getMessage()]);
 }
 ?>`
+    },
+    // --- NEW FILES ---
+    {
+        name: 'manage_settings.php',
+        folder: 'deployment/api',
+        content: `${phpHeader}
+$key = $_GET['key'] ?? null;
+$data = json_decode(file_get_contents("php://input"));
+
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && $key) {
+    $stmt = $conn->prepare("SELECT setting_value FROM system_settings WHERE setting_key = ?");
+    $stmt->execute([$key]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    echo json_encode(["value" => $row ? $row['setting_value'] : null]);
+}
+elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $stmt = $conn->prepare("INSERT INTO system_settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value = ?");
+    $stmt->execute([$data->key, $data->value, $data->value]);
+    echo json_encode(["message" => "Saved"]);
+}
+?>`
+    },
+    {
+        name: 'manage_users.php',
+        folder: 'deployment/api',
+        content: `${phpHeader}
+$method = $_SERVER['REQUEST_METHOD'];
+$data = json_decode(file_get_contents("php://input"));
+
+if ($method === 'GET') {
+    $stmt = $conn->query("SELECT id, name, email, role, is_verified, created_at FROM users ORDER BY created_at DESC");
+    echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
+}
+elseif ($method === 'PUT') {
+    $stmt = $conn->prepare("UPDATE users SET is_verified = ? WHERE id = ?");
+    $stmt->execute([$data->isVerified ? 1 : 0, $data->id]);
+    echo json_encode(["message" => "Updated"]);
+}
+elseif ($method === 'DELETE') {
+    $id = $_GET['id'];
+    $conn->prepare("DELETE FROM users WHERE id = ?")->execute([$id]);
+    echo json_encode(["message" => "Deleted"]);
+}
+?>`
+    },
+    {
+        name: 'contact.php',
+        folder: 'deployment/api',
+        content: `${phpHeader}
+$data = json_decode(file_get_contents("php://input"));
+if(!empty($data->email) && !empty($data->message)) {
+    $stmt = $conn->prepare("INSERT INTO contact_messages (name, email, subject, message) VALUES (?, ?, ?, ?)");
+    $stmt->execute([$data->name, $data->email, $data->subject, $data->message]);
+    echo json_encode(["message" => "Sent"]);
+}
+?>`
+    },
+    {
+        name: 'manage_contact.php',
+        folder: 'deployment/api',
+        content: `${phpHeader}
+if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+    $stmt = $conn->query("SELECT * FROM contact_messages ORDER BY created_at DESC");
+    echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
+}
+?>`
+    },
+    {
+        name: 'get_admin_stats.php',
+        folder: 'deployment/api',
+        content: `${phpHeader}
+$totalUsers = $conn->query("SELECT COUNT(*) FROM users")->fetchColumn();
+$totalVisits = 12450; 
+$dailyTraffic = [
+    ["date" => "Mon", "visits" => 120],
+    ["date" => "Tue", "visits" => 135],
+    ["date" => "Wed", "visits" => 125],
+    ["date" => "Thu", "visits" => 158],
+    ["date" => "Fri", "visits" => 190],
+    ["date" => "Sat", "visits" => 175],
+    ["date" => "Sun", "visits" => 160]
+];
+
+echo json_encode([
+    "totalUsers" => $totalUsers,
+    "totalVisits" => $totalVisits,
+    "dailyTraffic" => $dailyTraffic
+]);
+?>`
+    },
+    {
+        name: 'save_timetable.php',
+        folder: 'deployment/api',
+        content: `${phpHeader}
+$data = json_decode(file_get_contents("php://input"));
+if($data->user_id) {
+    $config = json_encode($data->config);
+    $slots = json_encode($data->slots);
+    $stmt = $conn->prepare("INSERT INTO timetable_configs (user_id, config_json, slots_json) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE config_json = ?, slots_json = ?");
+    $stmt->execute([$data->user_id, $config, $slots, $config, $slots]);
+    echo json_encode(["message" => "Saved"]);
+}
+?>`
+    },
+    {
+        name: 'manage_backlogs.php',
+        folder: 'deployment/api',
+        content: `${phpHeader}
+$data = json_decode(file_get_contents("php://input"));
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $stmt = $conn->prepare("INSERT INTO backlogs (id, user_id, title, subject, priority, status, deadline) VALUES (?, ?, ?, ?, ?, ?, ?)");
+    $stmt->execute([$data->id, $data->user_id, $data->title, $data->subject, $data->priority, $data->status, $data->deadline]);
+    echo json_encode(["message" => "Saved"]);
+}
+?>`
+    },
+    {
+        name: 'save_psychometric.php',
+        folder: 'deployment/api',
+        content: `${phpHeader}
+$data = json_decode(file_get_contents("php://input"));
+if($data->user_id && $data->report) {
+    $json = json_encode($data->report);
+    $stmt = $conn->prepare("INSERT INTO psychometric_results (user_id, report_json) VALUES (?, ?)");
+    $stmt->execute([$data->user_id, $json]);
+    echo json_encode(["message" => "Saved"]);
+}
+?>`
+    },
+    {
+        name: 'get_psychometric.php',
+        folder: 'deployment/api',
+        content: `${phpHeader}
+$user_id = $_GET['user_id'] ?? null;
+if($user_id) {
+    $stmt = $conn->prepare("SELECT report_json FROM psychometric_results WHERE user_id = ? ORDER BY date DESC LIMIT 1");
+    $stmt->execute([$user_id]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    if($row) {
+        echo json_encode(["report" => json_decode($row['report_json'])]);
+    } else {
+        echo json_encode(["report" => null]);
+    }
+}
+?>`
     }
 ];
 
