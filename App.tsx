@@ -44,7 +44,7 @@ import { DEFAULT_CHAPTER_NOTES } from './lib/chapterContent';
 import { MOCK_TESTS_DATA, generateInitialQuestionBank } from './lib/mockTestsData';
 import { TrendingUp, Bell, LogOut } from 'lucide-react';
 
-const APP_VERSION = '12.3';
+const APP_VERSION = '12.5';
 
 const ComingSoonScreen = ({ title, icon }: { title: string, icon: string }) => (
   <div className="flex flex-col items-center justify-center h-[70vh] text-center">
@@ -70,9 +70,44 @@ const saveUserToDB = (user: User) => {
 
 const findUserById = (id: string) => getUserDB().find(u => u.id === id);
 
+// --- Screen Validation Helper ---
+// Prevents blank pages by ensuring the current screen exists for the given role
+const validateScreen = (role: string, screen: Screen): Screen => {
+    const studentScreens: Screen[] = [
+        'dashboard', 'syllabus', 'ai-tutor', 'tests', 'psychometric', 'focus', 
+        'analytics', 'timetable', 'revision', 'mistakes', 'flashcards', 'backlogs', 
+        'hacks', 'wellness', 'features', 'profile'
+    ];
+    const parentScreens: Screen[] = [
+        'dashboard', 'family', 'analytics', 'tests', 'syllabus', 'profile'
+    ];
+    const adminScreens: Screen[] = [
+        'overview', 'users', 'syllabus_admin', 'inbox', 'content_admin', 'content', 
+        'blog_admin', 'tests', 'tests_admin', 'analytics', 'diagnostics', 'system', 'deployment'
+    ];
+    const publicScreens: Screen[] = [
+        'about', 'contact', 'exams', 'blog', 'public-blog', 'privacy', 'features'
+    ];
+
+    if (publicScreens.includes(screen)) return screen;
+
+    switch (role) {
+        case 'STUDENT': return studentScreens.includes(screen) ? screen : 'dashboard';
+        case 'PARENT': return parentScreens.includes(screen) ? screen : 'dashboard';
+        case 'ADMIN': return adminScreens.includes(screen) ? screen : 'overview';
+        default: return 'dashboard';
+    }
+};
+
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
-  const [currentScreen, setCurrentScreen] = useState<Screen>('dashboard');
+  
+  // Initialize screen from local storage with validation logic inside useEffect later
+  const [currentScreen, setCurrentScreen] = useState<Screen>(() => {
+      const saved = localStorage.getItem('iitjee_last_screen');
+      return (saved as Screen) || 'dashboard';
+  });
+
   const [enableGoogleLogin, setEnableGoogleLogin] = useState(false);
   const [gaMeasurementId, setGaMeasurementId] = useState<string | null>(null);
   const [socialConfig, setSocialConfig] = useState<SocialConfig>({ enabled: false });
@@ -129,17 +164,34 @@ export default function App() {
   const [questionBank, setQuestionBank] = useState<Question[]>([]);
   const [adminTests, setAdminTests] = useState<Test[]>(MOCK_TESTS_DATA);
 
-  // --- Version Check ---
+  // --- Version Check & Validation ---
   useEffect(() => {
       const storedVersion = localStorage.getItem('iitjee_app_version');
       if (storedVersion !== APP_VERSION) {
           // Clear caches on version upgrade
           localStorage.removeItem('iitjee_admin_tests');
-          // Question bank will be regenerated on init
+          // Update version
           localStorage.setItem('iitjee_app_version', APP_VERSION);
           setAdminTests(MOCK_TESTS_DATA);
       }
   }, []);
+
+  // --- Safety Check for Screen on User Load ---
+  useEffect(() => {
+      if (user) {
+          const safeScreen = validateScreen(user.role, currentScreen);
+          if (safeScreen !== currentScreen) {
+              setCurrentScreen(safeScreen);
+          }
+      }
+  }, [user, currentScreen]);
+
+  // --- Persist Current Screen ---
+  useEffect(() => {
+      if (user) {
+          localStorage.setItem('iitjee_last_screen', currentScreen);
+      }
+  }, [currentScreen, user]);
 
   // --- 1. Init System Settings ---
   useEffect(() => {
@@ -310,14 +362,22 @@ export default function App() {
     let newUser: User;
     if (existingUser) { newUser = { ...existingUser, ...userData, id: existingUser.id }; } 
     else { newUser = { ...userData, id: userData.id || Math.floor(100000 + Math.random() * 900000).toString(), notifications: [] }; }
+    
+    // Ensure screen is valid for new role
+    const safeScreen = validateScreen(newUser.role, currentScreen);
+    setCurrentScreen(safeScreen);
     setUser(newUser);
+    
     fetchRemoteData(newUser.id);
-    if (newUser.role === 'ADMIN') setCurrentScreen('overview');
-    else if (newUser.role === 'PARENT') { setCurrentScreen('dashboard'); if(newUser.linkedStudentId) loadLinkedStudent(newUser.linkedStudentId); }
-    else setCurrentScreen('dashboard');
+    if (newUser.role === 'PARENT' && newUser.linkedStudentId) loadLinkedStudent(newUser.linkedStudentId);
   };
 
-  const handleLogout = () => { setUser(null); setCurrentScreen('dashboard'); localStorage.removeItem('iitjee_user'); setLinkedStudentData(undefined); };
+  const handleLogout = () => { 
+      setUser(null); 
+      setCurrentScreen('dashboard'); 
+      localStorage.removeItem('iitjee_user'); 
+      setLinkedStudentData(undefined); 
+  };
   const handleNavigation = (page: string) => { setCurrentScreen(page as Screen); };
   const sendConnectionRequest = async (studentId: string): Promise<{success: boolean, message: string}> => {
       if(!user) return { success: false, message: 'Not logged in' };
