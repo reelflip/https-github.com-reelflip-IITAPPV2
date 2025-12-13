@@ -29,7 +29,7 @@ try {
         folder: 'deployment/api',
         desc: 'API Root Health Check',
         content: `${phpHeader}
-echo json_encode(["status" => "active", "message" => "IITGEEPrep API v12.5 Operational", "timestamp" => date('c')]);
+echo json_encode(["status" => "active", "message" => "IITGEEPrep API v12.6 Operational", "timestamp" => date('c')]);
 ?>`
     },
     // ... (All logic files mapped to deployment/api)
@@ -801,7 +801,7 @@ if ($user_id) {
     {
         name: '.htaccess',
         folder: 'deployment/seo',
-        desc: 'Routing Rules',
+        desc: 'Routing Rules & Cache Control',
         content: generateHtaccess()
     },
     {
@@ -865,6 +865,20 @@ export const generateHtaccess = () => `
   RewriteCond %{REQUEST_FILENAME} !-d
   RewriteRule . /index.html [L]
 </IfModule>
+
+<IfModule mod_headers.c>
+  # Prevent caching of index.html to force browser to load new JS bundles
+  <FilesMatch "^(index\.html)$">
+    Header set Cache-Control "no-store, no-cache, must-revalidate, max-age=0"
+    Header set Pragma "no-cache"
+    Header set Expires "0"
+  </FilesMatch>
+
+  # Cache assets with hash in filename for 1 year
+  <FilesMatch "\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2)$">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </FilesMatch>
+</IfModule>
 `;
 
 export const generateFrontendGuide = () => `# IITGEEPrep Deployment Manual (Hostinger)
@@ -911,7 +925,7 @@ export const generateFrontendGuide = () => `# IITGEEPrep Deployment Manual (Host
 
 export const generateSQLSchema = () => {
     let sql = `
--- IITGEEPrep Database Schema v12.5
+-- IITGEEPrep Database Schema v12.6
 -- Target: MySQL / MariaDB (Hostinger)
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";

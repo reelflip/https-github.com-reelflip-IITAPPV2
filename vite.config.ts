@@ -6,22 +6,16 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   plugins: [react()],
   build: {
-    // Disable minification to make the output code readable and easier to modify
-    minify: false,
+    // Enable minification for smaller bundle size
+    minify: true,
     rollupOptions: {
-      // Required setting when preserveModules is true to avoid build errors.
-      // Vite sets this to false by default, which conflicts with preserveModules.
-      preserveEntrySignatures: 'exports-only',
       output: {
-        // This setting forces Rollup to generate separate files for each module
-        // instead of bundling them into one file.
-        preserveModules: true,
-        
-        // This ensures the output files keep their original names (e.g., AuthScreen.js)
-        entryFileNames: '[name].js',
-        
-        // Optional: organize assets
-        assetFileNames: 'assets/[name][extname]'
+        // Forces all JS code into a single chunk named 'app'
+        manualChunks: () => 'app',
+        // Adds a hash to the filename to prevent browser caching of old code
+        entryFileNames: 'assets/[name]-[hash].js',
+        chunkFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash].[ext]',
       },
     },
   },
