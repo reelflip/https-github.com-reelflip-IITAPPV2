@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { TestAttempt, Test, QuestionResult, User } from '../lib/types';
+import { TestAttempt, Test, QuestionResult, User, Question } from '../lib/types';
 import { Button } from '../components/Button';
 import { PageHeader } from '../components/PageHeader';
-import { Clock, Check, AlertCircle, PlayCircle, RotateCcw, Filter, FileText } from 'lucide-react';
+import { Clock, Check, AlertCircle, PlayCircle, RotateCcw, Filter, FileText, X, CheckCircle2, ArrowLeft } from 'lucide-react';
 
 interface Props {
   user?: User;
@@ -16,6 +16,7 @@ export const TestScreen: React.FC<Props> = ({ user, addTestAttempt, history, ava
   const isParent = user?.role === 'PARENT';
   const [activeTab, setActiveTab] = useState<'practice' | 'history'>('practice');
   const [activeTest, setActiveTest] = useState<Test | null>(null);
+  const [reviewAttempt, setReviewAttempt] = useState<TestAttempt | null>(null);
   
   // Filter Toggle
   const [showAllTests, setShowAllTests] = useState(false);
@@ -89,6 +90,20 @@ export const TestScreen: React.FC<Props> = ({ user, addTestAttempt, history, ava
                 setActiveTab('history');
             }}
             onCancel={() => setActiveTest(null)}
+          />
+      );
+  }
+
+  if (reviewAttempt) {
+      // Find the original test questions to render the review
+      const originalTest = availableTests.find(t => t.id === reviewAttempt.testId);
+      const questions = originalTest ? originalTest.questions : [];
+
+      return (
+          <ReviewView 
+              attempt={reviewAttempt} 
+              questions={questions}
+              onClose={() => setReviewAttempt(null)} 
           />
       );
   }
@@ -213,9 +228,14 @@ export const TestScreen: React.FC<Props> = ({ user, addTestAttempt, history, ava
                           {isParent && <p className="text-xs text-slate-400 mt-1">Once the student attempts a test, results will appear here.</p>}
                       </div>
                   )}
-                  {[...history].reverse().map(attempt => (
+                  {[...history].reverse().map(attempt => {
+                      const hasDetailedResults = attempt.detailedResults && attempt.detailedResults.length > 0;
+                      // Only can review if we have detailed results AND we can find the questions (either via ID or logic)
+                      const canReview = hasDetailedResults && availableTests.some(t => t.id === attempt.testId);
+
+                      return (
                       <div key={attempt.id} className="bg-white p-5 rounded-xl border border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center hover:shadow-md transition-all gap-4">
-                          <div>
+                          <div className="flex-1">
                               <h4 className="font-bold text-lg text-slate-800">{attempt.title}</h4>
                               <div className="flex items-center gap-3 text-xs text-slate-500 mt-1">
                                   <span>📅 {new Date(attempt.date).toLocaleDateString()}</span>
@@ -235,19 +255,135 @@ export const TestScreen: React.FC<Props> = ({ user, addTestAttempt, history, ava
                                       {attempt.accuracy_percent}%
                                   </span>
                               </div>
-                              <div className="h-10 w-px bg-slate-200 hidden md:block"></div>
-                              <div className="text-center">
-                                  <span className="block text-xs font-bold text-slate-400 uppercase tracking-wider">Mistakes</span>
-                                  <span className="text-lg font-bold text-red-500">{attempt.incorrectCount}</span>
+                              
+                              <div className="flex flex-col gap-2">
+                                  {canReview && (
+                                      <Button variant="outline" size="sm" onClick={() => setReviewAttempt(attempt)}>
+                                          Review Mistakes
+                                      </Button>
+                                  )}
                               </div>
                           </div>
                       </div>
-                  ))}
+                  )})}
               </div>
           </div>
       )}
     </div>
   );
+};
+
+// --- Review View Component ---
+const ReviewView = ({ attempt, questions, onClose }: { attempt: TestAttempt, questions: Question[], onClose: () => void }) => {
+    // Helper to get result for a specific question
+    const getResult = (qId: string) => attempt.detailedResults?.find(r => r.questionId === qId);
+
+    return (
+        <div className="fixed inset-0 z-50 bg-slate-50 flex flex-col animate-in slide-in-from-right-4 duration-300">
+            {/* Header */}
+            <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shadow-sm shrink-0 sticky top-0 z-10">
+                <div className="flex items-center gap-4">
+                    <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-500 hover:text-slate-800">
+                        <ArrowLeft className="w-6 h-6" />
+                    </button>
+                    <div>
+                        <h2 className="text-xl font-black text-slate-900 leading-tight">Test Review</h2>
+                        <p className="text-xs text-slate-500 font-bold uppercase tracking-wide">{attempt.title}</p>
+                    </div>
+                </div>
+                
+                <div className="flex gap-4 items-center">
+                    <div className="text-right hidden md:block">
+                        <span className="block text-xs font-bold text-slate-400 uppercase">Score</span>
+                        <span className="text-lg font-black text-blue-600">{attempt.score}/{attempt.totalMarks}</span>
+                    </div>
+                    <div className="w-px bg-slate-200 h-8 hidden md:block"></div>
+                    <div className="text-right hidden md:block">
+                        <span className="block text-xs font-bold text-slate-400 uppercase">Accuracy</span>
+                        <span className={`text-lg font-bold ${attempt.accuracy_percent > 80 ? 'text-green-600' : 'text-slate-700'}`}>
+                            {attempt.accuracy_percent}%
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            {/* Questions List */}
+            <div className="flex-1 overflow-y-auto bg-slate-50 p-4 md:p-8">
+                <div className="max-w-4xl mx-auto space-y-6">
+                    {questions.length === 0 && (
+                        <div className="text-center py-12 text-slate-400 bg-white rounded-xl border border-dashed border-slate-300">
+                            <p>Questions data not available for this test type.</p>
+                        </div>
+                    )}
+                    
+                    {questions.map((q, idx) => {
+                        const result = getResult(q.id);
+                        const userSelected = result?.selectedOptionIndex;
+                        const isCorrect = result?.status === 'CORRECT';
+                        const isSkipped = result?.status === 'UNATTEMPTED';
+                        
+                        return (
+                            <div key={q.id} className={`bg-white p-6 rounded-xl border-2 transition-all ${
+                                isCorrect ? 'border-green-100' : isSkipped ? 'border-slate-100' : 'border-red-100'
+                            }`}>
+                                <div className="flex gap-4">
+                                    <div className={`w-8 h-8 shrink-0 rounded-full flex items-center justify-center font-bold text-sm ${
+                                        isCorrect ? 'bg-green-100 text-green-700' : 
+                                        isSkipped ? 'bg-slate-100 text-slate-500' : 
+                                        'bg-red-100 text-red-700'
+                                    }`}>
+                                        {idx + 1}
+                                    </div>
+                                    <div className="flex-1">
+                                        <div className="mb-4">
+                                            <div className="flex items-center gap-2 mb-2">
+                                                {isCorrect && <span className="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded uppercase">Correct</span>}
+                                                {!isCorrect && !isSkipped && <span className="bg-red-100 text-red-700 text-[10px] font-bold px-2 py-0.5 rounded uppercase">Incorrect</span>}
+                                                {isSkipped && <span className="bg-slate-100 text-slate-600 text-[10px] font-bold px-2 py-0.5 rounded uppercase">Skipped</span>}
+                                                <span className="text-[10px] font-bold text-slate-400 border px-1.5 py-0.5 rounded">{q.subjectId}</span>
+                                            </div>
+                                            <p className="text-slate-800 font-medium text-lg leading-relaxed">{q.text}</p>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                            {q.options.map((opt, i) => {
+                                                const isThisCorrect = i === q.correctOptionIndex;
+                                                const isThisSelected = i === userSelected;
+                                                
+                                                let cardClass = "border-slate-100 bg-white text-slate-600";
+                                                
+                                                if (isThisCorrect) {
+                                                    cardClass = "border-green-500 bg-green-50 text-green-800 font-bold ring-1 ring-green-500";
+                                                } else if (isThisSelected && !isThisCorrect) {
+                                                    cardClass = "border-red-400 bg-red-50 text-red-800 font-medium";
+                                                } else {
+                                                    cardClass = "opacity-60 grayscale";
+                                                }
+
+                                                return (
+                                                    <div key={i} className={`p-3 rounded-lg border flex items-center gap-3 text-sm ${cardClass}`}>
+                                                        <div className={`w-6 h-6 rounded-full border flex items-center justify-center text-xs shrink-0 ${
+                                                            isThisCorrect ? 'border-green-600 bg-green-200 text-green-800' :
+                                                            (isThisSelected ? 'border-red-500 bg-red-200 text-red-800' : 'border-slate-300')
+                                                        }`}>
+                                                            {String.fromCharCode(65 + i)}
+                                                        </div>
+                                                        {opt}
+                                                        {isThisCorrect && <CheckCircle2 className="w-4 h-4 ml-auto text-green-600" />}
+                                                        {isThisSelected && !isThisCorrect && <X className="w-4 h-4 ml-auto text-red-500" />}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+        </div>
+    );
 };
 
 // --- Active Test Component ---

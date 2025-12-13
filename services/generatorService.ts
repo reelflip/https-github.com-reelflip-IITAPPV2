@@ -29,7 +29,7 @@ try {
         folder: 'deployment/api',
         desc: 'API Root Health Check',
         content: `${phpHeader}
-echo json_encode(["status" => "active", "message" => "IITGEEPrep API v12.6 Operational", "timestamp" => date('c')]);
+echo json_encode(["status" => "active", "message" => "IITGEEPrep API v12.8 Operational", "timestamp" => date('c')]);
 ?>`
     },
     // ... (All logic files mapped to deployment/api)
@@ -231,20 +231,17 @@ foreach($attempts as &$attempt) {
     
     $detailedResults = [];
     foreach($details as $d) {
-        // Fetch Question Metadata for subject/topic info
         $qStmt = $conn->prepare("SELECT subject_id, topic_id FROM questions WHERE id = ?");
         $qStmt->execute([$d['question_id']]);
         $qData = $qStmt->fetch(PDO::FETCH_ASSOC);
         
-        if($qData) {
-            $detailedResults[] = [
-                "questionId" => $d['question_id'],
-                "subjectId" => $qData['subject_id'],
-                "topicId" => $qData['topic_id'],
-                "status" => $d['status'],
-                "selectedOptionIndex" => $d['selected_option']
-            ];
-        }
+        $detailedResults[] = [
+            "questionId" => $d['question_id'],
+            "subjectId" => $qData ? $qData['subject_id'] : 'Unknown',
+            "topicId" => $qData ? $qData['topic_id'] : 'Unknown',
+            "status" => $d['status'],
+            "selectedOptionIndex" => $d['selected_option']
+        ];
     }
     $attempt['detailedResults'] = $detailedResults;
 }
@@ -403,11 +400,11 @@ elseif ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
         folder: 'deployment/api',
         content: `${phpHeader}
 $data = json_decode(file_get_contents("php://input"));
-$stmt = $conn->prepare("INSERT INTO test_attempts (id, user_id, test_id, score, total_marks, accuracy, correct_count, incorrect_count, unattempted_count) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+$stmt = $conn->prepare("INSERT INTO test_attempts (id, user_id, test_id, score, total_marks, accuracy, correct_count, incorrect_count, unattempted_count, topic_id, difficulty) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 $id = uniqid('att_');
 $stmt->execute([
     $id, $data->user_id, $data->testId, $data->score, $data->totalQuestions*4, $data->accuracy_percent, 
-    $data->correctCount, $data->incorrectCount, $data->unattemptedCount
+    $data->correctCount, $data->incorrectCount, $data->unattemptedCount, $data->topicId ?? NULL, $data->difficulty ?? 'MIXED'
 ]);
 if(!empty($data->detailedResults)) {
     $dStmt = $conn->prepare("INSERT INTO attempt_details (attempt_id, question_id, status, selected_option) VALUES (?, ?, ?, ?)");
@@ -925,7 +922,7 @@ export const generateFrontendGuide = () => `# IITGEEPrep Deployment Manual (Host
 
 export const generateSQLSchema = () => {
     let sql = `
--- IITGEEPrep Database Schema v12.6
+-- IITGEEPrep Database Schema v12.8
 -- Target: MySQL / MariaDB (Hostinger)
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
@@ -1030,6 +1027,8 @@ CREATE TABLE IF NOT EXISTS \`test_attempts\` (
   \`correct_count\` int(11) DEFAULT 0,
   \`incorrect_count\` int(11) DEFAULT 0,
   \`unattempted_count\` int(11) DEFAULT 0,
+  \`topic_id\` varchar(50) DEFAULT NULL,
+  \`difficulty\` varchar(20) DEFAULT NULL,
   \`date\` timestamp DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (\`id\`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

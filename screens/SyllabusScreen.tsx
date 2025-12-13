@@ -124,6 +124,7 @@ export const SyllabusScreen: React.FC<SyllabusTrackerProps> = ({
       const [testSubmitted, setTestSubmitted] = useState(false);
       const [testScore, setTestScore] = useState(0);
       const [difficultyFilter, setDifficultyFilter] = useState<'ALL' | 'EASY' | 'MEDIUM' | 'HARD'>('ALL');
+      const [reviewingAttempt, setReviewingAttempt] = useState<TestAttempt | null>(null);
 
       const topicQuestions = useMemo(() => 
           questionBank.filter(q => q.topicId === topic.id), 
@@ -161,20 +162,33 @@ export const SyllabusScreen: React.FC<SyllabusTrackerProps> = ({
           let incorrect = 0;
           let unattempted = 0;
           const total = filteredQuestions.length;
+          
+          const detailedResults: any[] = [];
 
           filteredQuestions.forEach(q => {
               const ans = testAnswers[q.id];
+              let status = 'UNATTEMPTED';
               if(ans === undefined) {
                   unattempted++;
               } else if (ans === q.correctOptionIndex) {
                   correct++;
+                  status = 'CORRECT';
                   // Mark as solved in progress
                   if (onToggleQuestion && (!topicData.solvedQuestions || !topicData.solvedQuestions.includes(q.id))) {
                       onToggleQuestion(topic.id, q.id);
                   }
               } else {
                   incorrect++;
+                  status = 'INCORRECT';
               }
+              
+              detailedResults.push({
+                  questionId: q.id,
+                  subjectId: q.subjectId,
+                  topicId: q.topicId,
+                  status,
+                  selectedOptionIndex: ans
+              });
           });
 
           // Calculate score (JEE Pattern: +4, -1)
@@ -198,9 +212,86 @@ export const SyllabusScreen: React.FC<SyllabusTrackerProps> = ({
                   incorrectCount: incorrect,
                   unattemptedCount: unattempted,
                   topicId: topic.id,
-                  difficulty: difficultyFilter
+                  difficulty: difficultyFilter,
+                  detailedResults
               });
           }
+      };
+
+      // Review Modal Logic
+      const renderReviewModal = () => {
+          if(!reviewingAttempt) return null;
+          
+          // Reconstruct questions based on ID lookup in the global question bank
+          const questionList: Question[] = [];
+          if (reviewingAttempt.detailedResults) {
+              reviewingAttempt.detailedResults.forEach(res => {
+                  const q = questionBank.find(q => q.id === res.questionId);
+                  if(q) questionList.push(q);
+              });
+          }
+
+          return (
+              <div className="fixed inset-0 z-[60] bg-slate-50 flex flex-col animate-in slide-in-from-right-4 duration-300">
+                  <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shadow-sm shrink-0 sticky top-0 z-10">
+                      <div className="flex items-center gap-4">
+                          <button onClick={() => setReviewingAttempt(null)} className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-500 hover:text-slate-800">
+                              <ArrowLeft className="w-6 h-6" />
+                          </button>
+                          <div>
+                              <h2 className="text-xl font-black text-slate-900 leading-tight">Review Results</h2>
+                              <p className="text-xs text-slate-500 font-bold uppercase tracking-wide">{reviewingAttempt.title}</p>
+                          </div>
+                      </div>
+                      <div className="flex gap-4">
+                          <div className="text-right">
+                              <span className="block text-xs font-bold text-slate-400 uppercase">Score</span>
+                              <span className="text-lg font-black text-blue-600">{reviewingAttempt.score}</span>
+                          </div>
+                      </div>
+                  </div>
+                  <div className="flex-1 overflow-y-auto p-4 md:p-8 bg-slate-50">
+                      <div className="max-w-4xl mx-auto space-y-6">
+                          {questionList.length === 0 && <p className="text-center text-slate-400">Questions data not available.</p>}
+                          {questionList.map((q, idx) => {
+                              const res = reviewingAttempt.detailedResults?.find(r => r.questionId === q.id);
+                              const userSelected = res?.selectedOptionIndex;
+                              const isCorrect = res?.status === 'CORRECT';
+                              const isSkipped = res?.status === 'UNATTEMPTED';
+
+                              return (
+                                  <div key={q.id} className={`bg-white p-6 rounded-xl border-2 transition-all ${isCorrect ? 'border-green-100' : isSkipped ? 'border-slate-100' : 'border-red-100'}`}>
+                                      <div className="flex gap-4">
+                                          <div className={`w-8 h-8 shrink-0 rounded-full flex items-center justify-center font-bold text-sm ${isCorrect ? 'bg-green-100 text-green-700' : isSkipped ? 'bg-slate-100 text-slate-500' : 'bg-red-100 text-red-700'}`}>{idx + 1}</div>
+                                          <div className="flex-1">
+                                              <p className="text-slate-800 font-medium text-lg mb-4">{q.text}</p>
+                                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                  {q.options.map((opt, i) => {
+                                                      const isThisCorrect = i === q.correctOptionIndex;
+                                                      const isThisSelected = i === userSelected;
+                                                      let style = "border-slate-100 bg-white text-slate-600 opacity-60 grayscale";
+                                                      if (isThisCorrect) style = "border-green-500 bg-green-50 text-green-800 font-bold ring-1 ring-green-500";
+                                                      else if (isThisSelected) style = "border-red-400 bg-red-50 text-red-800 font-medium";
+                                                      
+                                                      return (
+                                                          <div key={i} className={`p-3 rounded-lg border flex items-center gap-3 text-sm ${style}`}>
+                                                              <div className={`w-6 h-6 rounded-full border flex items-center justify-center text-xs shrink-0 ${isThisCorrect ? 'border-green-600 bg-green-200 text-green-800' : 'border-slate-300'}`}>{String.fromCharCode(65 + i)}</div>
+                                                              {opt}
+                                                              {isThisCorrect && <CheckCircle2 className="w-4 h-4 ml-auto text-green-600" />}
+                                                              {isThisSelected && !isThisCorrect && <AlertCircle className="w-4 h-4 ml-auto text-red-500" />}
+                                                          </div>
+                                                      );
+                                                  })}
+                                              </div>
+                                          </div>
+                                      </div>
+                                  </div>
+                              );
+                          })}
+                      </div>
+                  </div>
+              </div>
+          );
       };
 
       return (
@@ -442,9 +533,12 @@ export const SyllabusScreen: React.FC<SyllabusTrackerProps> = ({
                                                                           <div className="text-lg font-black text-slate-800 leading-none mb-1">
                                                                               {attempt.score}
                                                                           </div>
-                                                                          <div className={`text-[10px] font-bold ${attempt.accuracy_percent > 80 ? 'text-green-600' : 'text-slate-500'}`}>
-                                                                              {attempt.accuracy_percent}% Acc.
-                                                                          </div>
+                                                                          <button 
+                                                                            onClick={() => setReviewingAttempt(attempt)}
+                                                                            className="text-[10px] font-bold text-blue-600 hover:underline"
+                                                                          >
+                                                                            Review
+                                                                          </button>
                                                                       </div>
                                                                   </div>
                                                               ))}
@@ -584,6 +678,7 @@ export const SyllabusScreen: React.FC<SyllabusTrackerProps> = ({
                       </div>
                   </div>
               </div>
+              {renderReviewModal()}
           </div>
       );
   };
