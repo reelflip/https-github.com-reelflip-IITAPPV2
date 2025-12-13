@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { User, PsychometricReport } from '../lib/types';
 import { PSYCHOMETRIC_QUESTIONS, generatePsychometricReport, PSYCHOMETRIC_DIMENSIONS } from '../lib/psychometricData';
-import { Brain, ArrowRight, CheckCircle, AlertTriangle, Activity, Loader2, Sparkles, HeartPulse, ChevronRight, RefreshCw, BarChart2, FileText } from 'lucide-react';
+import { Brain, ArrowRight, CheckCircle, AlertTriangle, Activity, Loader2, Sparkles, HeartPulse, ChevronRight, RefreshCw, BarChart2, FileText, Users, Lightbulb } from 'lucide-react';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
 
 interface Props {
@@ -18,12 +18,15 @@ export const PsychometricScreen: React.FC<Props> = ({ user, reportData: initialR
     const [analyzing, setAnalyzing] = useState(false);
     const [report, setReport] = useState<PsychometricReport | null>(initialReport || null);
     
+    const isParent = user.role === 'PARENT';
+
     // Check if user already has a report on load
     useEffect(() => {
         if (!report) {
             const checkReport = async () => {
                 try {
-                    const res = await fetch(`/api/get_psychometric.php?user_id=${user.id}`);
+                    const targetId = isParent && user.linkedStudentId ? user.linkedStudentId : user.id;
+                    const res = await fetch(`/api/get_psychometric.php?user_id=${targetId}`);
                     if(res.ok) {
                         const data = await res.json();
                         if(data && data.report) {
@@ -32,13 +35,14 @@ export const PsychometricScreen: React.FC<Props> = ({ user, reportData: initialR
                     }
                 } catch(e) { 
                     // Fallback to local
-                    const saved = localStorage.getItem(`psych_report_${user.id}`);
+                    const targetId = isParent && user.linkedStudentId ? user.linkedStudentId : user.id;
+                    const saved = localStorage.getItem(`psych_report_${targetId}`);
                     if(saved) setReport(JSON.parse(saved));
                 }
             };
             checkReport();
         }
-    }, [user.id, report]);
+    }, [user.id, report, isParent, user.linkedStudentId]);
 
     const handleStart = () => setStarted(true);
 
@@ -133,7 +137,7 @@ export const PsychometricScreen: React.FC<Props> = ({ user, reportData: initialR
                         </div>
                     </div>
                     {/* Only show retake if it's the student viewing their own report */}
-                    {!initialReport && (
+                    {!isParent && !initialReport && (
                         <button 
                             onClick={handleRetake}
                             className="relative z-10 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm font-bold transition-colors flex items-center gap-2"
@@ -174,6 +178,25 @@ export const PsychometricScreen: React.FC<Props> = ({ user, reportData: initialR
 
                     {/* Middle: Summary & Insights */}
                     <div className="lg:col-span-2 space-y-6">
+                        
+                        {/* PARENT SPECIFIC SECTION - Visible ONLY to Parents */}
+                        {isParent && report.parentTips && (
+                            <div className="bg-amber-50 rounded-xl border border-amber-200 p-6 shadow-sm animate-in slide-in-from-right-4">
+                                <h3 className="font-bold text-amber-900 text-lg mb-4 flex items-center">
+                                    <Users className="w-6 h-6 mr-2 text-amber-600" /> Parental Guidance Zone
+                                </h3>
+                                <div className="space-y-3">
+                                    <p className="text-sm text-amber-800 mb-2 font-medium">Based on your child's psychometric profile, here are personalized ways you can support them:</p>
+                                    {report.parentTips.map((tip, idx) => (
+                                        <div key={idx} className="flex items-start gap-3 bg-white p-3 rounded-lg border border-amber-100">
+                                            <Lightbulb className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+                                            <p className="text-sm text-slate-700 leading-relaxed">{tip}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
                         <div className="bg-violet-50 p-6 rounded-xl border border-violet-100">
                             <h3 className="text-lg font-bold text-violet-900 mb-3 flex items-center">
                                 <Sparkles className="w-5 h-5 mr-2" /> Executive Summary
@@ -225,9 +248,11 @@ export const PsychometricScreen: React.FC<Props> = ({ user, reportData: initialR
                             ))}
                         </div>
 
+                        {/* Hide Action Plan for parents if too granular, or show it. Keeping it as it gives context. */}
                         <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
                             <h3 className="font-bold text-slate-800 text-lg mb-4 flex items-center">
-                                <Activity className="w-5 h-5 mr-2 text-blue-600" /> Personalized Action Plan
+                                <Activity className="w-5 h-5 mr-2 text-blue-600" /> 
+                                {isParent ? "Student's Action Plan" : "Personalized Action Plan"}
                             </h3>
                             <ul className="space-y-3">
                                 {report.actionPlan.map((action, idx) => (
@@ -244,7 +269,29 @@ export const PsychometricScreen: React.FC<Props> = ({ user, reportData: initialR
         );
     }
 
+    // Parent View: Empty State (No report found)
+    if (isParent && !report) {
+        return (
+            <div className="max-w-2xl mx-auto py-12 px-4 animate-in fade-in">
+                <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-12 text-center">
+                    <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <Users className="w-10 h-10 text-slate-400" />
+                    </div>
+                    <h2 className="text-2xl font-bold text-slate-900 mb-2">Assessment Pending</h2>
+                    <p className="text-slate-500 mb-6 max-w-md mx-auto">
+                        The student has not taken the psychometric assessment yet. Once they complete it, you will see a detailed breakdown of their learning style, stress levels, and specific tips for how you can support them.
+                    </p>
+                    <div className="inline-flex items-center text-sm font-bold text-blue-600 bg-blue-50 px-4 py-2 rounded-lg">
+                        <Activity className="w-4 h-4 mr-2" /> Waiting for student action
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     if (!started) {
+        // Parent should not see the "Start" screen if no report exists, but logic above handles isParent && !report.
+        // So this block is exclusively for STUDENTS who haven't started.
         return (
             <div className="max-w-3xl mx-auto py-12 px-4 animate-in fade-in slide-in-from-bottom-4">
                 <div className="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden text-center p-12">

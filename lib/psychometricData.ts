@@ -117,12 +117,13 @@ export const generatePsychometricReport = (responses: Record<number, number>): P
     else if (dimensionScores["Preparation Strategy"] < 40 && dimensionScores["Conceptual Understanding"] > 60) profileType = "Unstructured Learner";
     else if (dimensionScores["Exam Temperament"] < 40 && overallScore > 60) profileType = "Exam Phobic";
 
-    // 3. Generate Insights & Action Plan
+    // 3. Generate Insights, Action Plan & Parent Tips
     const insights: { dimension: string; status: 'GOOD' | 'AVERAGE' | 'POOR'; text: string }[] = [];
     const actionPlan: string[] = [];
+    const parentTips: string[] = [];
     let detailedAnalysis = "";
 
-    // --- LOGIC ENGINE FOR DEEP ANALYSIS ---
+    // --- LOGIC ENGINE ---
     
     // Stress
     const stressScore = dimensionScores["Academic Stress & Burnout"];
@@ -130,10 +131,13 @@ export const generatePsychometricReport = (responses: Record<number, number>): P
         insights.push({ dimension: "Stress", status: "POOR", text: "High burnout risk detected. Your mental fatigue is likely hindering your retention." });
         actionPlan.push("Mandatory 1-hour 'No-Study' zone daily.");
         actionPlan.push("Practice 4-7-8 breathing before every study session.");
+        parentTips.push("Avoid asking about test scores immediately after an exam. Your child needs emotional recovery time, not analysis, right after the test.");
+        parentTips.push("Create a low-stress home environment. Arguments or high expectations right now will reduce their cognitive capacity.");
         detailedAnalysis += `### 🧠 Mental State Alert\nYour stress management score is critically low (${stressScore}%). This suggests you are operating in a state of chronic 'Fight or Flight', which actively shuts down the prefrontal cortex—the part of your brain responsible for complex problem solving in Physics and Maths. You are likely putting in hours but not seeing proportional results due to cognitive fatigue.\n\n`;
     } else if (stressScore > 80) {
         insights.push({ dimension: "Stress", status: "GOOD", text: "Excellent mental resilience. You are well-equipped to handle exam pressure." });
         detailedAnalysis += `### 🧠 Mental Fortitude\nYou have a psychological advantage. Your stress score (${stressScore}%) indicates high resilience. Use this to your advantage by taking on more challenging mock tests without fear of demotivation.\n\n`;
+        parentTips.push("Encourage their resilience but ensure they don't become complacent. Keep checking in on their mental well-being.");
     } else {
         insights.push({ dimension: "Stress", status: "AVERAGE", text: "Manageable stress levels, but watch out for fatigue during exam weeks." });
     }
@@ -145,6 +149,7 @@ export const generatePsychometricReport = (responses: Record<number, number>): P
         insights.push({ dimension: "Efficiency", status: "AVERAGE", text: "Knowledge-Strategy Gap: You know the concepts but lack a scoring strategy." });
         actionPlan.push("Shift ratio to 70% Problem Solving / 30% Theory.");
         actionPlan.push("Take timed mock tests to improve speed, not just accuracy.");
+        parentTips.push("Shift focus from 'How much did you study?' to 'How many questions did you solve under a timer?'.");
         detailedAnalysis += `### 📉 The Efficiency Trap\nYou scored high on Concepts (${conceptScore}%) but low on Strategy (${stratScore}%). This is a classic trap: "The Professor Syndrome". You enjoy learning the theory but avoid the grind of timed practice. In JEE, knowing the derivation isn't enough; you need to solve it under 2 minutes. Stop reading standard books and start solving PYQs with a stopwatch.\n\n`;
     }
 
@@ -160,6 +165,7 @@ export const generatePsychometricReport = (responses: Record<number, number>): P
     const healthScore = dimensionScores["Health & Lifestyle"];
     if (healthScore < 50) {
         actionPlan.push("Fix your sleep cycle. Memory consolidation happens during REM sleep.");
+        parentTips.push("Enforce a digital curfew or sleep schedule. Lack of sleep is physically preventing their brain from storing what they learned.");
         detailedAnalysis += `### 💤 Physical Baseline\nYou cannot drive a Ferrari on flat tires. Your health score (${healthScore}%) is a major bottleneck. Lack of sleep prevents short-term memory from converting to long-term memory. If you study 12 hours but sleep 4, you effectively studied for 2.\n\n`;
     }
 
@@ -168,6 +174,7 @@ export const generatePsychometricReport = (responses: Record<number, number>): P
     if (pressureScore < 40) {
         insights.push({ dimension: "Environment", status: "POOR", text: "High external pressure is affecting your confidence." });
         actionPlan.push("Focus on 'Process Goals' (e.g. solve 50 Qs) rather than 'Outcome Goals' (e.g. get Rank 1).");
+        parentTips.push("CRITICAL: Your child feels weighed down by expectations. Avoid comparisons with cousins or friends. Celebrate small efforts, not just big results.");
         detailedAnalysis += `### 🏋️ Weight of Expectations\nYou are carrying a heavy load of external expectations (${pressureScore}%). This fear of disappointment is likely causing 'Performance Anxiety', leading to silly mistakes in exams. Detach your self-worth from your mock test scores.\n\n`;
     }
 
@@ -176,6 +183,7 @@ export const generatePsychometricReport = (responses: Record<number, number>): P
     if (examScore < 50) {
         insights.push({ dimension: "Exam Hall", status: "POOR", text: "You tend to panic or blank out during tests." });
         actionPlan.push("Simulate exam noise at home (use background chatter sounds).");
+        parentTips.push("Help simulate exam conditions at home on weekends. Ensure a quiet environment for 3 hours straight.");
         detailedAnalysis += `### 🎭 Exam Day Execution\nYour preparation means nothing if you cannot execute on D-Day. Your low temperament score (${examScore}%) indicates you get flustered easily. You need to desensitize yourself to pressure. Take mock tests at the exact time of the real JEE (9 AM - 12 PM).\n\n`;
     }
 
@@ -183,6 +191,11 @@ export const generatePsychometricReport = (responses: Record<number, number>): P
     if (actionPlan.length === 0) {
         actionPlan.push("Maintain your current consistency but increase mock test frequency.");
         actionPlan.push("Focus on error analysis of previous tests.");
+    }
+    
+    if (parentTips.length === 0) {
+        parentTips.push("Your child is on a balanced track. Maintain a supportive and nutritious environment at home.");
+        parentTips.push("Discuss their weekly schedule on Sundays to stay aligned without nagging during the week.");
     }
 
     const summary = `Based on the assessment, you are performing at a ${overallScore}% readiness level. Your key strength lies in ${Object.entries(dimensionScores).reduce((a, b) => a[1] > b[1] ? a : b)[0]}, while you need to critically focus on ${Object.entries(dimensionScores).reduce((a, b) => a[1] < b[1] ? a : b)[0]}.`;
@@ -200,6 +213,7 @@ export const generatePsychometricReport = (responses: Record<number, number>): P
         summary,
         insights,
         actionPlan: actionPlan.slice(0, 5), // Top 5 actions
-        detailedAnalysis
+        detailedAnalysis,
+        parentTips: parentTips.slice(0, 4) // Top 4 tips
     };
 };

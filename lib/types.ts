@@ -300,6 +300,7 @@ export interface PsychometricReport {
     insights: { dimension: string; status: 'GOOD' | 'AVERAGE' | 'POOR'; text: string }[];
     actionPlan: string[];
     detailedAnalysis?: string; // Deeper breakdown
+    parentTips?: string[]; // Specific tips for parents
 }
 
 export type Screen = 
