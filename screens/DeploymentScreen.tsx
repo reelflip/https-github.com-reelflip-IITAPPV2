@@ -1,36 +1,19 @@
 
 import React, { useState } from 'react';
-import { generateSQLSchema, getBackendFiles, generateFrontendGuide, generateHtaccess, getDeploymentPhases } from '../services/generatorService';
-import { Download, Database, Code, Terminal, FileCode, BookOpen, CheckCircle, Activity, Play, AlertCircle, Server, Folder, File, Settings, Key, User as UserIcon, Package, Search, ShieldCheck, Layers, Cpu, Share2, GitBranch, ArrowRight, Layout, Box, Users, GraduationCap, Lock, Globe } from 'lucide-react';
+import { getBackendFiles, generateSQLSchema, generateHtaccess } from '../services/generatorService';
+import { Download, Server, BookOpen, Package, FileText, Folder, ArrowRight, ShieldCheck, Database, Layout, Activity } from 'lucide-react';
 import JSZip from 'jszip';
 
 export const DeploymentScreen: React.FC = () => {
     
-    const [activeTab, setActiveTab] = useState<'deployment' | 'architecture'>('deployment');
-
-    // Database Config State
+    const [activeTab, setActiveTab] = useState<'guide' | 'architecture'>('guide');
     const [dbConfig, setDbConfig] = useState({
         host: "localhost",
         name: "u123456789_iitjee",
         user: "u123456789_admin",
         pass: ""
     });
-
-    // Test Diagnostic State
-    const [testUrl, setTestUrl] = useState('https://yourdomain.com/api');
-    const [testResult, setTestResult] = useState<any>(null);
-    const [isLoading, setIsLoading] = useState(false);
     const [isZipping, setIsZipping] = useState(false);
-
-    const downloadFile = (filename: string, content: string) => {
-        const element = document.createElement('a');
-        const file = new Blob([content], { type: 'text/plain' });
-        element.href = URL.createObjectURL(file);
-        element.download = filename;
-        document.body.appendChild(element);
-        element.click();
-        document.body.removeChild(element);
-    };
 
     const downloadAllZip = async () => {
         setIsZipping(true);
@@ -38,17 +21,26 @@ export const DeploymentScreen: React.FC = () => {
             const zip = new JSZip();
             const backendFiles = getBackendFiles(dbConfig);
 
-            // Add .htaccess to root
-            zip.file(".htaccess", generateHtaccess());
-
-            // Add API files to api/ folder
-            const apiFolder = zip.folder("api");
+            // 1. Backend API Files (deployment/api)
+            const apiFolder = zip.folder("deployment/api");
             if (apiFolder) {
-                backendFiles.forEach(file => {
-                    if (file.folder === 'api') {
-                        apiFolder.file(file.name, file.content);
-                    }
+                backendFiles.filter(f => f.folder === 'deployment/api').forEach(file => {
+                    apiFolder.file(file.name, file.content);
                 });
+            }
+
+            // 2. SEO/Root Files (deployment/seo)
+            const seoFolder = zip.folder("deployment/seo");
+            if (seoFolder) {
+                backendFiles.filter(f => f.folder === 'deployment/seo').forEach(file => {
+                    seoFolder.file(file.name, file.content);
+                });
+            }
+
+            // 3. SQL (deployment/sql)
+            const sqlFolder = zip.folder("deployment/sql");
+            if (sqlFolder) {
+                sqlFolder.file('database.sql', generateSQLSchema());
             }
 
             // Generate blob
@@ -56,49 +48,16 @@ export const DeploymentScreen: React.FC = () => {
             const url = URL.createObjectURL(content);
             const link = document.createElement('a');
             link.href = url;
-            link.download = "hostinger_backend_bundle.zip";
+            link.download = "iitgeeprep_deployment_bundle.zip";
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
         } catch (error) {
             console.error("Failed to zip files", error);
-            alert("Error creating zip file. Please try downloading files individually.");
+            alert("Error creating zip file.");
         }
         setIsZipping(false);
     };
-
-    const runDiagnostics = async () => {
-        setIsLoading(true);
-        setTestResult(null);
-        try {
-            const baseUrl = testUrl.replace(/\/$/, "");
-            const response = await fetch(`${baseUrl}/test_db.php`, {
-                method: 'GET',
-                mode: 'cors'
-            });
-            
-            if (!response.ok) {
-                throw new Error(`Server returned ${response.status} ${response.statusText}`);
-            }
-            
-            const text = await response.text();
-            
-            try {
-                const data = JSON.parse(text);
-                setTestResult(data);
-            } catch (e) {
-                throw new Error(`Invalid JSON response.`);
-            }
-        } catch (error: any) {
-            setTestResult({ status: 'ERROR', message: error.message || 'Failed to fetch.' });
-        }
-        setIsLoading(false);
-    };
-
-    const phases = getDeploymentPhases();
-    const backendFiles = getBackendFiles(dbConfig);
-    const rootFiles = backendFiles.filter(f => f.folder === 'root');
-    const apiFiles = backendFiles.filter(f => f.folder === 'api');
 
     return (
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 pb-12">
@@ -107,25 +66,27 @@ export const DeploymentScreen: React.FC = () => {
                 <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                     <div>
                         <div className="flex items-center gap-3 mb-2">
-                            <h2 className="text-3xl font-bold">System Center</h2>
+                            <h2 className="text-3xl font-bold">System Deployment Center</h2>
                             <span className="px-2 py-1 rounded-md bg-slate-700 border border-slate-600 text-xs font-mono text-cyan-400 shadow-sm">
                                 v12.0 (Stable)
                             </span>
                         </div>
-                        <p className="text-slate-400 text-lg max-w-xl">Documentation, Deployment & System Architecture.</p>
+                        <p className="text-slate-400 text-lg max-w-xl">
+                            Download the complete backend kit and follow the structured guide to go live.
+                        </p>
                     </div>
                     
                     {/* Tab Switcher */}
                     <div className="flex bg-slate-700/50 p-1 rounded-xl border border-slate-600/50">
                         <button 
-                            onClick={() => setActiveTab('deployment')}
+                            onClick={() => setActiveTab('guide')}
                             className={`flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${
-                                activeTab === 'deployment' 
+                                activeTab === 'guide' 
                                 ? 'bg-blue-600 text-white shadow-lg' 
                                 : 'text-slate-400 hover:text-white hover:bg-white/5'
                             }`}
                         >
-                            <Server className="w-4 h-4" /> Deployment
+                            <BookOpen className="w-4 h-4" /> Instructions
                         </button>
                         <button 
                             onClick={() => setActiveTab('architecture')}
@@ -135,151 +96,158 @@ export const DeploymentScreen: React.FC = () => {
                                 : 'text-slate-400 hover:text-white hover:bg-white/5'
                             }`}
                         >
-                            <Cpu className="w-4 h-4" /> Architecture
+                            <Server className="w-4 h-4" /> Architecture
                         </button>
                     </div>
                 </div>
-                {/* Decor */}
-                <div className="absolute -bottom-10 -right-10 w-64 h-64 bg-green-600/10 rounded-full blur-3xl"></div>
-                <div className="absolute top-0 right-1/3 w-32 h-32 bg-blue-500/10 rounded-full blur-2xl"></div>
             </div>
 
-            {activeTab === 'deployment' ? (
-                /* ================= DEPLOYMENT VIEW ================= */
-                <div className="animate-in fade-in">
-                    {/* Deployment Steps */}
-                    <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm mb-8">
-                        <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-xl font-bold text-slate-800 flex items-center"><BookOpen className="mr-2 w-6 h-6 text-blue-600"/> Deployment Walkthrough</h3>
-                            <button 
-                                onClick={() => downloadFile('HOSTINGER_GUIDE.md', generateFrontendGuide())}
-                                className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg flex items-center shadow-md transition-colors text-sm font-bold"
-                            >
-                                <Download className="w-4 h-4 mr-2" /> Download Full Manual
-                            </button>
-                        </div>
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {phases.map((phase, idx) => (
-                                <div key={idx} className={`rounded-xl border p-5 shadow-sm hover:shadow-md transition-all ${phase.bg}`}>
-                                    <div className="flex items-center justify-between mb-3">
-                                        <h4 className={`font-bold text-lg ${phase.color}`}>{phase.title}</h4>
-                                        <span className="text-[10px] uppercase font-bold bg-white/50 px-2 py-1 rounded text-slate-600">{phase.subtitle}</span>
+            {activeTab === 'guide' ? (
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    
+                    {/* Main Instructions Panel */}
+                    <div className="lg:col-span-2 space-y-6">
+                        <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm">
+                            <h3 className="text-xl font-bold text-slate-800 mb-6 flex items-center border-b border-slate-100 pb-4">
+                                <Package className="w-6 h-6 mr-3 text-blue-600" /> Deployment Workflow
+                            </h3>
+                            
+                            <div className="space-y-8">
+                                <div className="flex gap-4">
+                                    <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center shrink-0">1</div>
+                                    <div>
+                                        <h4 className="text-lg font-bold text-slate-800">Download System Bundle</h4>
+                                        <p className="text-slate-500 text-sm mt-1 leading-relaxed">
+                                            Click the download button on the right. This ZIP contains all necessary server-side files organized into folders (`deployment/api`, `deployment/sql`, `deployment/seo`).
+                                        </p>
                                     </div>
-                                    <ul className="space-y-2">
-                                        {phase.steps.map((step, sIdx) => (
-                                            <li key={sIdx} className="flex items-start text-sm text-slate-700">
-                                                <CheckCircle className={`w-4 h-4 mr-2 mt-0.5 shrink-0 ${phase.color}`} />
-                                                <span className="leading-tight">{step}</span>
-                                            </li>
-                                        ))}
-                                    </ul>
                                 </div>
-                            ))}
+
+                                <div className="flex gap-4">
+                                    <div className="w-8 h-8 rounded-full bg-purple-100 text-purple-700 font-bold flex items-center justify-center shrink-0">2</div>
+                                    <div>
+                                        <h4 className="text-lg font-bold text-slate-800">Build Frontend</h4>
+                                        <p className="text-slate-500 text-sm mt-1 leading-relaxed">
+                                            Run <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-700 font-mono text-xs">npm run build</code> in your local terminal. 
+                                            This creates a <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-700 font-mono text-xs">dist/</code> folder containing the React application.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="flex gap-4">
+                                    <div className="w-8 h-8 rounded-full bg-orange-100 text-orange-700 font-bold flex items-center justify-center shrink-0">3</div>
+                                    <div>
+                                        <h4 className="text-lg font-bold text-slate-800">Server Mapping</h4>
+                                        <p className="text-slate-500 text-sm mt-2 mb-3">Copy files to your server's <code className="font-mono">public_html</code> as follows:</p>
+                                        
+                                        <div className="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden text-sm">
+                                            <div className="grid grid-cols-2 bg-slate-100 p-2 font-bold text-slate-600 border-b border-slate-200">
+                                                <div>Source</div>
+                                                <div>Destination</div>
+                                            </div>
+                                            <div className="grid grid-cols-2 p-3 border-b border-slate-100">
+                                                <div className="font-mono text-slate-700">dist/*</div>
+                                                <div className="font-mono text-blue-600">public_html/</div>
+                                            </div>
+                                            <div className="grid grid-cols-2 p-3 border-b border-slate-100">
+                                                <div className="font-mono text-slate-700">deployment/api/*</div>
+                                                <div className="font-mono text-blue-600">public_html/api/</div>
+                                            </div>
+                                            <div className="grid grid-cols-2 p-3 border-b border-slate-100">
+                                                <div className="font-mono text-slate-700">deployment/seo/*</div>
+                                                <div className="font-mono text-blue-600">public_html/</div>
+                                            </div>
+                                            <div className="grid grid-cols-2 p-3 bg-yellow-50/50">
+                                                <div className="font-mono text-slate-700">deployment/sql/database.sql</div>
+                                                <div className="font-mono text-orange-600">Import via phpMyAdmin</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {/* 1. DB Config */}
-                        <div className="md:col-span-1 bg-slate-50 rounded-2xl p-6 border border-slate-200 shadow-sm">
-                            <h3 className="text-slate-800 font-bold flex items-center mb-4 text-lg">
-                                <Settings className="mr-2 w-5 h-5 text-blue-600"/> 1. Database Configuration
-                            </h3>
-                            <p className="text-slate-500 text-xs mb-4">Enter Hostinger MySQL details. Generated PHP files will use these.</p>
+                    {/* Sidebar Actions */}
+                    <div className="space-y-6">
+                        
+                        {/* Download Card */}
+                        <div className="bg-slate-900 rounded-2xl p-6 text-white shadow-xl relative overflow-hidden">
+                            <div className="relative z-10">
+                                <h3 className="text-xl font-bold mb-2">Ready to Deploy?</h3>
+                                <p className="text-slate-400 text-sm mb-6">Get the full backend kit with SQL schemas and API scripts.</p>
+                                
+                                <button 
+                                    onClick={downloadAllZip} 
+                                    disabled={isZipping}
+                                    className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl flex items-center justify-center transition-all shadow-lg active:scale-95 disabled:opacity-50"
+                                >
+                                    {isZipping ? <Activity className="w-5 h-5 mr-2 animate-spin" /> : <Download className="w-5 h-5 mr-2" />}
+                                    Download Bundle .zip
+                                </button>
+                            </div>
+                            <div className="absolute -bottom-10 -right-10 w-32 h-32 bg-blue-500/20 rounded-full blur-2xl"></div>
+                        </div>
+
+                        {/* DB Config Form */}
+                        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                            <h4 className="font-bold text-slate-800 mb-4 flex items-center">
+                                <Database className="w-4 h-4 mr-2 text-slate-500" /> Pre-Config Database
+                            </h4>
+                            <p className="text-xs text-slate-500 mb-4">
+                                Enter your hosting DB details here to auto-generate the `config.php` inside the bundle.
+                            </p>
                             
                             <div className="space-y-3">
-                                {Object.entries(dbConfig).map(([key, val]) => (
-                                    <div key={key}>
-                                        <label className="text-xs font-bold text-slate-500 uppercase">MySQL {key}</label>
-                                        <div className="flex items-center bg-white border border-slate-300 rounded-lg px-3 py-2 mt-1">
-                                            {key === 'pass' ? <Key className="w-4 h-4 text-slate-400 mr-2"/> : <Terminal className="w-4 h-4 text-slate-400 mr-2"/>}
-                                            <input 
-                                                type="text" 
-                                                value={val}
-                                                onChange={(e) => setDbConfig({...dbConfig, [key]: e.target.value})}
-                                                className="w-full text-sm outline-none text-slate-700 font-mono"
-                                                placeholder={key === 'pass' ? 'Password' : 'Value'}
-                                            />
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* 2. SQL Schema */}
-                        <div className="md:col-span-1 bg-slate-900 text-slate-300 p-6 rounded-2xl overflow-hidden shadow-lg font-mono text-xs border border-slate-800">
-                            <div className="flex justify-between items-center mb-4 border-b border-slate-700 pb-3">
-                                <h3 className="text-white font-bold flex items-center text-sm"><Database className="mr-2 w-4 h-4 text-green-400"/> 2. MySQL Schema</h3>
-                                <button onClick={() => downloadFile('database.sql', generateSQLSchema())} className="bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded flex items-center transition-colors border border-slate-600"><Download className="w-3 h-3 mr-1" /> .sql</button>
-                            </div>
-                            <pre className="overflow-x-auto h-64 text-green-400 no-scrollbar p-2 bg-black/20 rounded-lg">{generateSQLSchema().substring(0, 500)}...</pre>
-                        </div>
-
-                        {/* 3. PHP Backend */}
-                        <div className="md:col-span-1 bg-slate-900 text-slate-300 p-6 rounded-2xl overflow-hidden shadow-lg font-mono text-xs border border-slate-800">
-                            <div className="flex justify-between items-center mb-4 border-b border-slate-700 pb-3">
-                                <h3 className="text-white font-bold flex items-center text-sm"><Code className="mr-2 w-4 h-4 text-purple-400"/> 3. PHP Backend API</h3>
-                                <button onClick={downloadAllZip} disabled={isZipping} className="bg-purple-600 hover:bg-purple-500 text-white px-3 py-1.5 rounded flex items-center transition-colors shadow-lg border border-purple-500 disabled:opacity-50">
-                                    {isZipping ? <Activity className="w-3 h-3 mr-1 animate-spin" /> : <Package className="w-3 h-3 mr-1" />} Download .zip
-                                </button>
-                            </div>
-                            <div className="grid grid-cols-1 gap-2 max-h-64 overflow-y-auto custom-scrollbar pr-2">
-                                {apiFiles.map((file, idx) => (
-                                    <div key={idx} className="flex justify-between items-center bg-slate-800 p-3 rounded border border-slate-700">
-                                        <div className="flex items-center space-x-2"><FileCode className="w-4 h-4 text-purple-400" /> <span>{file.name}</span></div>
-                                        <button onClick={() => downloadFile(file.name, file.content)}><Download className="w-4 h-4 text-slate-400 hover:text-white" /></button>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* 4. SEO & Configuration */}
-                        <div className="md:col-span-1 bg-slate-900 text-slate-300 p-6 rounded-2xl overflow-hidden shadow-lg font-mono text-xs border border-slate-800">
-                            <div className="flex justify-between items-center mb-4 border-b border-slate-700 pb-3">
-                                <h3 className="text-white font-bold flex items-center text-sm"><Globe className="mr-2 w-4 h-4 text-teal-400"/> 4. SEO & Configuration</h3>
-                            </div>
-                            <div className="space-y-2">
-                                <p className="text-slate-500 mb-2">Upload these to your <code>public_html</code> root directory.</p>
-                                {rootFiles.map((file, idx) => (
-                                    <div key={idx} className="flex justify-between items-center bg-slate-800 p-3 rounded border border-slate-700">
-                                        <div className="flex items-center space-x-2"><FileCode className="w-4 h-4 text-teal-400" /> <span>{file.name}</span></div>
-                                        <button onClick={() => downloadFile(file.name, file.content)} className="text-slate-400 hover:text-white"><Download className="w-4 h-4" /></button>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* 5. Live Tester */}
-                        <div className="md:col-span-1 md:col-start-1 bg-slate-900 rounded-2xl p-6 border border-slate-700 shadow-xl">
-                            <h3 className="text-white font-bold flex items-center mb-4 text-xl"><Activity className="mr-2 w-6 h-6 text-green-400"/> 5. Connection Tester</h3>
-                            <div className="space-y-4">
-                                <div className="space-y-2">
-                                    <label className="text-xs font-bold text-slate-500 uppercase">API Base URL</label>
-                                    <input type="text" className="w-full bg-slate-800 border border-slate-600 rounded-lg p-2.5 text-white text-sm focus:border-blue-500 outline-none" value={testUrl} onChange={(e) => setTestUrl(e.target.value)} />
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase">DB Name</label>
+                                    <input 
+                                        type="text" 
+                                        value={dbConfig.name}
+                                        onChange={(e) => setDbConfig({...dbConfig, name: e.target.value})}
+                                        className="w-full p-2 border border-slate-200 rounded text-sm mt-1 focus:ring-1 focus:ring-blue-200 outline-none"
+                                    />
                                 </div>
-                                <button onClick={runDiagnostics} disabled={isLoading} className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2.5 rounded-lg flex items-center justify-center transition-all disabled:opacity-50">
-                                    {isLoading ? <Activity className="w-4 h-4 animate-spin mr-2"/> : <Play className="w-4 h-4 mr-2" />} Run Diagnostics
-                                </button>
-                                {testResult && (
-                                    <div className={`p-4 rounded-lg border ${testResult.status === 'CONNECTED' ? 'bg-green-900/20 border-green-500/50' : 'bg-red-900/20 border-red-500/50'}`}>
-                                        <div className="flex items-center gap-2 mb-2">
-                                            {testResult.status === 'CONNECTED' ? <CheckCircle className="w-5 h-5 text-green-400"/> : <AlertCircle className="w-5 h-5 text-red-400"/>}
-                                            <span className={`font-bold ${testResult.status === 'CONNECTED' ? 'text-green-400' : 'text-red-400'}`}>{testResult.status === 'CONNECTED' ? 'SUCCESS' : 'FAILED'}</span>
-                                        </div>
-                                        <div className="text-xs font-mono text-slate-400 break-all">{testResult.message || JSON.stringify(testResult)}</div>
-                                    </div>
-                                )}
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase">DB User</label>
+                                    <input 
+                                        type="text" 
+                                        value={dbConfig.user}
+                                        onChange={(e) => setDbConfig({...dbConfig, user: e.target.value})}
+                                        className="w-full p-2 border border-slate-200 rounded text-sm mt-1 focus:ring-1 focus:ring-blue-200 outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase">DB Password</label>
+                                    <input 
+                                        type="text" 
+                                        value={dbConfig.pass}
+                                        onChange={(e) => setDbConfig({...dbConfig, pass: e.target.value})}
+                                        placeholder="Optional"
+                                        className="w-full p-2 border border-slate-200 rounded text-sm mt-1 focus:ring-1 focus:ring-blue-200 outline-none"
+                                    />
+                                </div>
                             </div>
                         </div>
+
+                        <div className="bg-green-50 border border-green-100 p-4 rounded-xl flex items-start gap-3">
+                            <ShieldCheck className="w-5 h-5 text-green-600 mt-0.5 shrink-0" />
+                            <div className="text-xs text-green-800">
+                                <strong className="block mb-1">Security Note</strong>
+                                Ensure your `api` folder has 755 permissions. Never upload the source code (`src/`, `package.json`) to the public server.
+                            </div>
+                        </div>
+
                     </div>
                 </div>
             ) : (
-                /* ================= ARCHITECTURE VIEW ================= */
-                <div className="animate-in fade-in space-y-8">
-                     {/* ... Architecture View Content (No Changes Required) ... */}
-                     <div className="bg-white p-8 rounded-xl border border-slate-200 shadow-sm text-center text-slate-500">
-                         Architecture diagram view is consistent with previous versions.
-                     </div>
+                <div className="bg-white p-12 rounded-2xl border border-slate-200 shadow-sm text-center">
+                    <Layout className="w-16 h-16 text-slate-200 mx-auto mb-4" />
+                    <h3 className="text-xl font-bold text-slate-800 mb-2">System Architecture</h3>
+                    <p className="text-slate-500 max-w-lg mx-auto">
+                        The IITGEEPrep platform utilizes a decoupled React Frontend (Client-side routing) talking to a lightweight PHP/MySQL Backend via REST API. 
+                        State is managed via LocalStorage for offline resilience with sync capabilities.
+                    </p>
                 </div>
             )}
         </div>
