@@ -2,8 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { TestAttempt, Test, QuestionResult, User, Question } from '../lib/types';
 import { Button } from '../components/Button';
-import { PageHeader } from '../components/PageHeader';
-import { Clock, Check, AlertCircle, PlayCircle, RotateCcw, Filter, FileText, X, CheckCircle2, ArrowLeft } from 'lucide-react';
+import { Clock, Check, AlertCircle, PlayCircle, RotateCcw, Filter, FileText, X, CheckCircle2, ArrowLeft, Target } from 'lucide-react';
 
 interface Props {
   user?: User;
@@ -110,18 +109,29 @@ export const TestScreen: React.FC<Props> = ({ user, addTestAttempt, history, ava
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
-      <PageHeader 
-        title={isParent ? "Student Test Records" : "Test Center"}
-        subtitle={isParent ? "Detailed history of mock tests taken by the student." : "Attempt new mock tests or analyze your past performance."}
-        action={
-            !isParent && (
-                <div className="flex bg-slate-100 p-1 rounded-lg">
-                    <button onClick={() => setActiveTab('practice')} className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${activeTab === 'practice' ? 'bg-white text-blue-600 shadow' : 'text-slate-500'}`}>Practice Zone</button>
-                    <button onClick={() => setActiveTab('history')} className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${activeTab === 'history' ? 'bg-white text-blue-600 shadow' : 'text-slate-500'}`}>History</button>
-                </div>
-            )
-        }
-      />
+      {/* Header Banner */}
+      <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-8 text-white shadow-xl relative overflow-hidden">
+          <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+              <div>
+                  <div className="flex items-center space-x-3 mb-2">
+                      <Target className="w-8 h-8 text-white" />
+                      <h1 className="text-3xl font-bold">{isParent ? "Student Test Records" : "Test Center"}</h1>
+                  </div>
+                  <p className="text-indigo-100 text-lg opacity-90 max-w-2xl">
+                      {isParent ? "Detailed history of mock tests taken by the student." : "Attempt mock tests, practice chapter-wise problems, and review your performance history."}
+                  </p>
+              </div>
+              
+              {!isParent && (
+                  <div className="flex bg-white/20 p-1 rounded-xl backdrop-blur-sm border border-white/20">
+                      <button onClick={() => setActiveTab('practice')} className={`px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${activeTab === 'practice' ? 'bg-white text-indigo-700 shadow-md' : 'text-indigo-100 hover:bg-white/10'}`}>Practice Zone</button>
+                      <button onClick={() => setActiveTab('history')} className={`px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${activeTab === 'history' ? 'bg-white text-indigo-700 shadow-md' : 'text-indigo-100 hover:bg-white/10'}`}>History</button>
+                  </div>
+              )}
+          </div>
+          <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 rounded-full bg-white opacity-10"></div>
+          <div className="absolute bottom-0 right-20 w-32 h-32 rounded-full bg-white opacity-10"></div>
+      </div>
 
       {activeTab === 'practice' && !isParent && (
           <div className="space-y-6">

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { User } from '../lib/types';
-import { Search, Shield, Trash2, CheckCircle, XCircle, MoreVertical, Loader2, Edit3, UserPlus, Save, X } from 'lucide-react';
+import { Search, Shield, Trash2, CheckCircle, XCircle, MoreVertical, Loader2, Edit3, UserPlus, Save, X, Users } from 'lucide-react';
 
 interface Props {}
 
@@ -57,10 +57,6 @@ export const AdminUserManagementScreen: React.FC<Props> = () => {
 
     const handleSaveEdit = async () => {
         if(!editingUser) return;
-        // Ideally we would have an endpoint to update detailed info, 
-        // for now we re-use the status update endpoint logic or similar if backend supports it.
-        // Assuming manage_users.php handles updates based on ID.
-        // For this demo, we'll just close modal as full update logic depends on backend expansion.
         setEditingUser(null);
     };
 
@@ -72,14 +68,20 @@ export const AdminUserManagementScreen: React.FC<Props> = () => {
 
     return (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <h2 className="text-2xl font-bold text-slate-900">User Management</h2>
-                    <p className="text-slate-500">Manage access, roles, and user accounts.</p>
+            
+            {/* Header Banner */}
+            <div className="bg-gradient-to-r from-slate-700 to-gray-700 rounded-2xl p-8 text-white shadow-xl relative overflow-hidden">
+                <div className="relative z-10">
+                    <div className="flex items-center space-x-3 mb-2">
+                        <Users className="w-8 h-8 text-white" />
+                        <h1 className="text-3xl font-bold">User Management</h1>
+                    </div>
+                    <p className="text-slate-200 text-lg opacity-90 max-w-2xl">
+                        Oversee registered students, parents, and administrators on the platform.
+                    </p>
                 </div>
-                {/* <button className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center shadow-md hover:bg-blue-700 transition-colors">
-                    <UserPlus className="w-4 h-4 mr-2" /> Add User
-                </button> */}
+                <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 rounded-full bg-white opacity-10"></div>
+                <div className="absolute bottom-0 right-20 w-32 h-32 rounded-full bg-white opacity-10"></div>
             </div>
 
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">

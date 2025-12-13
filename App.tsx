@@ -44,7 +44,7 @@ import { DEFAULT_CHAPTER_NOTES } from './lib/chapterContent';
 import { MOCK_TESTS_DATA, generateInitialQuestionBank } from './lib/mockTestsData';
 import { TrendingUp, Bell, LogOut } from 'lucide-react';
 
-const APP_VERSION = '12.8';
+const APP_VERSION = '12.9';
 
 const ComingSoonScreen = ({ title, icon }: { title: string, icon: string }) => (
   <div className="flex flex-col items-center justify-center h-[70vh] text-center">
@@ -76,7 +76,7 @@ const validateScreen = (role: string, screen: Screen): Screen => {
     const studentScreens: Screen[] = [
         'dashboard', 'syllabus', 'ai-tutor', 'tests', 'psychometric', 'focus', 
         'analytics', 'timetable', 'revision', 'mistakes', 'flashcards', 'backlogs', 
-        'hacks', 'wellness', 'features', 'profile'
+        'hacks', 'wellness', 'profile'
     ];
     const parentScreens: Screen[] = [
         'dashboard', 'family', 'analytics', 'tests', 'syllabus', 'profile'
@@ -589,7 +589,6 @@ export default function App() {
                 {currentScreen === 'hacks' && <HacksScreen hacks={hacks} />}
                 {currentScreen === 'analytics' && <AnalyticsScreen user={user} progress={progress} testAttempts={testAttempts} />}
                 {currentScreen === 'wellness' && <WellnessScreen />}
-                {currentScreen === 'features' && <FeaturesScreen />} 
                 {currentScreen === 'profile' && <ProfileScreen user={user} onAcceptRequest={acceptConnectionRequest} onUpdateUser={(u) => { const updated = { ...user, ...u }; setUser(updated); saveUserToDB(updated); }} />}
               </>
           )}

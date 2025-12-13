@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { User, UserProgress, TestAttempt } from '../lib/types';
-import { Brain, FileText } from 'lucide-react';
+import { Brain, FileText, Users } from 'lucide-react';
 import { PsychometricScreen } from './PsychometricScreen';
 
 interface Props {
@@ -59,9 +59,19 @@ export const ParentFamilyScreen: React.FC<Props> = ({ user, onSendRequest, linke
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
-      <div>
-        <h2 className="text-2xl font-bold text-slate-900">Family Connections</h2>
-        <p className="text-slate-500">Manage connected student accounts.</p>
+      {/* Header Banner */}
+      <div className="bg-gradient-to-r from-teal-600 to-green-600 rounded-2xl p-8 text-white shadow-xl relative overflow-hidden">
+          <div className="relative z-10">
+              <div className="flex items-center space-x-3 mb-2">
+                  <Users className="w-8 h-8 text-white" />
+                  <h1 className="text-3xl font-bold">Family Dashboard</h1>
+              </div>
+              <p className="text-teal-100 text-lg opacity-90 max-w-2xl">
+                  Connect with your child's account to view progress reports and provide support.
+              </p>
+          </div>
+          <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 rounded-full bg-white opacity-10"></div>
+          <div className="absolute bottom-0 right-20 w-32 h-32 rounded-full bg-white opacity-10"></div>
       </div>
 
       {user.linkedStudentId ? (

@@ -409,8 +409,23 @@ export const TimetableScreen: React.FC<Props> = ({ user, savedConfig, savedSlots
   };
 
   return (
-    <div className="max-w-4xl mx-auto pb-10 space-y-6">
+    <div className="max-w-4xl mx-auto pb-10 space-y-6 animate-in fade-in slide-in-from-bottom-4">
         
+        {/* Header Banner */}
+        <div className="bg-gradient-to-r from-emerald-600 to-teal-600 rounded-2xl p-8 text-white shadow-xl relative overflow-hidden">
+            <div className="relative z-10">
+                <div className="flex items-center space-x-3 mb-2">
+                    <CalendarDays className="w-8 h-8 text-white" />
+                    <h1 className="text-3xl font-bold">Schedule & Planner</h1>
+                </div>
+                <p className="text-emerald-100 text-lg opacity-90 max-w-2xl">
+                    Manage your daily routine and generate a long-term master plan for syllabus completion.
+                </p>
+            </div>
+            <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 rounded-full bg-white opacity-10"></div>
+            <div className="absolute bottom-0 right-20 w-32 h-32 rounded-full bg-white opacity-10"></div>
+        </div>
+
         {/* Top Toggle */}
         <div className="flex justify-center mb-6">
             <div className="bg-white p-1 rounded-xl shadow-sm border border-slate-200 flex">
@@ -429,6 +444,7 @@ export const TimetableScreen: React.FC<Props> = ({ user, savedConfig, savedSlots
             </div>
         </div>
 
+        {/* ... Rest of content ... */}
         {viewMode === 'MASTER' ? (
             <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
                 {/* Master Plan Inputs */}

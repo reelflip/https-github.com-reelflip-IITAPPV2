@@ -1,7 +1,7 @@
 
-
 import React, { useState } from 'react';
 import { Flashcard, MemoryHack, BlogPost } from '../lib/types';
+import { Layers } from 'lucide-react';
 
 interface Props {
   flashcards: Flashcard[];
@@ -22,25 +22,50 @@ export const ContentManagerScreen: React.FC<Props> = ({
   const [activeTab, setActiveTab] = useState<'flashcards' | 'hacks' | 'blog'>(initialTab);
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-           <h2 className="text-2xl font-bold text-slate-900">Content Manager</h2>
-           <p className="text-slate-500">Manage database content visible to users.</p>
-        </div>
-        <div className="flex bg-slate-100 p-1 rounded-lg">
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
+      {/* Header Banner */}
+      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-8 text-white shadow-xl relative overflow-hidden">
+          <div className="relative z-10 flex justify-between items-center">
+              <div>
+                  <div className="flex items-center space-x-3 mb-2">
+                      <Layers className="w-8 h-8 text-white" />
+                      <h1 className="text-3xl font-bold">Content Manager</h1>
+                  </div>
+                  <p className="text-blue-100 text-lg opacity-90 max-w-2xl">
+                      Manage flashcards, memory hacks, and other educational resources.
+                  </p>
+              </div>
+              <div className="flex bg-white/20 p-1 rounded-xl backdrop-blur-sm border border-white/20 hidden md:flex">
+                 {(['flashcards', 'hacks', 'blog'] as const).map(tab => (
+                   <button
+                     key={tab}
+                     onClick={() => setActiveTab(tab)}
+                     className={`px-4 py-2 text-sm font-bold capitalize rounded-lg transition-all ${
+                       activeTab === tab ? 'bg-white text-blue-700 shadow-md' : 'text-blue-100 hover:bg-white/10'
+                     }`}
+                   >
+                     {tab}
+                   </button>
+                 ))}
+              </div>
+          </div>
+          <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 rounded-full bg-white opacity-10"></div>
+          <div className="absolute bottom-0 right-20 w-32 h-32 rounded-full bg-white opacity-10"></div>
+      </div>
+
+      {/* Mobile Tab Switcher */}
+      <div className="md:hidden flex bg-slate-100 p-1 rounded-lg">
            {(['flashcards', 'hacks', 'blog'] as const).map(tab => (
              <button
                key={tab}
                onClick={() => setActiveTab(tab)}
-               className={`px-4 py-2 text-sm font-bold capitalize rounded-md transition-all ${
+               className={`flex-1 px-4 py-2 text-sm font-bold capitalize rounded-md transition-all ${
                  activeTab === tab ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
                }`}
              >
                {tab}
              </button>
            ))}
-        </div>
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm min-h-[500px]">
@@ -73,16 +98,16 @@ const FlashcardManager = ({ cards, onAdd, onDelete }: any) => {
 
   return (
     <div className="space-y-6">
-       <form onSubmit={handleSubmit} className="flex gap-4 items-end bg-slate-50 p-4 rounded-lg border border-slate-200">
-         <div className="flex-1">
+       <form onSubmit={handleSubmit} className="flex flex-col md:flex-row gap-4 items-end bg-slate-50 p-4 rounded-lg border border-slate-200">
+         <div className="flex-1 w-full">
             <label className="block text-xs font-bold text-slate-500 mb-1">Front (Question)</label>
             <input required value={front} onChange={e => setFront(e.target.value)} className="w-full p-2 border rounded" placeholder="e.g. Unit of Force" />
          </div>
-         <div className="flex-1">
+         <div className="flex-1 w-full">
             <label className="block text-xs font-bold text-slate-500 mb-1">Back (Answer)</label>
             <input required value={back} onChange={e => setBack(e.target.value)} className="w-full p-2 border rounded" placeholder="e.g. Newton (N)" />
          </div>
-         <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded font-bold hover:bg-blue-700">Add Card</button>
+         <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded font-bold hover:bg-blue-700 w-full md:w-auto">Add Card</button>
        </form>
 
        <div className="space-y-2">

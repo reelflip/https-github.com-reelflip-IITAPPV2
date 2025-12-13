@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Play, Pause, RotateCw, Zap, RefreshCw, FileText } from 'lucide-react';
+import { Play, Pause, RotateCw, Zap, RefreshCw, FileText, Timer } from 'lucide-react';
 
 export const FocusScreen: React.FC = () => {
   const [mode, setMode] = useState<'POMODORO' | 'DEEP' | 'BREAK'>('POMODORO');
@@ -59,9 +59,19 @@ export const FocusScreen: React.FC = () => {
 
   return (
     <div className="max-w-2xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 pb-12">
-      <div className="text-center">
-        <h2 className="text-3xl font-bold text-slate-900 mb-2">Focus Zone</h2>
-        <p className="text-slate-500 text-sm">Eliminate distractions and master your workflow.</p>
+      {/* Header Banner */}
+      <div className="bg-gradient-to-r from-violet-600 to-fuchsia-600 rounded-2xl p-8 text-white shadow-xl relative overflow-hidden text-center">
+          <div className="relative z-10">
+              <div className="flex items-center justify-center space-x-3 mb-2">
+                  <Timer className="w-8 h-8 text-white" />
+                  <h1 className="text-3xl font-bold">Focus Zone</h1>
+              </div>
+              <p className="text-violet-100 text-lg opacity-90">
+                  Eliminate distractions and master your workflow with structured timer blocks.
+              </p>
+          </div>
+          <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 rounded-full bg-white opacity-10"></div>
+          <div className="absolute bottom-0 left-0 -ml-16 -mb-16 w-32 h-32 rounded-full bg-white opacity-10"></div>
       </div>
 
       {/* Timer Card */}

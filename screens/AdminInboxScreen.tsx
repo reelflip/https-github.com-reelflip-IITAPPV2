@@ -3,9 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { ContactMessage } from '../lib/types';
 import { Inbox, Mail, Clock, Trash2, User, Search, RefreshCw } from 'lucide-react';
 
-interface Props {
-    // If we wanted to pass props from App, but we'll fetch internally to be self contained or use passed prop
-}
+interface Props {}
 
 export const AdminInboxScreen: React.FC<Props> = () => {
     const [messages, setMessages] = useState<ContactMessage[]>([]);
@@ -57,13 +55,24 @@ export const AdminInboxScreen: React.FC<Props> = () => {
 
     return (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div>
-                    <h2 className="text-2xl font-bold text-slate-900 flex items-center">
-                        <Inbox className="w-6 h-6 mr-2 text-purple-600" /> Inbox
-                    </h2>
-                    <p className="text-slate-500">Read inquiries from the Contact Us page.</p>
+            
+            {/* Header Banner */}
+            <div className="bg-gradient-to-r from-violet-600 to-purple-600 rounded-2xl p-8 text-white shadow-xl relative overflow-hidden">
+                <div className="relative z-10">
+                    <div className="flex items-center space-x-3 mb-2">
+                        <Inbox className="w-8 h-8 text-white" />
+                        <h1 className="text-3xl font-bold">Message Inbox</h1>
+                    </div>
+                    <p className="text-violet-100 text-lg opacity-90 max-w-2xl">
+                        View and manage inquiries received from the contact form.
+                    </p>
                 </div>
+                <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 rounded-full bg-white opacity-10"></div>
+                <div className="absolute bottom-0 right-20 w-32 h-32 rounded-full bg-white opacity-10"></div>
+            </div>
+
+            <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                <h3 className="font-bold text-slate-700">All Messages ({messages.length})</h3>
                 <div className="flex gap-2 w-full md:w-auto">
                     <div className="relative flex-1 md:w-64">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />

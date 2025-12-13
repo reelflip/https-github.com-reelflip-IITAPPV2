@@ -4,7 +4,7 @@ import { Question, Test, Topic } from '../lib/types';
 import { Button } from '../components/Button';
 import { PageHeader } from '../components/PageHeader';
 import { NATIONAL_EXAMS } from '../lib/constants';
-import { Plus, Save, Database, FileText, Check, Trash2, Filter, Tag, Calendar, BarChart } from 'lucide-react';
+import { Plus, Save, Database, FileText, Check, Trash2, Filter, Tag, Calendar, BarChart, Target } from 'lucide-react';
 
 interface Props {
   questionBank: Question[];
@@ -23,29 +23,31 @@ export const AdminTestManagerScreen: React.FC<Props> = ({
 
   return (
     <div className="space-y-6 animate-in fade-in">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-            <h2 className="text-2xl font-bold text-slate-900">Test & Question Manager</h2>
-            <p className="text-slate-500">Build your question bank and publish mock tests.</p>
-        </div>
-        <div className="flex bg-slate-100 p-1 rounded-lg self-start">
-           <button
-             onClick={() => setActiveTab('questions')}
-             className={`px-4 py-2 text-sm font-bold rounded-md transition-all flex items-center gap-2 ${
-               activeTab === 'questions' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-             }`}
-           >
-             <Database size={16} /> Question Bank
-           </button>
-           <button
-             onClick={() => setActiveTab('tests')}
-             className={`px-4 py-2 text-sm font-bold rounded-md transition-all flex items-center gap-2 ${
-               activeTab === 'tests' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-             }`}
-           >
-             <FileText size={16} /> Test Builder
-           </button>
-        </div>
+        
+      {/* Header Banner */}
+      <div className="bg-gradient-to-r from-indigo-700 to-blue-700 rounded-2xl p-8 text-white shadow-xl relative overflow-hidden">
+          <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+              <div>
+                  <div className="flex items-center space-x-3 mb-2">
+                      <Target className="w-8 h-8 text-white" />
+                      <h1 className="text-3xl font-bold">Test & Question Bank</h1>
+                  </div>
+                  <p className="text-indigo-100 text-lg opacity-90 max-w-2xl">
+                      Create new questions, assemble mock tests, and manage the examination database.
+                  </p>
+              </div>
+              
+              <div className="flex bg-white/20 p-1 rounded-xl backdrop-blur-sm border border-white/20">
+                  <button onClick={() => setActiveTab('questions')} className={`flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${activeTab === 'questions' ? 'bg-white text-indigo-700 shadow-md' : 'text-indigo-100 hover:bg-white/10'}`}>
+                      <Database className="w-4 h-4" /> Question Bank
+                  </button>
+                  <button onClick={() => setActiveTab('tests')} className={`flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${activeTab === 'tests' ? 'bg-white text-indigo-700 shadow-md' : 'text-indigo-100 hover:bg-white/10'}`}>
+                      <FileText className="w-4 h-4" /> Test Builder
+                  </button>
+              </div>
+          </div>
+          <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 rounded-full bg-white opacity-10"></div>
+          <div className="absolute bottom-0 right-20 w-32 h-32 rounded-full bg-white opacity-10"></div>
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm min-h-[600px] p-6">

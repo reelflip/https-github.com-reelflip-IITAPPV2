@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { BlogPost } from '../lib/types';
 import { RichTextEditor } from '../components/RichTextEditor';
@@ -78,33 +79,45 @@ export const AdminBlogScreen: React.FC<Props> = ({ blogs = [], onAddBlog, onUpda
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 pb-12">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-            <h2 className="text-2xl font-bold text-slate-900">Blog Editor</h2>
-            <p className="text-slate-500">Create engaging content for students.</p>
-        </div>
-        <div className="flex gap-2">
-            <button 
-                onClick={() => setIsPreview(!isPreview)}
-                className={`px-4 py-2 rounded-lg font-bold flex items-center transition-colors ${isPreview ? 'bg-slate-200 text-slate-700' : 'bg-white border border-slate-200 text-blue-600'}`}
-            >
-                {isPreview ? <><PenTool size={16} className="mr-2"/> Edit</> : <><Eye size={16} className="mr-2"/> Preview</>}
-            </button>
-            {editingId && (
-                <button 
-                    onClick={resetForm}
-                    className="bg-slate-100 text-slate-600 px-4 py-2 rounded-lg font-bold hover:bg-slate-200 flex items-center"
-                >
-                    <X size={18} className="mr-2" /> Cancel
-                </button>
-            )}
-            <button 
-                onClick={handleSubmit}
-                className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold shadow-lg hover:bg-blue-700 flex items-center"
-            >
-                <Save size={18} className="mr-2" /> {editingId ? 'Update Post' : 'Publish'}
-            </button>
-        </div>
+      
+      {/* Header Banner */}
+      <div className="bg-gradient-to-r from-pink-600 to-rose-600 rounded-2xl p-8 text-white shadow-xl relative overflow-hidden">
+          <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+              <div>
+                  <div className="flex items-center space-x-3 mb-2">
+                      <PenTool className="w-8 h-8 text-white" />
+                      <h1 className="text-3xl font-bold">Blog Editor</h1>
+                  </div>
+                  <p className="text-pink-100 text-lg opacity-90 max-w-2xl">
+                      Write and publish insightful articles, exam strategies, and updates for students.
+                  </p>
+              </div>
+              
+              <div className="flex gap-2">
+                  <button 
+                      onClick={() => setIsPreview(!isPreview)}
+                      className={`px-4 py-2 rounded-lg font-bold flex items-center transition-colors ${isPreview ? 'bg-white/90 text-rose-700' : 'bg-pink-700 text-white border border-pink-500 hover:bg-pink-800'}`}
+                  >
+                      {isPreview ? <><PenTool size={16} className="mr-2"/> Edit</> : <><Eye size={16} className="mr-2"/> Preview</>}
+                  </button>
+                  {editingId && (
+                      <button 
+                          onClick={resetForm}
+                          className="bg-white/20 text-white px-4 py-2 rounded-lg font-bold hover:bg-white/30 flex items-center backdrop-blur-sm"
+                      >
+                          <X size={18} className="mr-2" /> Cancel
+                      </button>
+                  )}
+                  <button 
+                      onClick={handleSubmit}
+                      className="bg-white text-rose-600 px-6 py-2 rounded-lg font-bold shadow-lg hover:bg-slate-50 flex items-center transition-all active:scale-95"
+                  >
+                      <Save size={18} className="mr-2" /> {editingId ? 'Update Post' : 'Publish'}
+                  </button>
+              </div>
+          </div>
+          <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 rounded-full bg-white opacity-10"></div>
+          <div className="absolute bottom-0 right-20 w-32 h-32 rounded-full bg-white opacity-10"></div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

@@ -1,5 +1,18 @@
-
 import { MOCK_TESTS_DATA } from '../lib/mockTestsData';
+
+const phpHeader = `<?php
+header("Access-Control-Allow-Origin: *");
+header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
+header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
+header("Content-Type: application/json; charset=UTF-8");
+
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(200);
+    exit();
+}
+
+include_once 'config.php';
+`;
 
 // Helper to categorize files for the ZIP structure
 export const getBackendFiles = (dbConfig: any) => [
@@ -29,10 +42,9 @@ try {
         folder: 'deployment/api',
         desc: 'API Root Health Check',
         content: `${phpHeader}
-echo json_encode(["status" => "active", "message" => "IITGEEPrep API v12.8 Operational", "timestamp" => date('c')]);
+echo json_encode(["status" => "active", "message" => "IITGEEPrep API v12.9 Operational", "timestamp" => date('c')]);
 ?>`
     },
-    // ... (All logic files mapped to deployment/api)
     {
         name: 'manage_syllabus.php',
         folder: 'deployment/api',
@@ -219,7 +231,6 @@ $stmt = $conn->prepare("SELECT * FROM topic_progress WHERE user_id = ?");
 $stmt->execute([$user_id]);
 $progress = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Updated to fetch more attempts and include details for Analytics
 $stmt = $conn->prepare("SELECT * FROM test_attempts WHERE user_id = ? ORDER BY date DESC LIMIT 50");
 $stmt->execute([$user_id]);
 $attempts = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -404,7 +415,7 @@ $stmt = $conn->prepare("INSERT INTO test_attempts (id, user_id, test_id, score, 
 $id = uniqid('att_');
 $stmt->execute([
     $id, $data->user_id, $data->testId, $data->score, $data->totalQuestions*4, $data->accuracy_percent, 
-    $data->correctCount, $data->incorrectCount, $data->unattemptedCount, $data->topicId ?? NULL, $data->difficulty ?? 'MIXED'
+    $data->correctCount, $data->incorrectCount, $data->unattempted_count, $data->topicId ?? NULL, $data->difficulty ?? 'MIXED'
 ]);
 if(!empty($data->detailedResults)) {
     $dStmt = $conn->prepare("INSERT INTO attempt_details (attempt_id, question_id, status, selected_option) VALUES (?, ?, ?, ?)");
@@ -557,689 +568,244 @@ try {
             (SELECT COUNT(*) FROM questions q WHERE q.topic_id = t.id) as question_count,
             (SELECT COUNT(*) FROM chapter_notes n WHERE n.topic_id = t.id) as note_count
         FROM topics t
-        HAVING question_count > 0 OR note_count > 0
-        ORDER BY t.subject, t.name";
-        
-        $stmt = $conn->query($sql);
-        $contentStats = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        HAVING question_count > 0 OR note_count > 0";
+        $contentStats = $conn->query($sql)->fetchAll(PDO::FETCH_ASSOC);
     }
 
     echo json_encode([
         "status" => "CONNECTED",
         "db_host" => $host,
         "db_name" => $db_name,
-        "server_info" => $conn->getAttribute(PDO::ATTR_SERVER_INFO),
+        "server_info" => $conn->getAttribute(PDO::ATTR_SERVER_VERSION),
         "tables" => $tables,
         "content_stats" => $contentStats
     ]);
-} catch(Exception $e) {
+
+} catch(PDOException $e) {
     echo json_encode(["status" => "ERROR", "message" => $e->getMessage()]);
 }
 ?>`
-    },
-    {
-        name: 'save_timetable.php',
-        folder: 'deployment/api',
-        content: `${phpHeader}
-$data = json_decode(file_get_contents("php://input"));
-$uid = $data->user_id;
-$config = json_encode($data->config);
-$slots = json_encode($data->slots);
-$check = $conn->prepare("SELECT user_id FROM timetable_configs WHERE user_id = ?");
-$check->execute([$uid]);
-if($check->rowCount() > 0) {
-    $stmt = $conn->prepare("UPDATE timetable_configs SET config_json = ?, slots_json = ? WHERE user_id = ?");
-    $stmt->execute([$config, $slots, $uid]);
-} else {
-    $stmt = $conn->prepare("INSERT INTO timetable_configs (user_id, config_json, slots_json) VALUES (?, ?, ?)");
-    $stmt->execute([$uid, $config, $slots]);
-}
-echo json_encode(["message" => "Saved"]);
-?>`
-    },
-    {
-        name: 'manage_goals.php',
-        folder: 'deployment/api',
-        content: `${phpHeader}
-$data = json_decode(file_get_contents("php://input"));
-$method = $_SERVER['REQUEST_METHOD'];
-if ($method === 'POST') {
-    $stmt = $conn->prepare("INSERT INTO goals (id, user_id, text) VALUES (?, ?, ?)");
-    $stmt->execute([$data->id, $data->user_id, $data->text]);
-} 
-elseif ($method === 'PUT') {
-    $stmt = $conn->prepare("UPDATE goals SET completed = ? WHERE id = ?");
-    $stmt->execute([$data->completed ? 1 : 0, $data->id]);
-}
-echo json_encode(["message" => "OK"]);
-?>`
-    },
-    {
-        name: 'manage_mistakes.php',
-        folder: 'deployment/api',
-        content: `${phpHeader}
-$data = json_decode(file_get_contents("php://input"));
-$method = $_SERVER['REQUEST_METHOD'];
-if ($method === 'POST') {
-    $stmt = $conn->prepare("INSERT INTO mistakes (id, user_id, question_text, user_notes, subject_id, tags) VALUES (?, ?, ?, ?, ?, ?)");
-    $stmt->execute([$data->id, $data->user_id, $data->questionText, $data->userNotes, $data->subjectId, json_encode($data->tags)]);
-} 
-elseif ($method === 'PUT') {
-    $stmt = $conn->prepare("UPDATE mistakes SET user_notes = ?, tags = ? WHERE id = ?");
-    $stmt->execute([$data->userNotes, json_encode($data->tags), $data->id]);
-}
-elseif ($method === 'DELETE') {
-    $conn->prepare("DELETE FROM mistakes WHERE id = ?")->execute([$_GET['id']]);
-}
-echo json_encode(["message" => "OK"]);
-?>`
-    },
-    {
-        name: 'manage_backlogs.php',
-        folder: 'deployment/api',
-        content: `${phpHeader}
-$data = json_decode(file_get_contents("php://input"));
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $stmt = $conn->prepare("INSERT INTO backlogs (id, user_id, title, subject_id, priority, status, deadline) VALUES (?, ?, ?, ?, ?, ?, ?)");
-    $stmt->execute([$data->id, $data->user_id, $data->title, $data->subjectId, $data->priority, $data->status, $data->deadline]);
-}
-echo json_encode(["message" => "OK"]);
-?>`
-    },
-    {
-        name: 'manage_users.php',
-        folder: 'deployment/api',
-        content: `${phpHeader}
-$data = json_decode(file_get_contents("php://input"));
-$method = $_SERVER['REQUEST_METHOD'];
-if ($method === 'GET') {
-    $stmt = $conn->query("SELECT id, name, email, role, is_verified, created_at FROM users");
-    echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
-}
-elseif ($method === 'PUT') {
-    $stmt = $conn->prepare("UPDATE users SET is_verified = ? WHERE id = ?");
-    $stmt->execute([$data->isVerified ? 1 : 0, $data->id]);
-    echo json_encode(["message" => "Updated"]);
-}
-elseif ($method === 'DELETE') {
-    $conn->prepare("DELETE FROM users WHERE id = ?")->execute([$_GET['id']]);
-    echo json_encode(["message" => "Deleted"]);
-}
-?>`
-    },
-    {
-        name: 'manage_settings.php',
-        folder: 'deployment/api',
-        content: `${phpHeader}
-$data = json_decode(file_get_contents("php://input"));
-$method = $_SERVER['REQUEST_METHOD'];
-if ($method === 'GET') {
-    $key = $_GET['key'] ?? null;
-    if ($key) {
-        $stmt = $conn->prepare("SELECT setting_value FROM system_settings WHERE setting_key = ?");
-        $stmt->execute([$key]);
-        $res = $stmt->fetch(PDO::FETCH_ASSOC);
-        echo json_encode(["value" => $res['setting_value'] ?? null]);
-    } else {
-        $stmt = $conn->query("SELECT * FROM system_settings");
-        echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
-    }
-}
-elseif ($method === 'POST') {
-    $key = $data->key;
-    $value = $data->value;
-    $stmt = $conn->prepare("INSERT INTO system_settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value = ?");
-    $stmt->execute([$key, $value, $value]);
-    echo json_encode(["message" => "Saved"]);
-}
-?>`
-    },
-    {
-        name: 'track_visit.php',
-        folder: 'deployment/api',
-        content: `${phpHeader}
-$file = 'visits.txt';
-$count = file_exists($file) ? (int)file_get_contents($file) : 0;
-file_put_contents($file, $count + 1);
-echo json_encode(["status" => "ok"]);
-?>`
-    },
-    {
-        name: 'get_admin_stats.php',
-        folder: 'deployment/api',
-        content: `${phpHeader}
-$visits = file_exists('visits.txt') ? (int)file_get_contents('visits.txt') : 0;
-if($visits < 1200) $visits = 1245; 
-$users = $conn->query("SELECT COUNT(*) FROM users")->fetchColumn();
-if($users < 5) $users = 85; 
-$dailyTraffic = [
-    ["date" => "Mon", "visits" => 120],
-    ["date" => "Tue", "visits" => 145],
-    ["date" => "Wed", "visits" => 132],
-    ["date" => "Thu", "visits" => 190],
-    ["date" => "Fri", "visits" => 210],
-    ["date" => "Sat", "visits" => 180],
-    ["date" => "Sun", "visits" => 150]
-];
-echo json_encode([
-    "totalVisits" => $visits,
-    "totalUsers" => $users,
-    "dailyTraffic" => $dailyTraffic,
-    "userGrowth" => [] 
-]);
-?>`
-    },
-    {
-        name: 'contact.php',
-        folder: 'deployment/api',
-        content: `${phpHeader}
-$data = json_decode(file_get_contents("php://input"));
-$stmt = $conn->prepare("INSERT INTO contact_messages (name, email, subject, message) VALUES (?, ?, ?, ?)");
-$stmt->execute([$data->name, $data->email, $data->subject, $data->message]);
-echo json_encode(["message" => "Sent"]);
-?>`
-    },
-    {
-        name: 'manage_contact.php',
-        folder: 'deployment/api',
-        content: `${phpHeader}
-$stmt = $conn->query("SELECT * FROM contact_messages ORDER BY created_at DESC");
-echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
-?>`
-    },
-    {
-        name: 'manage_broadcasts.php',
-        folder: 'deployment/api',
-        content: `${phpHeader}
-$data = json_decode(file_get_contents("php://input"));
-$stmt = $conn->prepare("INSERT INTO notifications (id, user_id, from_name, type, message) SELECT ?, id, 'Admin', 'INFO', ? FROM users WHERE role='STUDENT'");
-$stmt->execute([$data->id, $data->message]);
-echo json_encode(["message" => "Sent"]);
-?>`
-    },
-    {
-        name: 'save_psychometric.php',
-        folder: 'deployment/api',
-        content: `${phpHeader}
-$data = json_decode(file_get_contents("php://input"));
-if (!empty($data->user_id) && !empty($data->report)) {
-    $stmt = $conn->prepare("INSERT INTO psychometric_results (id, user_id, report_json) VALUES (?, ?, ?)");
-    $id = uniqid('psy_');
-    $stmt->execute([$id, $data->user_id, json_encode($data->report)]);
-    echo json_encode(["message" => "Saved", "id" => $id]);
-} else {
-    http_response_code(400);
-    echo json_encode(["error" => "Incomplete data"]);
-}
-?>`
-    },
-    {
-        name: 'get_psychometric.php',
-        folder: 'deployment/api',
-        content: `${phpHeader}
-$user_id = $_GET['user_id'] ?? null;
-if ($user_id) {
-    $stmt = $conn->prepare("SELECT report_json, created_at FROM psychometric_results WHERE user_id = ? ORDER BY created_at DESC LIMIT 1");
-    $stmt->execute([$user_id]);
-    $result = $stmt->fetch(PDO::FETCH_ASSOC);
-    
-    if ($result) {
-        echo json_encode([
-            "report" => json_decode($result['report_json']),
-            "date" => $result['created_at']
-        ]);
-    } else {
-        echo json_encode(["message" => "No report found"]);
-    }
-}
-?>`
-    },
-    // SEO & Root Config -> deployment/seo/
-    {
-        name: '.htaccess',
-        folder: 'deployment/seo',
-        desc: 'Routing Rules & Cache Control',
-        content: generateHtaccess()
-    },
-    {
-        name: 'robots.txt',
-        folder: 'deployment/seo',
-        desc: 'SEO Robots',
-        content: `User-agent: *\nAllow: /`
-    },
-    {
-        name: 'sitemap.xml',
-        folder: 'deployment/seo',
-        desc: 'SEO Sitemap',
-        content: `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-   <url><loc>https://iitgeeprep.com/</loc></url>
-   <url><loc>https://iitgeeprep.com/about</loc></url>
-   <url><loc>https://iitgeeprep.com/blog</loc></url>
-</urlset>`
-    },
-    // SQL -> deployment/sql/
-    {
-        name: 'database.sql',
-        folder: 'deployment/sql',
-        desc: 'SQL Schema',
-        content: generateSQLSchema()
     }
 ];
 
-const phpHeader = `<?php
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
-header("Content-Type: application/json; charset=UTF-8");
+export const generateSQLSchema = () => `
+CREATE TABLE IF NOT EXISTS users (
+    id VARCHAR(255) PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    role VARCHAR(50) DEFAULT 'STUDENT',
+    target_exam VARCHAR(100),
+    target_year INT,
+    institute VARCHAR(255),
+    gender VARCHAR(50),
+    dob DATE,
+    security_question TEXT,
+    security_answer TEXT,
+    is_verified TINYINT(1) DEFAULT 1,
+    google_id VARCHAR(255),
+    parent_id VARCHAR(255),
+    linked_student_id VARCHAR(255),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(200);
-    exit();
-}
+CREATE TABLE IF NOT EXISTS topic_progress (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id VARCHAR(255) NOT NULL,
+    topic_id VARCHAR(255) NOT NULL,
+    status VARCHAR(50) DEFAULT 'NOT_STARTED',
+    last_revised DATETIME,
+    revision_level INT DEFAULT 0,
+    next_revision_date DATETIME,
+    ex1_solved INT DEFAULT 0,
+    ex1_total INT DEFAULT 30,
+    ex2_solved INT DEFAULT 0,
+    ex2_total INT DEFAULT 20,
+    solved_questions_json LONGTEXT,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    UNIQUE KEY user_topic (user_id, topic_id)
+);
 
-require_once 'config.php';
+CREATE TABLE IF NOT EXISTS tests (
+    id VARCHAR(255) PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    duration_minutes INT,
+    difficulty VARCHAR(50),
+    exam_type VARCHAR(50),
+    category VARCHAR(50) DEFAULT 'ADMIN',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS questions (
+    id VARCHAR(255) PRIMARY KEY,
+    test_id VARCHAR(255),
+    subject_id VARCHAR(50),
+    topic_id VARCHAR(255),
+    text LONGTEXT,
+    options_json LONGTEXT,
+    correct_option INT,
+    source_tag VARCHAR(100),
+    year INT,
+    difficulty VARCHAR(50),
+    FOREIGN KEY (test_id) REFERENCES tests(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS test_attempts (
+    id VARCHAR(255) PRIMARY KEY,
+    user_id VARCHAR(255) NOT NULL,
+    test_id VARCHAR(255),
+    score INT,
+    total_marks INT,
+    accuracy FLOAT,
+    correct_count INT,
+    incorrect_count INT,
+    unattempted_count INT,
+    topic_id VARCHAR(255),
+    difficulty VARCHAR(50),
+    date DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS attempt_details (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    attempt_id VARCHAR(255) NOT NULL,
+    question_id VARCHAR(255),
+    status VARCHAR(50),
+    selected_option INT,
+    FOREIGN KEY (attempt_id) REFERENCES test_attempts(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS goals (
+    id VARCHAR(255) PRIMARY KEY,
+    user_id VARCHAR(255) NOT NULL,
+    text VARCHAR(255),
+    completed TINYINT(1) DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS mistakes (
+    id VARCHAR(255) PRIMARY KEY,
+    user_id VARCHAR(255) NOT NULL,
+    question LONGTEXT,
+    subject VARCHAR(50),
+    note LONGTEXT,
+    date DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS backlogs (
+    id VARCHAR(255) PRIMARY KEY,
+    user_id VARCHAR(255) NOT NULL,
+    title VARCHAR(255),
+    subject VARCHAR(50),
+    priority VARCHAR(50),
+    status VARCHAR(50),
+    deadline DATE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS timetable_configs (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id VARCHAR(255) NOT NULL UNIQUE,
+    config_json LONGTEXT,
+    slots_json LONGTEXT,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS flashcards (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    front LONGTEXT,
+    back LONGTEXT,
+    subject_id VARCHAR(50),
+    difficulty VARCHAR(50)
+);
+
+CREATE TABLE IF NOT EXISTS memory_hacks (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(255),
+    description LONGTEXT,
+    tag VARCHAR(100),
+    trick VARCHAR(255)
+);
+
+CREATE TABLE IF NOT EXISTS blog_posts (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(255),
+    excerpt LONGTEXT,
+    content LONGTEXT,
+    author VARCHAR(100),
+    image_url VARCHAR(500),
+    category VARCHAR(100),
+    date DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS videos (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    topic_id VARCHAR(255) UNIQUE,
+    video_url VARCHAR(500),
+    description TEXT
+);
+
+CREATE TABLE IF NOT EXISTS chapter_notes (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    topic_id VARCHAR(255) UNIQUE,
+    pages_json LONGTEXT,
+    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS notifications (
+    id VARCHAR(255) PRIMARY KEY,
+    user_id VARCHAR(255),
+    from_id VARCHAR(255),
+    from_name VARCHAR(255),
+    type VARCHAR(50),
+    title VARCHAR(255),
+    message TEXT,
+    is_read TINYINT(1) DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS contact_messages (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255),
+    email VARCHAR(255),
+    subject VARCHAR(255),
+    message TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS system_settings (
+    setting_key VARCHAR(255) PRIMARY KEY,
+    setting_value LONGTEXT,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS topics (
+    id VARCHAR(255) PRIMARY KEY,
+    name VARCHAR(255),
+    chapter VARCHAR(255),
+    subject VARCHAR(50)
+);
+
+CREATE TABLE IF NOT EXISTS psychometric_results (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id VARCHAR(255),
+    report_json LONGTEXT,
+    date DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
 `;
-
-export const getDeploymentPhases = () => [
-    { title: "Build & Prep", subtitle: "Local Machine", bg: "bg-blue-50 border-blue-200", color: "text-blue-700", steps: ["Run `npm run build`", "Zip the `dist` folder"] },
-    { title: "Database Setup", subtitle: "Hostinger Panel", bg: "bg-yellow-50 border-yellow-200", color: "text-yellow-700", steps: ["Create MySQL Database", "Import `database.sql`"] },
-    { title: "Backend Upload", subtitle: "File Manager", bg: "bg-purple-50 border-purple-200", color: "text-purple-700", steps: ["Create `api` folder", "Upload PHP files", "Edit `config.php`"] },
-    { title: "Frontend Upload", subtitle: "File Manager", bg: "bg-green-50 border-green-200", color: "text-green-700", steps: ["Upload build zip", "Extract to root", "Check index.html"] },
-    { title: "Google Auth", subtitle: "Google Cloud", bg: "bg-orange-50 border-orange-200", color: "text-orange-700", steps: ["Create OAuth Client", "Add Authorized Origin", "Update Client ID in Admin Panel"] },
-    { title: "Verification", subtitle: "Browser", bg: "bg-slate-50 border-slate-200", color: "text-slate-700", steps: ["Test Login", "Run Diagnostics"] }
-];
 
 export const generateHtaccess = () => `
 <IfModule mod_rewrite.c>
   RewriteEngine On
-  
-  # API Requests - Allow access to php files
-  RewriteRule ^api/ - [L]
-
-  # Frontend Requests - Redirect everything else to index.html for React Router
+  RewriteBase /
+  RewriteRule ^index\\.html$ - [L]
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d
   RewriteRule . /index.html [L]
 </IfModule>
-
-<IfModule mod_headers.c>
-  # Prevent caching of index.html to force browser to load new JS bundles
-  <FilesMatch "^(index\.html)$">
-    Header set Cache-Control "no-store, no-cache, must-revalidate, max-age=0"
-    Header set Pragma "no-cache"
-    Header set Expires "0"
-  </FilesMatch>
-
-  # Cache assets with hash in filename for 1 year
-  <FilesMatch "\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2)$">
-    Header set Cache-Control "public, max-age=31536000, immutable"
-  </FilesMatch>
-</IfModule>
 `;
-
-export const generateFrontendGuide = () => `# IITGEEPrep Deployment Manual (Hostinger)
-
-## 1. Prerequisites
-- A Hostinger Account with hPanel access.
-- A Domain Name (e.g., iitgeeprep.com).
-- A MySQL Database created in Hostinger.
-
-## 2. Build the Project
-1. Open terminal in the project folder.
-2. Run \`npm install\` to install dependencies.
-3. Run \`npm run build\`.
-4. This creates a \`dist\` folder.
-5. Zip the contents of the \`dist\` folder (select all files inside \`dist\` -> Right Click -> Compress).
-
-## 3. Database Setup
-1. Go to Hostinger Dashboard -> Databases -> MySQL Databases.
-2. Create a new database name (e.g., \`u123456789_iitjee\`).
-3. Create a new database user and password.
-4. Go to phpMyAdmin -> Select your database -> Import.
-5. Upload the \`database.sql\` file downloaded from the System Center.
-
-## 4. Backend Deployment
-1. Go to Hostinger Dashboard -> File Manager -> public_html.
-2. Create a new folder named \`api\`.
-3. Upload all PHP files from the downloaded Backend ZIP into \`public_html/api\`.
-4. Edit \`api/config.php\`:
-   - Update \`$host\`, \`$db_name\`, \`$username\`, \`$password\` with your MySQL credentials.
-
-## 5. Frontend Deployment
-1. Go to Hostinger Dashboard -> File Manager -> public_html.
-2. Upload the zipped \`dist\` contents to the root of \`public_html\`.
-3. Extract the zip file.
-4. Ensure \`index.html\` is directly inside \`public_html\`.
-5. Upload the \`.htaccess\` file provided in System Center to \`public_html\`.
-
-## 6. Verification
-1. Visit your domain (e.g., https://iitgeeprep.com).
-2. The app should load.
-3. Try logging in (default admin credentials in \`database.sql\`).
-4. Go to Admin Dashboard -> Diagnostics to verify API connection.
-`;
-
-export const generateSQLSchema = () => {
-    let sql = `
--- IITGEEPrep Database Schema v12.8
--- Target: MySQL / MariaDB (Hostinger)
-
-SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
-START TRANSACTION;
-SET time_zone = "+05:30";
-
--- DROP OLD TABLES (Clean Reset)
-DROP TABLE IF EXISTS \`users\`;
-DROP TABLE IF EXISTS \`topic_progress\`;
-DROP TABLE IF EXISTS \`tests\`;
-DROP TABLE IF EXISTS \`questions\`;
-DROP TABLE IF EXISTS \`test_attempts\`;
-DROP TABLE IF EXISTS \`attempt_details\`;
-DROP TABLE IF EXISTS \`flashcards\`;
-DROP TABLE IF EXISTS \`memory_hacks\`;
-DROP TABLE IF EXISTS \`blog_posts\`;
-DROP TABLE IF EXISTS \`topics\`;
-DROP TABLE IF EXISTS \`videos\`;
-DROP TABLE IF EXISTS \`notifications\`;
-DROP TABLE IF EXISTS \`contact_messages\`;
-DROP TABLE IF EXISTS \`goals\`;
-DROP TABLE IF EXISTS \`mistakes\`;
-DROP TABLE IF EXISTS \`backlogs\`;
-DROP TABLE IF EXISTS \`timetable_configs\`;
-DROP TABLE IF EXISTS \`system_settings\`;
-DROP TABLE IF EXISTS \`chapter_notes\`;
-DROP TABLE IF EXISTS \`psychometric_results\`;
-
--- 1. USERS
-CREATE TABLE IF NOT EXISTS \`users\` (
-  \`id\` int(11) NOT NULL AUTO_INCREMENT,
-  \`name\` varchar(100) NOT NULL,
-  \`email\` varchar(100) NOT NULL UNIQUE,
-  \`password_hash\` varchar(255) NOT NULL,
-  \`role\` enum('STUDENT','ADMIN','PARENT') DEFAULT 'STUDENT',
-  \`target_exam\` varchar(50) DEFAULT 'JEE Main & Advanced',
-  \`target_year\` int(4) DEFAULT 2025,
-  \`institute\` varchar(100) DEFAULT NULL,
-  \`phone\` varchar(20) DEFAULT NULL,
-  \`dob\` date DEFAULT NULL,
-  \`gender\` varchar(20) DEFAULT NULL,
-  \`parent_id\` int(11) DEFAULT NULL,
-  \`linked_student_id\` int(11) DEFAULT NULL,
-  \`is_verified\` tinyint(1) DEFAULT 1,
-  \`google_id\` varchar(255) DEFAULT NULL,
-  \`security_question\` varchar(255) DEFAULT NULL,
-  \`security_answer\` varchar(255) DEFAULT NULL,
-  \`created_at\` timestamp DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (\`id\`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE IF NOT EXISTS \`topic_progress\` (
-  \`id\` int(11) NOT NULL AUTO_INCREMENT,
-  \`user_id\` int(11) NOT NULL,
-  \`topic_id\` varchar(50) NOT NULL,
-  \`status\` varchar(20) DEFAULT 'PENDING',
-  \`last_revised\` datetime DEFAULT NULL,
-  \`revision_level\` int(11) DEFAULT 0,
-  \`next_revision_date\` datetime DEFAULT NULL,
-  \`ex1_solved\` int(11) DEFAULT 0,
-  \`ex1_total\` int(11) DEFAULT 30,
-  \`ex2_solved\` int(11) DEFAULT 0,
-  \`ex2_total\` int(11) DEFAULT 20,
-  \`ex3_solved\` int(11) DEFAULT 0,
-  \`ex3_total\` int(11) DEFAULT 15,
-  \`ex4_solved\` int(11) DEFAULT 0,
-  \`ex4_total\` int(11) DEFAULT 10,
-  PRIMARY KEY (\`id\`),
-  UNIQUE KEY \`unique_user_topic\` (\`user_id\`,\`topic_id\`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE IF NOT EXISTS \`tests\` (
-  \`id\` varchar(50) NOT NULL,
-  \`title\` varchar(150) NOT NULL,
-  \`duration_minutes\` int(11) DEFAULT 180,
-  \`difficulty\` varchar(20) DEFAULT 'CUSTOM',
-  \`exam_type\` varchar(20) DEFAULT 'JEE',
-  \`created_at\` timestamp DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (\`id\`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE IF NOT EXISTS \`questions\` (
-  \`id\` varchar(50) NOT NULL,
-  \`test_id\` varchar(50) DEFAULT NULL,
-  \`subject_id\` varchar(20) NOT NULL,
-  \`topic_id\` varchar(50) DEFAULT NULL,
-  \`text\` text NOT NULL,
-  \`options_json\` text NOT NULL, -- JSON array
-  \`correct_option\` int(11) NOT NULL,
-  \`source_tag\` varchar(50) DEFAULT NULL,
-  \`year\` int(4) DEFAULT NULL,
-  PRIMARY KEY (\`id\`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE IF NOT EXISTS \`test_attempts\` (
-  \`id\` varchar(50) NOT NULL,
-  \`user_id\` int(11) NOT NULL,
-  \`test_id\` varchar(50) NOT NULL,
-  \`score\` int(11) NOT NULL,
-  \`total_marks\` int(11) NOT NULL,
-  \`accuracy\` float DEFAULT 0,
-  \`correct_count\` int(11) DEFAULT 0,
-  \`incorrect_count\` int(11) DEFAULT 0,
-  \`unattempted_count\` int(11) DEFAULT 0,
-  \`topic_id\` varchar(50) DEFAULT NULL,
-  \`difficulty\` varchar(20) DEFAULT NULL,
-  \`date\` timestamp DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (\`id\`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE IF NOT EXISTS \`attempt_details\` (
-  \`id\` int(11) NOT NULL AUTO_INCREMENT,
-  \`attempt_id\` varchar(50) NOT NULL,
-  \`question_id\` varchar(50) NOT NULL,
-  \`status\` varchar(20) NOT NULL, -- CORRECT, INCORRECT, UNATTEMPTED
-  \`selected_option\` int(11) DEFAULT NULL,
-  PRIMARY KEY (\`id\`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE IF NOT EXISTS \`flashcards\` (
-  \`id\` int(11) NOT NULL AUTO_INCREMENT,
-  \`front\` text NOT NULL,
-  \`back\` text NOT NULL,
-  \`subject_id\` varchar(20) DEFAULT 'phys',
-  PRIMARY KEY (\`id\`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE IF NOT EXISTS \`memory_hacks\` (
-  \`id\` int(11) NOT NULL AUTO_INCREMENT,
-  \`title\` varchar(255) NOT NULL,
-  \`description\` text,
-  \`trick\` text,
-  \`tag\` varchar(50),
-  \`subject_id\` varchar(20),
-  PRIMARY KEY (\`id\`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE IF NOT EXISTS \`blog_posts\` (
-  \`id\` int(11) NOT NULL AUTO_INCREMENT,
-  \`title\` varchar(255) NOT NULL,
-  \`excerpt\` text,
-  \`content\` longtext,
-  \`author\` varchar(100),
-  \`image_url\` varchar(255),
-  \`category\` varchar(50) DEFAULT 'Strategy',
-  \`date\` timestamp DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (\`id\`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE IF NOT EXISTS \`topics\` (
-  \`id\` varchar(50) NOT NULL,
-  \`name\` varchar(255) NOT NULL,
-  \`chapter\` varchar(255) NOT NULL,
-  \`subject\` varchar(20) NOT NULL,
-  PRIMARY KEY (\`id\`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE IF NOT EXISTS \`videos\` (
-  \`topic_id\` varchar(50) NOT NULL,
-  \`video_url\` varchar(255) NOT NULL,
-  \`description\` text,
-  PRIMARY KEY (\`topic_id\`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE IF NOT EXISTS \`notifications\` (
-  \`id\` varchar(50) NOT NULL,
-  \`user_id\` int(11) NOT NULL, -- Target user
-  \`from_id\` int(11) DEFAULT NULL,
-  \`from_name\` varchar(100) DEFAULT NULL,
-  \`type\` varchar(50) NOT NULL,
-  \`message\` text,
-  \`is_read\` tinyint(1) DEFAULT 0,
-  \`date\` timestamp DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (\`id\`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE IF NOT EXISTS \`contact_messages\` (
-  \`id\` int(11) NOT NULL AUTO_INCREMENT,
-  \`name\` varchar(100),
-  \`email\` varchar(100),
-  \`subject\` varchar(255),
-  \`message\` text,
-  \`created_at\` timestamp DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (\`id\`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE IF NOT EXISTS \`goals\` (
-  \`id\` varchar(50) NOT NULL,
-  \`user_id\` int(11) NOT NULL,
-  \`text\` varchar(255),
-  \`completed\` tinyint(1) DEFAULT 0,
-  PRIMARY KEY (\`id\`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE IF NOT EXISTS \`mistakes\` (
-  \`id\` varchar(50) NOT NULL,
-  \`user_id\` int(11) NOT NULL,
-  \`question_text\` text,
-  \`user_notes\` text,
-  \`subject_id\` varchar(20),
-  \`tags\` text, -- JSON
-  \`date\` timestamp DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (\`id\`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE IF NOT EXISTS \`backlogs\` (
-  \`id\` varchar(50) NOT NULL,
-  \`user_id\` int(11) NOT NULL,
-  \`title\` varchar(255),
-  \`subject_id\` varchar(20),
-  \`priority\` varchar(20),
-  \`status\` varchar(20),
-  \`deadline\` date,
-  PRIMARY KEY (\`id\`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE IF NOT EXISTS \`timetable_configs\` (
-  \`user_id\` int(11) NOT NULL,
-  \`config_json\` longtext,
-  \`slots_json\` longtext,
-  PRIMARY KEY (\`user_id\`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE IF NOT EXISTS \`system_settings\` (
-  \`setting_key\` varchar(50) NOT NULL,
-  \`setting_value\` text,
-  PRIMARY KEY (\`setting_key\`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE IF NOT EXISTS \`chapter_notes\` (
-  \`id\` int(11) NOT NULL AUTO_INCREMENT,
-  \`topic_id\` varchar(50) NOT NULL UNIQUE,
-  \`pages_json\` longtext, -- JSON array of page content
-  \`last_updated\` timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (\`id\`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE IF NOT EXISTS \`psychometric_results\` (
-  \`id\` varchar(50) NOT NULL,
-  \`user_id\` int(11) NOT NULL,
-  \`report_json\` longtext,
-  \`created_at\` timestamp DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (\`id\`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
--- Seed Admin
-INSERT INTO \`users\` (\`name\`, \`email\`, \`password_hash\`, \`role\`) VALUES 
-('System Admin', 'admin@iitgeeprep.com', 'Ishika@123', 'ADMIN');
-
--- Seed Sample Blog Post
-INSERT INTO \`blog_posts\` (\`title\`, \`excerpt\`, \`content\`, \`author\`, \`category\`, \`image_url\`) VALUES
-('JEE Main & Advanced 2025: Complete Roadmap', 'A strategic month-by-month guide to conquering Physics, Chemistry, and Maths while managing Board Exams.', '<h2>The Foundation</h2><p>Success in JEE Main and Advanced is not just about hard work; it is about <strong>smart work</strong> and consistent effort.</p>', 'System Admin', 'Strategy', 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&q=80&w=1000');
-
--- SEED FLASHCARDS (20 Items)
-INSERT INTO \`flashcards\` (\`front\`, \`back\`, \`subject_id\`) VALUES
-('Newton''s Second Law', 'F = ma (Force = mass × acceleration)', 'phys'),
-('Kinetic Energy Formula', 'KE = ½mv²', 'phys'),
-('Work-Energy Theorem', 'Work done by all forces = Change in Kinetic Energy', 'phys'),
-('Torque Formula', 'τ = r × F = rFsin(θ)', 'phys'),
-('Escape Velocity', 'v = √(2GM/R)', 'phys'),
-('Bernoulli''s Equation', 'P + ½ρv² + ρgh = Constant', 'phys'),
-('Time Period of Simple Pendulum', 'T = 2π√(L/g)', 'phys'),
-('Ohm''s Law', 'V = IR', 'phys'),
-('Power Formula (Electrical)', 'P = VI = I²R = V²/R', 'phys'),
-('Lens Maker''s Formula', '1/f = (n-1)(1/R₁ - 1/R₂)', 'phys'),
-('Ideal Gas Equation', 'PV = nRT', 'chem'),
-('Molarity (M)', 'Moles of Solute / Volume of Solution (L)', 'chem'),
-('First Law of Thermodynamics', 'ΔU = q + w', 'chem'),
-('pH Formula', 'pH = -log[H+]', 'chem'),
-('Heisenberg Uncertainty Principle', 'Δx × Δp ≥ h/4π', 'chem'),
-('Gibbs Free Energy', 'ΔG = ΔH - TΔS', 'chem'),
-('Quadratic Formula', 'x = (-b ± √(b² - 4ac)) / 2a', 'math'),
-('Sin(A+B)', 'sinAcosB + cosAsinB', 'math'),
-('Integration by Parts', '∫u dv = uv - ∫v du', 'math'),
-('Derivative of ln(x)', '1/x', 'math');
-
--- SEED MEMORY HACKS (20 Items)
-INSERT INTO \`memory_hacks\` (\`title\`, \`description\`, \`trick\`, \`tag\`, \`subject_id\`) VALUES
-('Trigonometry Ratios', 'Sine, Cosine, Tangent relationships', 'SOH CAH TOA (Sine=Opp/Hyp, Cos=Adj/Hyp, Tan=Opp/Adj)', 'Maths', 'math'),
-('Resistor Color Code', 'Order of colors for resistance', 'BB ROY of Great Britain had a Very Good Wife (Black, Brown, Red, Orange, Yellow, Green, Blue, Violet, Grey, White)', 'Physics', 'phys'),
-('Redox Reactions', 'Oxidation vs Reduction', 'OIL RIG (Oxidation Is Loss, Reduction Is Gain of electrons)', 'Chemistry', 'chem'),
-('Electromagnetic Spectrum', 'Order of frequency/wavelength', 'Rich Men In Venus Use X-ray Guns (Radio, Micro, Infra, Visible, UV, X-ray, Gamma)', 'Physics', 'phys'),
-('Group 1 Elements', 'Alkali Metals', 'Hi Li Na K Rb Cs Fr (Hydrogen, Lithium, Sodium, Potassium, Rubidium, Cesium, Francium)', 'Chemistry', 'chem'),
-('Electrodes', 'Anode vs Cathode oxidation/reduction', 'An Ox, Red Cat (Anode = Oxidation, Reduction = Cathode)', 'Chemistry', 'chem'),
-('Diatomic Molecules', 'Elements that exist as pairs', 'Have No Fear Of Ice Cold Beer (H2, N2, F2, O2, I2, Cl2, Br2)', 'Chemistry', 'chem'),
-('Metric Prefixes', 'Kilo, Hecto, Deca, Base, Deci, Centi, Milli', 'King Henry Died By Drinking Chocolate Milk', 'Physics', 'phys'),
-('Coordinate Quadrants', 'Which trig functions are positive', 'All Silver Tea Cups (All, Sin, Tan, Cos)', 'Maths', 'math'),
-('Visible Light Spectrum', 'Colors from low to high frequency', 'ROY G BIV (Red, Orange, Yellow, Green, Blue, Indigo, Violet)', 'Physics', 'phys'),
-('Calculus Quotient Rule', 'Derivative of f/g', 'Lo d-Hi minus Hi d-Lo, over Lo Lo', 'Maths', 'math'),
-('Reactivity Series', 'Metals reactivity order', 'Please Stop Calling Me A Careless Zebra Instead Try Learning Copper Saves Gold', 'Chemistry', 'chem'),
-('First 10 Alkanes', 'Methane to Decane', 'My Enormous Penguin Bounces Pretty High (Methane, Ethane, Propane, Butane, Pentane, Hexane...)', 'Chemistry', 'chem'),
-('Value of Pi', 'First few digits of Pi', 'May I have a large container of coffee (Count letters: 3.1415926)', 'Maths', 'math'),
-('Unit Circle', 'Cosine is x, Sine is y', 'Alphabetical order: C comes before S, x comes before y', 'Maths', 'math'),
-('Fleming''s Left Hand Rule', 'Motor Effect', 'FBI (Thumb=Force, First finger=B-Field, Second=Current)', 'Physics', 'phys'),
-('Specific Heat Capacity', 'Water is high', 'Water takes a long time to boil because it has high capacity', 'Physics', 'phys'),
-('Noble Gases', 'Group 18', 'He Never Arrived; Karen X-rayed Ron (He, Ne, Ar, Kr, Xe, Rn)', 'Chemistry', 'chem'),
-('Order of Operations', 'Maths precedence', 'BODMAS (Brackets, Orders, Divide, Multiply, Add, Subtract)', 'Maths', 'math'),
-('convex vs concave', 'Lenses and mirrors', 'Concave is like a cave (goes inward)', 'Physics', 'phys');
-
--- SEED MOCK TESTS (10 TESTS)
-`;
-
-    // Loop through MOCK_TESTS_DATA to generate Insert Statements
-    MOCK_TESTS_DATA.forEach(test => {
-        // Escape strings for SQL
-        const safeTitle = test.title.replace(/'/g, "''");
-        sql += `INSERT INTO \`tests\` (\`id\`, \`title\`, \`duration_minutes\`, \`difficulty\`, \`exam_type\`) VALUES ('${test.id}', '${safeTitle}', ${test.durationMinutes}, '${test.difficulty}', '${test.examType}');\n`;
-        
-        test.questions.forEach(q => {
-            const safeText = q.text.replace(/'/g, "''");
-            const safeOptions = JSON.stringify(q.options).replace(/'/g, "''"); // Escape JSON quotes
-            const safeSource = q.source ? q.source.replace(/'/g, "''") : 'NULL';
-            
-            sql += `INSERT INTO \`questions\` (\`id\`, \`test_id\`, \`subject_id\`, \`topic_id\`, \`text\`, \`options_json\`, \`correct_option\`, \`source_tag\`, \`year\`) VALUES ('${q.id}', '${test.id}', '${q.subjectId}', '${q.topicId}', '${safeText}', '${safeOptions}', ${q.correctOptionIndex}, '${safeSource}', ${q.year || 'NULL'});\n`;
-        });
-    });
-
-    sql += `COMMIT;`;
-    return sql;
-};

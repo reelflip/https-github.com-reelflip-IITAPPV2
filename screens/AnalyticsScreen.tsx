@@ -120,9 +120,19 @@ export const AnalyticsScreen: React.FC<Props> = ({ user, progress = {}, testAtte
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
-      <div>
-        <h2 className="text-2xl font-bold text-slate-900">Performance Analytics</h2>
-        <p className="text-slate-500">Deep dive into your study metrics, question volume, and test scores.</p>
+      {/* Header Banner */}
+      <div className="bg-gradient-to-r from-slate-700 to-slate-800 rounded-2xl p-8 text-white shadow-xl relative overflow-hidden">
+          <div className="relative z-10">
+              <div className="flex items-center space-x-3 mb-2">
+                  <BarChart3 className="w-8 h-8 text-white" />
+                  <h1 className="text-3xl font-bold">Performance Analytics</h1>
+              </div>
+              <p className="text-slate-200 text-lg opacity-90 max-w-2xl">
+                  Deep dive into your study metrics, question volume, and test score trends.
+              </p>
+          </div>
+          <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 rounded-full bg-white opacity-10"></div>
+          <div className="absolute bottom-0 right-20 w-32 h-32 rounded-full bg-white opacity-10"></div>
       </div>
 
       {/* Top Row: Syllabus Radar & Score Trend */}

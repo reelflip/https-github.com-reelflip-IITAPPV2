@@ -30,19 +30,25 @@ export const BacklogScreen: React.FC<Props> = ({ backlogs, onAddBacklog, onToggl
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
-      {/* Header */}
-      <div className="bg-[#0f172a] rounded-2xl p-6 text-white shadow-lg flex justify-between items-center">
-        <div>
-          <h2 className="text-2xl font-bold flex items-center gap-3">
-            <ListTodo className="text-orange-500 w-8 h-8" />
-            Backlog Crusher
-          </h2>
-          <p className="text-slate-400 text-sm mt-1">Prioritize and clear your pending topics. Don't let debt pile up.</p>
-        </div>
-        <div className="text-center bg-white/10 p-3 rounded-xl border border-white/10">
-          <span className="block text-3xl font-bold text-orange-500">{pendingCount}</span>
-          <span className="text-[10px] text-slate-300 uppercase font-bold tracking-wider">Pending Tasks</span>
-        </div>
+      {/* Header Banner */}
+      <div className="bg-gradient-to-r from-rose-600 to-orange-600 rounded-2xl p-8 text-white shadow-xl relative overflow-hidden">
+          <div className="relative z-10 flex justify-between items-center">
+              <div>
+                  <div className="flex items-center space-x-3 mb-2">
+                      <ListTodo className="w-8 h-8 text-white" />
+                      <h1 className="text-3xl font-bold">Backlog Manager</h1>
+                  </div>
+                  <p className="text-rose-100 text-lg opacity-90 max-w-2xl">
+                      Track and clear pending topics to ensure you stay on top of your preparation.
+                  </p>
+              </div>
+              <div className="text-center bg-white/20 p-3 rounded-xl border border-white/20 backdrop-blur-sm hidden md:block">
+                  <span className="block text-3xl font-bold text-white">{pendingCount}</span>
+                  <span className="text-[10px] text-white uppercase font-bold tracking-wider">Pending Tasks</span>
+              </div>
+          </div>
+          <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 rounded-full bg-white opacity-10"></div>
+          <div className="absolute bottom-0 right-20 w-32 h-32 rounded-full bg-white opacity-10"></div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
