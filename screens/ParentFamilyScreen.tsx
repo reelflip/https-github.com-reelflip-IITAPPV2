@@ -1,6 +1,8 @@
 
 import React, { useState } from 'react';
 import { User, UserProgress, TestAttempt } from '../lib/types';
+import { Brain, FileText } from 'lucide-react';
+import { PsychometricScreen } from './PsychometricScreen';
 
 interface Props {
   user: User;
@@ -16,6 +18,7 @@ export const ParentFamilyScreen: React.FC<Props> = ({ user, onSendRequest, linke
   const [searchId, setSearchId] = useState('');
   const [statusMsg, setStatusMsg] = useState<{type: 'success' | 'error', text: string} | null>(null);
   const [loading, setLoading] = useState(false);
+  const [viewingPsychReport, setViewingPsychReport] = useState(false);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,8 +41,24 @@ export const ParentFamilyScreen: React.FC<Props> = ({ user, onSendRequest, linke
   const completedTopics = linkedData ? Object.values(linkedData.progress).filter((p: UserProgress) => p.status === 'COMPLETED').length : 0;
   const recentTest = linkedData && linkedData.tests.length > 0 ? linkedData.tests[linkedData.tests.length - 1] : null;
 
+  if (viewingPsychReport && user.linkedStudentId) {
+      // Mock a user object for the student ID to reuse the component
+      const studentUser: User = { ...user, id: user.linkedStudentId, role: 'STUDENT' };
+      return (
+          <div className="space-y-6">
+              <button 
+                onClick={() => setViewingPsychReport(false)}
+                className="text-sm font-bold text-slate-500 hover:text-blue-600 flex items-center gap-2"
+              >
+                  ← Back to Family Dashboard
+              </button>
+              <PsychometricScreen user={studentUser} />
+          </div>
+      );
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
       <div>
         <h2 className="text-2xl font-bold text-slate-900">Family Connections</h2>
         <p className="text-slate-500">Manage connected student accounts.</p>
@@ -59,16 +78,31 @@ export const ParentFamilyScreen: React.FC<Props> = ({ user, onSendRequest, linke
                 </div>
                 <span className="bg-green-100 text-green-700 text-xs font-bold px-3 py-1 rounded-full">Connected</span>
             </div>
-            <div className="p-6 grid grid-cols-2 gap-6">
-                <div className="text-center">
-                   <span className="block text-3xl font-bold text-slate-800">{completedTopics}</span>
-                   <span className="text-xs text-slate-500 uppercase font-bold">Topics Completed</span>
+            
+            <div className="p-6">
+                <div className="grid grid-cols-2 gap-6 mb-6">
+                    <div className="text-center p-4 bg-slate-50 rounded-lg border border-slate-100">
+                       <span className="block text-3xl font-bold text-slate-800">{completedTopics}</span>
+                       <span className="text-xs text-slate-500 uppercase font-bold">Topics Completed</span>
+                    </div>
+                    <div className="text-center p-4 bg-slate-50 rounded-lg border border-slate-100">
+                       <span className="block text-3xl font-bold text-slate-800">
+                         {recentTest ? `${recentTest.score}/${recentTest.totalMarks}` : 'N/A'}
+                       </span>
+                       <span className="text-xs text-slate-500 uppercase font-bold">Recent Test Score</span>
+                    </div>
                 </div>
-                <div className="text-center">
-                   <span className="block text-3xl font-bold text-slate-800">
-                     {recentTest ? `${recentTest.score}/${recentTest.totalMarks}` : 'N/A'}
-                   </span>
-                   <span className="text-xs text-slate-500 uppercase font-bold">Recent Test</span>
+
+                <div className="flex gap-4">
+                    <button 
+                        onClick={() => setViewingPsychReport(true)}
+                        className="flex-1 bg-violet-600 text-white font-bold py-3 rounded-lg hover:bg-violet-700 transition-colors flex items-center justify-center gap-2 shadow-sm"
+                    >
+                        <Brain className="w-5 h-5" /> View Psychometric Profile
+                    </button>
+                    {/* <button className="flex-1 border border-slate-200 text-slate-700 font-bold py-3 rounded-lg hover:bg-slate-50 transition-colors flex items-center justify-center gap-2">
+                        <FileText className="w-5 h-5" /> Detailed Report
+                    </button> */}
                 </div>
             </div>
          </div>

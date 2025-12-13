@@ -283,9 +283,29 @@ export interface AdminStats {
     userGrowth: { date: string, users: number }[];
 }
 
+export interface PsychometricQuestion {
+    id: number;
+    text: string;
+    dimension: string;
+    polarity: 'POSITIVE' | 'NEGATIVE'; // POSITIVE: 5 is good, NEGATIVE: 5 is bad
+}
+
+export interface PsychometricReport {
+    id?: string;
+    date: string;
+    scores: Record<string, number>; // Dimension Name -> Score (0-100)
+    overallScore: number;
+    profileType: string;
+    summary: string;
+    insights: { dimension: string; status: 'GOOD' | 'AVERAGE' | 'POOR'; text: string }[];
+    actionPlan: string[];
+    detailedAnalysis?: string; // Deeper breakdown
+}
+
 export type Screen = 
   | 'dashboard' | 'syllabus' | 'tests' | 'ai-tutor' | 'focus' | 'analytics' | 'timetable' 
   | 'revision' | 'mistakes' | 'flashcards' | 'backlogs' | 'hacks' | 'wellness' | 'profile'
+  | 'psychometric'
   | 'overview' | 'users' | 'videos' | 'content' | 'diagnostics' | 'system' | 'deployment' 
   | 'tests_admin' | 'content_admin' | 'video_admin' | 'admin_analytics' | 'syllabus_admin'
   | 'inbox' | 'blog_admin'

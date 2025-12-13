@@ -29,7 +29,7 @@ try {
         folder: 'deployment/api',
         desc: 'API Root Health Check',
         content: `${phpHeader}
-echo json_encode(["status" => "active", "message" => "IITGEEPrep API v12.0 Operational", "timestamp" => date('c')]);
+echo json_encode(["status" => "active", "message" => "IITGEEPrep API v12.1 Operational", "timestamp" => date('c')]);
 ?>`
     },
     // ... (All logic files mapped to deployment/api)
@@ -308,7 +308,7 @@ if ($method === 'GET') {
 elseif ($method === 'POST') {
     $test = $data;
     $stmt = $conn->prepare("INSERT INTO tests (id, title, duration_minutes, difficulty, exam_type) VALUES (?, ?, ?, ?, ?)");
-    $stmt->execute([$test.id, $test.title, $test->durationMinutes, $test->difficulty, $test->examType]);
+    $stmt->execute([$test.id, $test.title, $test.durationMinutes, $test->difficulty, $test->examType]);
     foreach($test.questions as $q) {
         $qStmt = $conn->prepare("INSERT INTO questions (id, test_id, subject_id, topic_id, text, options_json, correct_option, source_tag, year) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
         $qStmt->execute([
@@ -712,6 +712,43 @@ $stmt->execute([$data->id, $data->message]);
 echo json_encode(["message" => "Sent"]);
 ?>`
     },
+    {
+        name: 'save_psychometric.php',
+        folder: 'deployment/api',
+        content: `${phpHeader}
+$data = json_decode(file_get_contents("php://input"));
+if (!empty($data->user_id) && !empty($data->report)) {
+    $stmt = $conn->prepare("INSERT INTO psychometric_results (id, user_id, report_json) VALUES (?, ?, ?)");
+    $id = uniqid('psy_');
+    $stmt->execute([$id, $data->user_id, json_encode($data->report)]);
+    echo json_encode(["message" => "Saved", "id" => $id]);
+} else {
+    http_response_code(400);
+    echo json_encode(["error" => "Incomplete data"]);
+}
+?>`
+    },
+    {
+        name: 'get_psychometric.php',
+        folder: 'deployment/api',
+        content: `${phpHeader}
+$user_id = $_GET['user_id'] ?? null;
+if ($user_id) {
+    $stmt = $conn->prepare("SELECT report_json, created_at FROM psychometric_results WHERE user_id = ? ORDER BY created_at DESC LIMIT 1");
+    $stmt->execute([$user_id]);
+    $result = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if ($result) {
+        echo json_encode([
+            "report" => json_decode($result['report_json']),
+            "date" => $result['created_at']
+        ]);
+    } else {
+        echo json_encode(["message" => "No report found"]);
+    }
+}
+?>`
+    },
     // SEO & Root Config -> deployment/seo/
     {
         name: '.htaccess',
@@ -826,7 +863,7 @@ export const generateFrontendGuide = () => `# IITGEEPrep Deployment Manual (Host
 
 export const generateSQLSchema = () => {
     let sql = `
--- IITGEEPrep Database Schema v12.0
+-- IITGEEPrep Database Schema v12.1
 -- Target: MySQL / MariaDB (Hostinger)
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
@@ -853,6 +890,7 @@ DROP TABLE IF EXISTS \`backlogs\`;
 DROP TABLE IF EXISTS \`timetable_configs\`;
 DROP TABLE IF EXISTS \`system_settings\`;
 DROP TABLE IF EXISTS \`chapter_notes\`;
+DROP TABLE IF EXISTS \`psychometric_results\`;
 
 -- 1. USERS
 CREATE TABLE IF NOT EXISTS \`users\` (
@@ -1058,6 +1096,14 @@ CREATE TABLE IF NOT EXISTS \`chapter_notes\` (
   \`topic_id\` varchar(50) NOT NULL UNIQUE,
   \`pages_json\` longtext, -- JSON array of page content
   \`last_updated\` timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (\`id\`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS \`psychometric_results\` (
+  \`id\` varchar(50) NOT NULL,
+  \`user_id\` int(11) NOT NULL,
+  \`report_json\` longtext,
+  \`created_at\` timestamp DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (\`id\`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 

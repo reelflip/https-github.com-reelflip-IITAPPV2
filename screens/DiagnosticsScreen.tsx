@@ -1,13 +1,15 @@
+
 import React, { useState, useEffect } from 'react';
 import { Database, RefreshCw, Server, Table, CheckCircle2, AlertTriangle, XCircle, Activity, Globe, Play, Loader2, Clock, Terminal, AlertCircle } from 'lucide-react';
 import { SYLLABUS_DATA } from '../lib/syllabusData';
 
-// Full List of Required Tables based on schema v10.0
+// Full List of Required Tables based on schema v12.1
 const REQUIRED_SCHEMA = [
     'users', 'topic_progress', 'tests', 'questions', 'test_attempts',
     'attempt_details', 'flashcards', 'memory_hacks', 'blog_posts',
     'topics', 'videos', 'notifications', 'contact_messages', 'goals',
-    'mistakes', 'backlogs', 'timetable_configs', 'system_settings', 'chapter_notes'
+    'mistakes', 'backlogs', 'timetable_configs', 'system_settings', 'chapter_notes',
+    'psychometric_results'
 ];
 
 // Embedded JSON Data from the test run
@@ -15,7 +17,7 @@ const DIAGNOSTICS_DATA = {
   "metadata": {
     "timestamp": new Date().toISOString(),
     "url": "https://iitgeeprep.com/",
-    "appVersion": "v11.0"
+    "appVersion": "v12.1"
   },
   "results": {
     "1. [System] Core Health": [
@@ -252,6 +254,43 @@ export const DiagnosticsScreen: React.FC = () => {
               tests.push({ description: "should handle note operations", passed: false, duration: 0, error: e.message });
           }
           return tests;
+      },
+      psychometricFlow: async () => {
+        const tests = [];
+        const userId = 'diag_psycho_user';
+        try {
+            const start = performance.now();
+            // 1. Save
+            const mockReport = {
+                date: new Date().toISOString(),
+                scores: { "Stress": 50 },
+                overallScore: 75,
+                profileType: "Test User",
+                summary: "Diagnostics Test",
+                insights: [],
+                actionPlan: [],
+                detailedAnalysis: "Diagnostics Detailed Analysis"
+            };
+            await fetch('/api/save_psychometric.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: userId, report: mockReport })
+            });
+            tests.push({ description: "should save assessment result", passed: true, duration: performance.now() - start });
+
+            // 2. Fetch
+            const start2 = performance.now();
+            const res = await fetch(`/api/get_psychometric.php?user_id=${userId}`);
+            const data = await res.json();
+            if(data && data.report && data.report.profileType === "Test User") {
+                 tests.push({ description: "should retrieve assessment result", passed: true, duration: performance.now() - start2 });
+            } else {
+                 tests.push({ description: "should retrieve assessment result", passed: false, duration: 0, error: "Data mismatch" });
+            }
+        } catch(e: any) {
+            tests.push({ description: "should handle psychometric flow", passed: false, duration: 0, error: e.message });
+        }
+        return tests;
       }
   };
 
@@ -261,7 +300,8 @@ export const DiagnosticsScreen: React.FC = () => {
       ["21. [Student] Action Verification", dynamicResults['studentActions'] || []],
       ["22. [AI] System Connectivity", dynamicResults['aiSystem'] || []],
       ["23. [DB] Large Data Storage", dynamicResults['longTextStorage'] || []],
-      ["24. [Content] Notes System", dynamicResults['notesSystem'] || []]
+      ["24. [Content] Notes System", dynamicResults['notesSystem'] || []],
+      ["25. [Module] Psychometric Test", dynamicResults['psychometricFlow'] || []]
   ];
 
   const handleStartScan = async () => {
@@ -291,6 +331,9 @@ export const DiagnosticsScreen: React.FC = () => {
 
               setScanIndex(staticCount + 4);
               await performTest('notesSystem', tests.notesSystem);
+
+              setScanIndex(staticCount + 5);
+              await performTest('psychometricFlow', tests.psychometricFlow);
               
               setScanStatus('COMPLETE');
           } else {

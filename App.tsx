@@ -33,6 +33,7 @@ import { FocusScreen } from './screens/FocusScreen';
 import { AnalyticsScreen } from './screens/AnalyticsScreen';
 import { WellnessScreen } from './screens/WellnessScreen';
 import { BacklogScreen } from './screens/BacklogScreen'; 
+import { PsychometricScreen } from './screens/PsychometricScreen';
 import { PublicLayout } from './components/PublicLayout';
 import { AITutorChat } from './components/AITutorChat';
 import { User, UserProgress, TopicStatus, TestAttempt, Screen, Goal, MistakeLog, Flashcard, MemoryHack, BlogPost, VideoLesson, Question, Test, TimetableConfig, Topic, ContactMessage, BacklogItem, TopicNote, ChapterNote, SocialConfig } from './lib/types';
@@ -42,7 +43,7 @@ import { DEFAULT_CHAPTER_NOTES } from './lib/chapterContent';
 import { MOCK_TESTS_DATA } from './lib/mockTestsData';
 import { TrendingUp, Bell, LogOut } from 'lucide-react';
 
-const APP_VERSION = '12.0';
+const APP_VERSION = '12.1';
 
 const ComingSoonScreen = ({ title, icon }: { title: string, icon: string }) => (
   <div className="flex flex-col items-center justify-center h-[70vh] text-center">
@@ -480,6 +481,7 @@ export default function App() {
                 {currentScreen === 'syllabus' && <SyllabusScreen user={user} subjects={syllabus} progress={progress} onUpdateProgress={updateTopicProgress} videoMap={videoMap} chapterNotes={chapterNotes} />}
                 {currentScreen === 'revision' && <RevisionScreen progress={progress} handleRevisionComplete={handleRevisionComplete} />}
                 {currentScreen === 'tests' && <TestScreen user={user} history={testAttempts} addTestAttempt={addTestAttempt} availableTests={adminTests} />}
+                {currentScreen === 'psychometric' && <PsychometricScreen user={user} />}
                 {currentScreen === 'timetable' && <TimetableScreen user={user} savedConfig={timetableData?.config} savedSlots={timetableData?.slots} onSave={saveTimetable} progress={progress} />}
                 {currentScreen === 'focus' && <FocusScreen />}
                 {currentScreen === 'ai-tutor' && (
