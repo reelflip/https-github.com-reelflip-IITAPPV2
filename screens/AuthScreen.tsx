@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { User, Role } from '../lib/types';
+import { User, Role, SocialConfig } from '../lib/types';
 import { COACHING_INSTITUTES, TARGET_YEARS, TARGET_EXAMS } from '../lib/constants';
 import { 
   TrendingUp,
@@ -22,18 +22,81 @@ import {
   Key,
   Search,
   ArrowLeft,
-  X
+  X,
+  Book,
+  PenTool,
+  Calculator,
+  Atom,
+  Sigma,
+  Pi,
+  Instagram,
+  Facebook,
+  Twitter,
+  Youtube,
+  Linkedin,
+  Compass,
+  Ruler,
+  Triangle,
+  FlaskConical,
+  Microscope,
+  GraduationCap,
+  Binary,
+  FunctionSquare,
+  Divide
 } from 'lucide-react';
 
 interface AuthScreenProps {
   onLogin: (user: User) => void;
   onNavigate: (page: string) => void;
   enableGoogleLogin?: boolean;
+  socialConfig?: SocialConfig;
 }
 
 type AuthView = 'LOGIN' | 'REGISTER' | 'RECOVERY';
 
-export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate, enableGoogleLogin }) => {
+// Sketch-style Background Component
+const EducationSketchBackground = () => (
+    <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none select-none bg-slate-50">
+        {/* Soft Colored Orbs for Depth - Muted & Professional */}
+        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-blue-100/40 blur-[100px]"></div>
+        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] rounded-full bg-indigo-100/40 blur-[100px]"></div>
+        <div className="absolute top-[40%] left-[60%] w-[30%] h-[30%] rounded-full bg-purple-100/20 blur-[80px]"></div>
+        
+        {/* Icons Layer - Muted & Rotated for Artistic Effect */}
+        <div className="absolute top-[5%] left-[5%] transform -rotate-12 text-slate-300 opacity-30"><Book size={96} strokeWidth={1} /></div>
+        <div className="absolute top-[15%] right-[10%] transform rotate-12 text-blue-200 opacity-40"><Calculator size={80} strokeWidth={1} /></div>
+        <div className="absolute bottom-[10%] left-[8%] transform rotate-45 text-indigo-200 opacity-30"><PenTool size={88} strokeWidth={1} /></div>
+        <div className="absolute bottom-[20%] right-[5%] transform -rotate-6 text-slate-300 opacity-30"><Atom size={110} strokeWidth={1} /></div>
+        
+        {/* Mathematical Symbols & Formulas */}
+        <div className="absolute top-1/2 left-[15%] transform rotate-180 text-slate-300 opacity-20"><Sigma size={64} strokeWidth={1.5} /></div>
+        <div className="absolute top-[25%] right-[25%] transform -rotate-45 text-blue-200 opacity-30"><Pi size={72} strokeWidth={1.5} /></div>
+        <div className="absolute top-[65%] left-[30%] transform rotate-12 text-indigo-200 opacity-25"><Divide size={56} strokeWidth={2} /></div>
+        <div className="absolute bottom-[15%] left-[40%] transform -rotate-12 text-slate-300 opacity-20"><FunctionSquare size={60} strokeWidth={1} /></div>
+
+        {/* Geometric Instruments */}
+        <div className="absolute top-[10%] left-[40%] transform rotate-90 text-slate-200 opacity-40"><Compass size={100} strokeWidth={1} /></div>
+        <div className="absolute bottom-[40%] right-[15%] transform -rotate-15 text-blue-100 opacity-50"><Ruler size={120} strokeWidth={1} /></div>
+        <div className="absolute top-[45%] right-[5%] transform rotate-30 text-indigo-100 opacity-50"><Triangle size={90} strokeWidth={1} /></div>
+        
+        {/* Scientific Elements */}
+        <div className="absolute top-[5%] right-[40%] transform -rotate-12 text-slate-200 opacity-40"><FlaskConical size={80} strokeWidth={1} /></div>
+        <div className="absolute bottom-[5%] right-[40%] transform rotate-6 text-blue-100 opacity-50"><Microscope size={88} strokeWidth={1} /></div>
+        <div className="absolute top-[80%] left-[5%] transform -rotate-45 text-indigo-200 opacity-30"><Binary size={56} strokeWidth={1.5} /></div>
+        
+        {/* Central/Misc Elements */}
+        <div className="absolute top-[55%] right-[45%] transform rotate-12 text-slate-100 opacity-60"><GraduationCap size={140} strokeWidth={0.5} /></div>
+        <div className="absolute bottom-[30%] left-[5%] transform rotate-12 text-purple-100 opacity-40"><Target size={70} strokeWidth={1} /></div>
+
+        {/* Subtle Grid Texture Overlay */}
+        <div className="absolute inset-0 opacity-[0.4]" style={{ 
+            backgroundImage: `radial-gradient(#cbd5e1 1px, transparent 1px)`, 
+            backgroundSize: '30px 30px' 
+        }}></div>
+    </div>
+);
+
+export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate, enableGoogleLogin, socialConfig }) => {
   const [view, setView] = useState<AuthView>('LOGIN');
   const [role, setRole] = useState<Role>('STUDENT');
   const [error, setError] = useState('');
@@ -395,8 +458,10 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate, ena
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-inter relative">
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-inter relative overflow-hidden">
       
+      <EducationSketchBackground />
+
       {/* Role Selection Modal */}
       {showRoleModal && (
           <div className="absolute inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm animate-in fade-in">
@@ -437,7 +502,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate, ena
           </div>
       )}
 
-      <div className="bg-white w-full max-w-[480px] rounded-[2rem] shadow-xl overflow-hidden border border-slate-100 flex flex-col">
+      <div className="bg-white/90 backdrop-blur-xl w-full max-w-[480px] rounded-[2rem] shadow-2xl overflow-hidden border border-slate-100 flex flex-col relative z-10">
         
         {/* Header Section (Logo) */}
         <div className="pt-10 pb-4 text-center">
@@ -531,8 +596,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate, ena
                 {/* ================= RECOVERY FORM ================= */}
                 {view === 'RECOVERY' ? (
                     <form onSubmit={handleRecovery} className="space-y-5 animate-in fade-in slide-in-from-right-4">
-                        
-                        {/* Step 1: Identify */}
+                        {/* ... (Recovery Form Fields - Unchanged) ... */}
                         {recoveryStep === 1 && (
                             <div className="space-y-4">
                                 <p className="text-sm text-slate-600 bg-blue-50 p-3 rounded-lg border border-blue-100">
@@ -926,6 +990,40 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate, ena
                 </div>
             )}
 
+            {/* Social Media Footer inside Login Card (If Enabled) */}
+            {socialConfig?.enabled && (
+                <div className="mt-6 pt-6 border-t border-slate-100 flex flex-col items-center">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Connect With Us</p>
+                    <div className="flex gap-4">
+                        {socialConfig.instagram && (
+                            <a href={socialConfig.instagram} target="_blank" rel="noopener noreferrer" className="p-2 bg-pink-50 text-pink-600 rounded-full hover:bg-pink-100 transition-colors">
+                                <Instagram size={16} />
+                            </a>
+                        )}
+                        {socialConfig.facebook && (
+                            <a href={socialConfig.facebook} target="_blank" rel="noopener noreferrer" className="p-2 bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100 transition-colors">
+                                <Facebook size={16} />
+                            </a>
+                        )}
+                        {socialConfig.twitter && (
+                            <a href={socialConfig.twitter} target="_blank" rel="noopener noreferrer" className="p-2 bg-slate-50 text-slate-800 rounded-full hover:bg-slate-100 transition-colors">
+                                <Twitter size={16} />
+                            </a>
+                        )}
+                        {socialConfig.youtube && (
+                            <a href={socialConfig.youtube} target="_blank" rel="noopener noreferrer" className="p-2 bg-red-50 text-red-600 rounded-full hover:bg-red-100 transition-colors">
+                                <Youtube size={16} />
+                            </a>
+                        )}
+                        {socialConfig.linkedin && (
+                            <a href={socialConfig.linkedin} target="_blank" rel="noopener noreferrer" className="p-2 bg-blue-50 text-blue-700 rounded-full hover:bg-blue-100 transition-colors">
+                                <Linkedin size={16} />
+                            </a>
+                        )}
+                    </div>
+                </div>
+            )}
+
             {/* Footer Links */}
             <div className="mt-8 text-center space-x-4 text-xs text-slate-400 font-medium flex flex-wrap justify-center gap-y-2">
                 <button onClick={() => onNavigate('about')} className="hover:text-blue-600 transition-colors">About Us</button>
@@ -939,7 +1037,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate, ena
                 <button onClick={() => onNavigate('contact')} className="hover:text-blue-600 transition-colors">Contact</button>
             </div>
             <div className="text-center text-[10px] text-slate-300 mt-4">
-                v11.3
+                v12.0
             </div>
         </div>
       </div>

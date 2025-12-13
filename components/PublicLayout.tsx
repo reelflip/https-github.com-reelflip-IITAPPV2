@@ -1,14 +1,16 @@
 
 import React from 'react';
-import { TrendingUp, LogIn, ArrowLeft } from 'lucide-react';
+import { TrendingUp, LogIn, ArrowLeft, Instagram, Facebook, Twitter, Youtube, Linkedin } from 'lucide-react';
+import { SocialConfig } from '../lib/types';
 
 interface PublicLayoutProps {
   children: React.ReactNode;
   onNavigate: (page: string) => void;
   currentScreen: string;
+  socialConfig?: SocialConfig;
 }
 
-export const PublicLayout: React.FC<PublicLayoutProps> = ({ children, onNavigate, currentScreen }) => {
+export const PublicLayout: React.FC<PublicLayoutProps> = ({ children, onNavigate, currentScreen, socialConfig }) => {
   return (
     <div className="min-h-screen bg-slate-50 font-inter flex flex-col">
       <header className="bg-white border-b border-slate-200 sticky top-0 z-50">
@@ -58,6 +60,16 @@ export const PublicLayout: React.FC<PublicLayoutProps> = ({ children, onNavigate
                  <p className="text-sm leading-relaxed max-w-xs text-slate-500">
                      The ultimate companion for IIT JEE and other engineering entrance aspirants. Track, Test, Revise, Conquer.
                  </p>
+                 
+                 {socialConfig?.enabled && (
+                     <div className="flex gap-4 mt-6">
+                        {socialConfig.instagram && <a href={socialConfig.instagram} target="_blank" rel="noopener noreferrer" className="hover:text-pink-500 transition-colors"><Instagram size={18} /></a>}
+                        {socialConfig.facebook && <a href={socialConfig.facebook} target="_blank" rel="noopener noreferrer" className="hover:text-blue-500 transition-colors"><Facebook size={18} /></a>}
+                        {socialConfig.twitter && <a href={socialConfig.twitter} target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors"><Twitter size={18} /></a>}
+                        {socialConfig.youtube && <a href={socialConfig.youtube} target="_blank" rel="noopener noreferrer" className="hover:text-red-500 transition-colors"><Youtube size={18} /></a>}
+                        {socialConfig.linkedin && <a href={socialConfig.linkedin} target="_blank" rel="noopener noreferrer" className="hover:text-blue-400 transition-colors"><Linkedin size={18} /></a>}
+                     </div>
+                 )}
              </div>
              <div>
                  <h4 className="text-white font-bold mb-4 uppercase tracking-wider text-xs">Platform</h4>

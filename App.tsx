@@ -35,14 +35,14 @@ import { WellnessScreen } from './screens/WellnessScreen';
 import { BacklogScreen } from './screens/BacklogScreen'; 
 import { PublicLayout } from './components/PublicLayout';
 import { AITutorChat } from './components/AITutorChat';
-import { User, UserProgress, TopicStatus, TestAttempt, Screen, Goal, MistakeLog, Flashcard, MemoryHack, BlogPost, VideoLesson, Question, Test, TimetableConfig, Topic, ContactMessage, BacklogItem, TopicNote, ChapterNote } from './lib/types';
+import { User, UserProgress, TopicStatus, TestAttempt, Screen, Goal, MistakeLog, Flashcard, MemoryHack, BlogPost, VideoLesson, Question, Test, TimetableConfig, Topic, ContactMessage, BacklogItem, TopicNote, ChapterNote, SocialConfig } from './lib/types';
 import { calculateNextRevision } from './lib/utils';
 import { SYLLABUS_DATA } from './lib/syllabusData';
 import { DEFAULT_CHAPTER_NOTES } from './lib/chapterContent';
 import { MOCK_TESTS_DATA } from './lib/mockTestsData';
 import { TrendingUp, Bell, LogOut } from 'lucide-react';
 
-const APP_VERSION = '11.3';
+const APP_VERSION = '12.0';
 
 const ComingSoonScreen = ({ title, icon }: { title: string, icon: string }) => (
   <div className="flex flex-col items-center justify-center h-[70vh] text-center">
@@ -73,6 +73,7 @@ export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('dashboard');
   const [enableGoogleLogin, setEnableGoogleLogin] = useState(false);
   const [gaMeasurementId, setGaMeasurementId] = useState<string | null>(null);
+  const [socialConfig, setSocialConfig] = useState<SocialConfig>({ enabled: false });
   
   // Persisted Data
   const [progress, setProgress] = useState<Record<string, UserProgress>>({});
@@ -150,6 +151,13 @@ export default function App() {
               if(resLogin.ok) {
                   const data = await resLogin.json();
                   if (data && data.value !== null) setEnableGoogleLogin(data.value === 'true');
+              }
+              const resSocial = await fetch('/api/manage_settings.php?key=social_links');
+              if(resSocial.ok) {
+                  const data = await resSocial.json();
+                  if (data && data.value) {
+                      setSocialConfig(JSON.parse(data.value));
+                  }
               }
           } catch (e) {}
       };
@@ -364,14 +372,65 @@ export default function App() {
   const toggleGoal = (id: string) => setGoals(prev => prev.map(g => g.id === id ? { ...g, completed: !g.completed } : g));
   const addMistake = (m: Omit<MistakeLog, 'id' | 'date'>) => setMistakes(prev => [{ ...m, id: Date.now().toString(), date: new Date().toISOString() }, ...prev]);
   
-  const addFlashcard = (card: Omit<Flashcard, 'id'>) => { setFlashcards(prev => [...prev, { ...card, id: Date.now() }]); };
-  const addHack = (hack: Omit<MemoryHack, 'id'>) => { setHacks(prev => [...prev, { ...hack, id: Date.now() }]); };
-  const addBlog = (blog: Omit<BlogPost, 'id' | 'date'>) => { setBlogs(prev => [{ ...blog, id: Date.now(), date: new Date().toISOString() }, ...prev]); };
-  const updateBlog = (blog: BlogPost) => { setBlogs(prev => prev.map(b => b.id === blog.id ? blog : b)); };
+  const addFlashcard = (card: Omit<Flashcard, 'id'>) => { 
+      const newCard = { ...card, id: Date.now() };
+      setFlashcards(prev => [...prev, newCard]); 
+      
+      fetch('/api/manage_content.php?type=flashcard', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({...card, type: 'flashcard'})
+      }).catch(console.error);
+  };
+
+  const addHack = (hack: Omit<MemoryHack, 'id'>) => { 
+      const newHack = { ...hack, id: Date.now() };
+      setHacks(prev => [...prev, newHack]); 
+      
+      fetch('/api/manage_content.php?type=hack', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({...hack, type: 'hack'})
+      }).catch(console.error);
+  };
+
+  const addBlog = (blog: Omit<BlogPost, 'id' | 'date'>) => { 
+      const tempId = Date.now();
+      const newBlog = { ...blog, id: tempId, date: new Date().toISOString() };
+      setBlogs(prev => [newBlog, ...prev]); 
+      
+      fetch('/api/manage_content.php?type=blog', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({...blog, type: 'blog'}) 
+      })
+      .then(res => res.json())
+      .then(data => {
+          if(data && data.id) {
+              setBlogs(prev => prev.map(b => b.id === tempId ? { ...b, id: data.id } : b));
+          }
+      })
+      .catch(console.error);
+  };
+
+  const updateBlog = (blog: BlogPost) => { 
+      setBlogs(prev => prev.map(b => b.id === blog.id ? blog : b)); 
+      
+      fetch('/api/manage_content.php?type=blog', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({...blog, type: 'blog'}) 
+      }).catch(console.error);
+  };
+
   const deleteContent = (type: 'flashcard' | 'hack' | 'blog', id: number) => {
     if(type === 'flashcard') setFlashcards(prev => prev.filter(i => i.id !== id));
     if(type === 'hack') setHacks(prev => prev.filter(i => i.id !== id));
     if(type === 'blog') setBlogs(prev => prev.filter(i => i.id !== id));
+    
+    fetch(`/api/manage_content.php?type=${type}&id=${id}`, {
+        method: 'DELETE'
+    }).catch(console.error);
   };
 
   const handleAddTopic = (topic: Omit<Topic, 'id'>) => { const newTopic: Topic = { ...topic, id: `${topic.subject[0].toLowerCase()}_${Date.now()}` }; setSyllabus(prev => [...prev, newTopic]); };
@@ -381,12 +440,12 @@ export default function App() {
   const deleteBacklog = (id: string) => { setBacklogs(prev => prev.filter(b => b.id !== id)); };
 
   if (currentScreen === 'public-blog' || currentScreen === 'blog') return <PublicBlogScreen blogs={blogs} onBack={() => user ? setCurrentScreen('dashboard') : setCurrentScreen('dashboard')} />;
-  if (currentScreen === 'about') return <PublicLayout onNavigate={handleNavigation} currentScreen="about"><AboutUsScreen /></PublicLayout>;
-  if (currentScreen === 'contact') return <PublicLayout onNavigate={handleNavigation} currentScreen="contact"><ContactUsScreen /></PublicLayout>;
-  if (currentScreen === 'exams') return <PublicLayout onNavigate={handleNavigation} currentScreen="exams"><ExamGuideScreen /></PublicLayout>;
-  if (currentScreen === 'privacy') return <PublicLayout onNavigate={handleNavigation} currentScreen="privacy"><PrivacyPolicyScreen /></PublicLayout>;
+  if (currentScreen === 'about') return <PublicLayout onNavigate={handleNavigation} currentScreen="about" socialConfig={socialConfig}><AboutUsScreen /></PublicLayout>;
+  if (currentScreen === 'contact') return <PublicLayout onNavigate={handleNavigation} currentScreen="contact" socialConfig={socialConfig}><ContactUsScreen /></PublicLayout>;
+  if (currentScreen === 'exams') return <PublicLayout onNavigate={handleNavigation} currentScreen="exams" socialConfig={socialConfig}><ExamGuideScreen /></PublicLayout>;
+  if (currentScreen === 'privacy') return <PublicLayout onNavigate={handleNavigation} currentScreen="privacy" socialConfig={socialConfig}><PrivacyPolicyScreen /></PublicLayout>;
 
-  if (!user) { return <AuthScreen onLogin={handleLogin} onNavigate={handleNavigation} enableGoogleLogin={enableGoogleLogin} />; }
+  if (!user) { return <AuthScreen onLogin={handleLogin} onNavigate={handleNavigation} enableGoogleLogin={enableGoogleLogin} socialConfig={socialConfig} />; }
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900 flex">

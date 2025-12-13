@@ -68,7 +68,7 @@ export const generateFrontendGuide = () => `# IITGEEPrep Deployment Manual (Host
 
 export const generateSQLSchema = () => {
     let sql = `
--- IITGEEPrep Database Schema v11.3
+-- IITGEEPrep Database Schema v12.0
 -- Target: MySQL / MariaDB (Hostinger)
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
@@ -373,7 +373,7 @@ try {
         folder: 'api',
         desc: 'API Root Health Check',
         content: `${phpHeader}
-echo json_encode(["status" => "active", "message" => "IITGEEPrep API v11.3 Operational", "timestamp" => date('c')]);
+echo json_encode(["status" => "active", "message" => "IITGEEPrep API v12.0 Operational", "timestamp" => date('c')]);
 ?>`
     },
     {
@@ -734,13 +734,15 @@ elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
              if($check->rowCount() > 0) {
                  $stmt = $conn->prepare("UPDATE blog_posts SET title=?, excerpt=?, content=?, author=?, image_url=?, category=? WHERE id=?");
                  $stmt->execute([$data->title, $data->excerpt, $data->content, $data->author, $data->imageUrl, $data->category ?? 'Strategy', $data->id]);
-                 echo json_encode(["message" => "Updated"]);
+                 echo json_encode(["message" => "Updated", "id" => $data->id]);
                  exit;
              }
         }
         
         $stmt = $conn->prepare("INSERT INTO blog_posts (title, excerpt, content, author, image_url, category) VALUES (?, ?, ?, ?, ?, ?)");
         $stmt->execute([$data->title, $data->excerpt, $data->content, $data->author, $data->imageUrl, $data->category ?? 'Strategy']);
+        echo json_encode(["message" => "Created", "id" => $conn->lastInsertId()]);
+        exit;
     }
     echo json_encode(["message" => "Created"]);
 }

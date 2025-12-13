@@ -25,6 +25,15 @@ export type TopicStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'BACKLOG' | 
 
 export type Role = 'STUDENT' | 'ADMIN' | 'PARENT';
 
+export interface SocialConfig {
+  enabled: boolean;
+  instagram?: string;
+  facebook?: string;
+  twitter?: string;
+  youtube?: string;
+  linkedin?: string;
+}
+
 export interface Topic {
   id: string;
   name: string;

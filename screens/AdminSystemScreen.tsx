@@ -1,6 +1,8 @@
+
 // v10.1 - Enhanced Model Selection (Radio Cards) + OAuth Config
 import React, { useState, useEffect } from 'react';
-import { Save, Bot, Zap, CheckCircle2, AlertCircle, MessageSquare, Loader2, Play, BookOpen, Check, Brain, Key, BarChart3, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Save, Bot, Zap, CheckCircle2, AlertCircle, MessageSquare, Loader2, Play, BookOpen, Check, Brain, Key, BarChart3, ToggleLeft, ToggleRight, Share2, Instagram, Facebook, Twitter, Youtube, Linkedin } from 'lucide-react';
+import { SocialConfig } from '../lib/types';
 
 const MODEL_METADATA: Record<string, any> = {
   'gemini-2.5-flash': { 
@@ -45,6 +47,16 @@ export const AdminSystemScreen: React.FC = () => {
   const [googleClientId, setGoogleClientId] = useState('');
   const [enableGoogleLogin, setEnableGoogleLogin] = useState(false);
   const [gaId, setGaId] = useState('');
+  
+  // Social Media State
+  const [socialConfig, setSocialConfig] = useState<SocialConfig>({
+      enabled: false,
+      instagram: '',
+      facebook: '',
+      twitter: '',
+      youtube: '',
+      linkedin: ''
+  });
   
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -96,6 +108,13 @@ export const AdminSystemScreen: React.FC = () => {
             if (data && data.value) setGaId(data.value);
         }
 
+        // Fetch Social Config
+        const resSocial = await fetch('/api/manage_settings.php?key=social_links');
+        if(resSocial.ok) {
+            const data = await resSocial.json();
+            if (data && data.value) setSocialConfig(JSON.parse(data.value));
+        }
+
       } catch (e) { 
           console.debug("Config fetch failed, using defaults"); 
       } 
@@ -135,6 +154,13 @@ export const AdminSystemScreen: React.FC = () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ key: 'google_analytics_id', value: gaId })
+      });
+
+      // 5. Save Social Config
+      await fetch('/api/manage_settings.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: 'social_links', value: JSON.stringify(socialConfig) })
       });
 
       setTimeout(() => setSaving(false), 800);
@@ -213,6 +239,74 @@ export const AdminSystemScreen: React.FC = () => {
                         <p className="text-xs text-slate-400 mt-2">
                             Required for "Sign in with Google". Get this from Google Cloud Console.
                         </p>
+                    </div>
+                </div>
+            </div>
+
+            {/* Social Media Config */}
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+                <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-lg font-bold text-slate-800 flex items-center"><Share2 className="w-5 h-5 mr-2 text-pink-500" /> Social Media Presence</h3>
+                    <div className="flex items-center gap-3">
+                        <span className={`text-xs font-bold ${socialConfig.enabled ? 'text-green-600' : 'text-slate-400'}`}>
+                            {socialConfig.enabled ? 'Links Visible' : 'Links Hidden'}
+                        </span>
+                        <button onClick={() => setSocialConfig(prev => ({ ...prev, enabled: !prev.enabled }))} className={`text-2xl transition-colors ${socialConfig.enabled ? 'text-green-500' : 'text-slate-300'}`}>
+                            {socialConfig.enabled ? <ToggleRight className="w-8 h-8" /> : <ToggleLeft className="w-8 h-8" />}
+                        </button>
+                    </div>
+                </div>
+
+                <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 transition-opacity duration-300 ${socialConfig.enabled ? 'opacity-100' : 'opacity-50 pointer-events-none'}`}>
+                    <div>
+                        <label className="flex items-center text-xs font-bold text-slate-500 uppercase mb-2"><Instagram className="w-3 h-3 mr-1" /> Instagram URL</label>
+                        <input 
+                            type="text"
+                            value={socialConfig.instagram || ''}
+                            onChange={(e) => setSocialConfig({ ...socialConfig, instagram: e.target.value })}
+                            placeholder="https://instagram.com/..."
+                            className="w-full p-2.5 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-pink-100"
+                        />
+                    </div>
+                    <div>
+                        <label className="flex items-center text-xs font-bold text-slate-500 uppercase mb-2"><Facebook className="w-3 h-3 mr-1" /> Facebook URL</label>
+                        <input 
+                            type="text"
+                            value={socialConfig.facebook || ''}
+                            onChange={(e) => setSocialConfig({ ...socialConfig, facebook: e.target.value })}
+                            placeholder="https://facebook.com/..."
+                            className="w-full p-2.5 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-100"
+                        />
+                    </div>
+                    <div>
+                        <label className="flex items-center text-xs font-bold text-slate-500 uppercase mb-2"><Twitter className="w-3 h-3 mr-1" /> Twitter / X URL</label>
+                        <input 
+                            type="text"
+                            value={socialConfig.twitter || ''}
+                            onChange={(e) => setSocialConfig({ ...socialConfig, twitter: e.target.value })}
+                            placeholder="https://x.com/..."
+                            className="w-full p-2.5 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-sky-100"
+                        />
+                    </div>
+                    <div>
+                        <label className="flex items-center text-xs font-bold text-slate-500 uppercase mb-2"><Youtube className="w-3 h-3 mr-1" /> YouTube URL</label>
+                        <input 
+                            type="text"
+                            value={socialConfig.youtube || ''}
+                            onChange={(e) => setSocialConfig({ ...socialConfig, youtube: e.target.value })}
+                            placeholder="https://youtube.com/..."
+                            className="w-full p-2.5 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-red-100"
+                        />
+                    </div>
+                    <div>
+                        <label className="flex items-center text-xs font-bold text-slate-500 uppercase mb-2"><Linkedin className="w-3 h-3 mr-1" /> LinkedIn URL</label>
+                        <input 
+                            type="text"
+                            value={socialConfig.linkedin || ''}
+                            onChange={(e) => setSocialConfig({ ...socialConfig, linkedin: e.target.value })}
+                            placeholder="https://linkedin.com/in/..."
+                            className="w-full p-2.5 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-100"
+                        />
                     </div>
                 </div>
             </div>
