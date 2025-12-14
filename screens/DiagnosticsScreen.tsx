@@ -420,6 +420,27 @@ const SystemIntegrityCheck = () => {
   const { suites, isRunning, executeTests } = useTestRunner();
   const [expanded, setExpanded] = useState<string | null>(null);
 
+  // Stats for terminal view
+  const totalTests = suites.reduce((acc, s) => acc + s.tests.length, 0);
+  const passedTests = suites.reduce((acc, s) => acc + s.tests.filter((t: any) => t.passed).length, 0);
+  const passRate = totalTests > 0 ? Math.round((passedTests / totalTests) * 100) : 0;
+
+  const downloadJSON = () => {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({ 
+          date: new Date().toISOString(),
+          mode: 'DEEP_AUDIT',
+          passRate,
+          totalTests,
+          suites 
+      }, null, 2));
+      const downloadAnchorNode = document.createElement('a');
+      downloadAnchorNode.setAttribute("href", dataStr);
+      downloadAnchorNode.setAttribute("download", "iitgeeprep_deep_audit_report.json");
+      document.body.appendChild(downloadAnchorNode);
+      downloadAnchorNode.click();
+      downloadAnchorNode.remove();
+  };
+
   return (
       <div className="bg-slate-900 text-white rounded-2xl shadow-xl overflow-hidden font-sans">
          <div className="p-6 border-b border-slate-800 flex justify-between items-center">
@@ -431,14 +452,32 @@ const SystemIntegrityCheck = () => {
                    Real-time execution logs for all 25 test modules.
                 </p>
              </div>
-             <button 
-                onClick={executeTests}
-                disabled={isRunning}
-                className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white px-6 py-2 rounded-lg font-bold flex items-center transition-all disabled:opacity-50"
-             >
-                {isRunning ? <Loader2 className="w-4 h-4 animate-spin mr-2"/> : <Play className="w-4 h-4 mr-2"/>} 
-                Execute
-             </button>
+             <div className="flex gap-2 items-center">
+                 {totalTests > 0 && (
+                     <div className="mr-4 text-right hidden md:block">
+                         <span className="block text-sm font-bold text-slate-300">{passRate}% Pass</span>
+                         <span className="text-xs text-slate-500">{totalTests} Tests</span>
+                     </div>
+                 )}
+                 {/* Deep Audit JSON Export */}
+                 {totalTests > 0 && !isRunning && (
+                    <button 
+                        onClick={downloadJSON}
+                        className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-blue-400 px-4 py-2 rounded-lg font-bold flex items-center transition-all"
+                        title="Export Audit Log"
+                    >
+                        <Download className="w-4 h-4 mr-2" /> JSON
+                    </button>
+                 )}
+                 <button 
+                    onClick={executeTests}
+                    disabled={isRunning}
+                    className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white px-6 py-2 rounded-lg font-bold flex items-center transition-all disabled:opacity-50"
+                 >
+                    {isRunning ? <Loader2 className="w-4 h-4 animate-spin mr-2"/> : <Play className="w-4 h-4 mr-2"/>} 
+                    Execute
+                 </button>
+             </div>
          </div>
 
          <div className="p-6 space-y-4 font-mono text-sm h-[600px] overflow-y-auto custom-scrollbar">
