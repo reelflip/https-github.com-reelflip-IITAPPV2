@@ -15,7 +15,7 @@ export const FeaturesScreen: React.FC = () => {
         <div className="absolute top-0 right-0 w-1/2 h-full opacity-10 bg-gradient-to-l from-blue-600 to-transparent pointer-events-none"></div>
         <div className="max-w-5xl mx-auto text-center relative z-10">
             <span className="inline-block py-1 px-3 rounded-full bg-blue-900 text-blue-200 text-xs font-bold uppercase tracking-wider mb-4 border border-blue-800">
-                v12.10 Platform Overview
+                v12.12 Platform Overview
             </span>
             <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight leading-tight mb-6">
                 The Complete Toolkit for <br/>

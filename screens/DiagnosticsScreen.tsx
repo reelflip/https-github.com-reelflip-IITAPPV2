@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Database, RefreshCw, Server, CheckCircle2, AlertTriangle, XCircle, Activity, Globe, Play, Loader2, Terminal, AlertCircle, ChevronDown, List, Shield, LayoutGrid, Clock, Users, Brain, Bot, Lock, FileText } from 'lucide-react';
+import { Database, RefreshCw, Server, CheckCircle2, AlertTriangle, XCircle, Activity, Globe, Play, Loader2, Terminal, AlertCircle, ChevronDown, List, Shield, LayoutGrid, Clock, Users, Brain, Bot, Lock, FileText, Download } from 'lucide-react';
 
 export const DiagnosticsScreen: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'VISUAL' | 'TERMINAL' | 'DB'>('VISUAL');
@@ -287,7 +287,7 @@ const useTestRunner = () => {
 
             // 25. Psychometric (Specifically Fixing the Previous Fail)
             await runTest(24, "Save Assessment Result", () => fetchAPI('/api/save_psychometric.php', {
-                method: 'POST', body: JSON.stringify({ user_id: userId, report: { date: new Date().toISOString(), scores: { "Stress": 50 }, overallScore: 80, profileType: "High Achiever", insights: [], actionPlan: [] } })
+                method: 'POST', body: JSON.stringify({ user_id: userId, report: { date: new Date().toISOString(), scores: { "Stress": 50 }, overallScore: 80, profileType: "Balanced", insights: [], actionPlan: [] } })
             }));
             await runTest(24, "Complete Flow", async () => {
                 const res = await fetchAPI(`/api/get_psychometric.php?user_id=${userId}`);
@@ -321,6 +321,21 @@ const VisualSystemHealth = () => {
     const passedTests = suites.reduce((acc, s) => acc + s.tests.filter((t: any) => t.passed).length, 0);
     const passRate = totalTests > 0 ? Math.round((passedTests / totalTests) * 100) : 0;
 
+    const downloadJSON = () => {
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({ 
+            date: new Date().toISOString(),
+            passRate,
+            totalTests,
+            suites 
+        }, null, 2));
+        const downloadAnchorNode = document.createElement('a');
+        downloadAnchorNode.setAttribute("href", dataStr);
+        downloadAnchorNode.setAttribute("download", "iitgeeprep_diagnostics_report.json");
+        document.body.appendChild(downloadAnchorNode);
+        downloadAnchorNode.click();
+        downloadAnchorNode.remove();
+    };
+
     return (
         <div className="space-y-6">
             <div className="bg-slate-900 rounded-2xl p-8 text-white flex flex-col md:flex-row justify-between items-center shadow-lg gap-6">
@@ -342,14 +357,25 @@ const VisualSystemHealth = () => {
                         <span className="block text-3xl font-black text-white">{totalTests}</span>
                         <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Tests Run</span>
                     </div>
-                    <button 
-                        onClick={executeTests}
-                        disabled={isRunning}
-                        className="bg-green-600 hover:bg-green-500 text-white px-6 py-3 rounded-xl font-bold shadow-lg flex items-center transition-all disabled:opacity-50"
-                    >
-                        {isRunning ? <Loader2 className="w-5 h-5 animate-spin mr-2"/> : <Play className="w-5 h-5 mr-2"/>}
-                        {isRunning ? 'Scanning...' : (totalTests === 0 ? 'Start System Scan' : 'Re-Run Scan')}
-                    </button>
+                    <div className="flex gap-2">
+                        {totalTests > 0 && (
+                            <button 
+                                onClick={downloadJSON}
+                                className="bg-white/10 hover:bg-white/20 text-white px-4 py-3 rounded-xl font-bold shadow-lg flex items-center transition-all border border-white/10"
+                                title="Download JSON Report"
+                            >
+                                <Download className="w-5 h-5" />
+                            </button>
+                        )}
+                        <button 
+                            onClick={executeTests}
+                            disabled={isRunning}
+                            className="bg-green-600 hover:bg-green-500 text-white px-6 py-3 rounded-xl font-bold shadow-lg flex items-center transition-all disabled:opacity-50"
+                        >
+                            {isRunning ? <Loader2 className="w-5 h-5 animate-spin mr-2"/> : <Play className="w-5 h-5 mr-2"/>}
+                            {isRunning ? 'Scanning...' : (totalTests === 0 ? 'Start System Scan' : 'Re-Run Scan')}
+                        </button>
+                    </div>
                 </div>
             </div>
 
