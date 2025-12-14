@@ -365,7 +365,7 @@ export default function App() {
     if (savedTimetable) setTimetableData(JSON.parse(savedTimetable));
   };
 
-  const fetchRemoteData = async (userId: string) => {
+  const fetchRemoteData = async (userId: string, retryCount = 0) => {
       setSyncStatus('SAVING'); 
       setSyncErrorMsg(null);
       try {
@@ -386,6 +386,13 @@ export default function App() {
                   }
                   return;
               } else if (res.status === 500) {
+                  if (retryCount === 0) {
+                      // Attempt Auto-Heal for DB Schema mismatch
+                      console.log("Detecting DB Schema mismatch. Attempting auto-repair...");
+                      await fetch('/api/migrate_db.php');
+                      // Retry once
+                      return fetchRemoteData(userId, 1);
+                  }
                   throw new Error("Server Error (500). Check Database Credentials in config.php.");
               }
               throw new Error(`HTTP Error ${res.status}`);

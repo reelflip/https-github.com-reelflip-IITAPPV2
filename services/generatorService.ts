@@ -64,25 +64,29 @@ function checkAndAddColumn($conn, $table, $col, $def) {
         $stmt->execute([$col]);
         if ($stmt->rowCount() == 0) {
             $conn->exec("ALTER TABLE $table ADD COLUMN $col $def");
-            echo "Added $col to $table<br>";
         }
     } catch(Exception $e) {
-        // Table might not exist or other error, ignore to let Create Table handle it or fail gracefully
+        // Table might not exist or other error
     }
 }
 
 try {
-    // 1. Ensure Tables Exist (Simplified Re-run of Create)
+    // 1. Ensure Base Tables Exist (Simplified Re-run of Create)
     $sql = "
     CREATE TABLE IF NOT EXISTS users (id VARCHAR(255) PRIMARY KEY, name VARCHAR(255));
     CREATE TABLE IF NOT EXISTS test_attempts (id VARCHAR(255) PRIMARY KEY);
     CREATE TABLE IF NOT EXISTS user_progress (id INT AUTO_INCREMENT PRIMARY KEY);
     CREATE TABLE IF NOT EXISTS timetable (user_id VARCHAR(255) PRIMARY KEY);
     CREATE TABLE IF NOT EXISTS backlogs (id VARCHAR(255) PRIMARY KEY);
+    CREATE TABLE IF NOT EXISTS goals (id VARCHAR(255) PRIMARY KEY);
+    CREATE TABLE IF NOT EXISTS mistake_logs (id VARCHAR(255) PRIMARY KEY);
+    CREATE TABLE IF NOT EXISTS content (id INT AUTO_INCREMENT PRIMARY KEY);
+    CREATE TABLE IF NOT EXISTS notifications (id VARCHAR(255) PRIMARY KEY);
     CREATE TABLE IF NOT EXISTS psychometric_results (id INT AUTO_INCREMENT PRIMARY KEY);
     ";
+    $conn->exec($sql);
     
-    // 2. Add Missing Columns (The Fix for 1054 Errors)
+    // 2. Add Missing Columns (Comprehensive Check for 1054 Errors)
     
     // Users Table
     checkAndAddColumn($conn, 'users', 'school', 'VARCHAR(255)');
@@ -92,21 +96,63 @@ try {
     checkAndAddColumn($conn, 'users', 'parent_id', 'VARCHAR(255)');
     checkAndAddColumn($conn, 'users', 'google_id', 'VARCHAR(255)');
     checkAndAddColumn($conn, 'users', 'is_verified', 'TINYINT(1) DEFAULT 1');
+    checkAndAddColumn($conn, 'users', 'target_exam', 'VARCHAR(100)');
+    checkAndAddColumn($conn, 'users', 'target_year', 'INT');
+    checkAndAddColumn($conn, 'users', 'institute', 'VARCHAR(255)');
     
     // Test Attempts
     checkAndAddColumn($conn, 'test_attempts', 'detailed_results', 'LONGTEXT');
     checkAndAddColumn($conn, 'test_attempts', 'topic_id', 'VARCHAR(255)');
     checkAndAddColumn($conn, 'test_attempts', 'difficulty', 'VARCHAR(50)');
+    checkAndAddColumn($conn, 'test_attempts', 'accuracy', 'FLOAT');
+    checkAndAddColumn($conn, 'test_attempts', 'total_marks', 'INT');
+    checkAndAddColumn($conn, 'test_attempts', 'user_id', 'VARCHAR(255)');
+    checkAndAddColumn($conn, 'test_attempts', 'test_id', 'VARCHAR(255)');
     
     // User Progress
     checkAndAddColumn($conn, 'user_progress', 'solved_questions_json', 'LONGTEXT');
     checkAndAddColumn($conn, 'user_progress', 'next_revision_date', 'DATETIME');
+    checkAndAddColumn($conn, 'user_progress', 'status', 'VARCHAR(50)');
+    checkAndAddColumn($conn, 'user_progress', 'last_revised', 'DATETIME');
+    checkAndAddColumn($conn, 'user_progress', 'revision_level', 'INT');
     
     // Timetable
     checkAndAddColumn($conn, 'timetable', 'config_json', 'LONGTEXT');
     checkAndAddColumn($conn, 'timetable', 'slots_json', 'LONGTEXT');
+    
+    // Backlogs
+    checkAndAddColumn($conn, 'backlogs', 'user_id', 'VARCHAR(255)');
+    checkAndAddColumn($conn, 'backlogs', 'title', 'VARCHAR(255)');
+    checkAndAddColumn($conn, 'backlogs', 'subject', 'VARCHAR(50)');
+    checkAndAddColumn($conn, 'backlogs', 'priority', 'VARCHAR(50)');
+    checkAndAddColumn($conn, 'backlogs', 'status', 'VARCHAR(50)');
+    checkAndAddColumn($conn, 'backlogs', 'deadline', 'DATE');
+    
+    // Goals
+    checkAndAddColumn($conn, 'goals', 'user_id', 'VARCHAR(255)');
+    checkAndAddColumn($conn, 'goals', 'text', 'VARCHAR(255)');
+    checkAndAddColumn($conn, 'goals', 'completed', 'TINYINT(1) DEFAULT 0');
+    
+    // Mistake Logs
+    checkAndAddColumn($conn, 'mistake_logs', 'user_id', 'VARCHAR(255)');
+    checkAndAddColumn($conn, 'mistake_logs', 'question', 'TEXT');
+    checkAndAddColumn($conn, 'mistake_logs', 'subject', 'VARCHAR(50)');
+    checkAndAddColumn($conn, 'mistake_logs', 'note', 'TEXT');
+    checkAndAddColumn($conn, 'mistake_logs', 'date', 'DATETIME');
+    
+    // Content (Flashcards/Hacks)
+    checkAndAddColumn($conn, 'content', 'type', 'VARCHAR(50)');
+    checkAndAddColumn($conn, 'content', 'title', 'VARCHAR(255)');
+    checkAndAddColumn($conn, 'content', 'content_json', 'LONGTEXT');
+    
+    // Notifications
+    checkAndAddColumn($conn, 'notifications', 'from_id', 'VARCHAR(255)');
+    checkAndAddColumn($conn, 'notifications', 'from_name', 'VARCHAR(255)');
+    checkAndAddColumn($conn, 'notifications', 'to_id', 'VARCHAR(255)');
+    checkAndAddColumn($conn, 'notifications', 'type', 'VARCHAR(50)');
+    checkAndAddColumn($conn, 'notifications', 'message', 'TEXT');
 
-    echo json_encode(["status" => "success", "message" => "Database schema updated successfully."]);
+    echo json_encode(["status" => "success", "message" => "Database schema verified and updated successfully."]);
 
 } catch(Exception $e) {
     http_response_code(500);
@@ -592,10 +638,30 @@ if(!$user_id) {
 try {
     $response = [];
 
-    // Profile (Aliased columns for React compatibility)
-    $stmt = $conn->prepare("SELECT id, name, email, role, target_exam as targetExam, target_year as targetYear, institute, parent_id as parentId, linked_student_id as linkedStudentId, is_verified as isVerified, school, phone, avatar_url as avatarUrl FROM users WHERE id = ?");
+    // Profile: Use SELECT * to avoid 1054 error if specific columns (school, phone) are missing in DB
+    $stmt = $conn->prepare("SELECT * FROM users WHERE id = ?");
     $stmt->execute([$user_id]);
-    $response['userProfileSync'] = $stmt->fetch(PDO::FETCH_ASSOC);
+    $u = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if($u) {
+        $response['userProfileSync'] = [
+            "id" => $u['id'],
+            "name" => $u['name'],
+            "email" => $u['email'],
+            "role" => $u['role'],
+            "targetExam" => $u['target_exam'] ?? '',
+            "targetYear" => $u['target_year'] ?? 2025,
+            "institute" => $u['institute'] ?? '',
+            "parentId" => $u['parent_id'] ?? null,
+            "linkedStudentId" => $u['linked_student_id'] ?? null,
+            "isVerified" => $u['is_verified'] ?? 1,
+            "school" => $u['school'] ?? '',
+            "phone" => $u['phone'] ?? '',
+            "avatarUrl" => $u['avatar_url'] ?? ''
+        ];
+    } else {
+        $response['userProfileSync'] = null;
+    }
 
     // Progress
     $stmt = $conn->prepare("SELECT * FROM user_progress WHERE user_id = ?");
@@ -1174,6 +1240,15 @@ CREATE TABLE IF NOT EXISTS analytics_visits (
         }).join(',\n');
         sql += values + ';\n';
     }
+
+    // 5. Seed Flashcards & Hacks (Fixes Diagnostic Test #13)
+    sql += `
+    INSERT IGNORE INTO content (type, title, content_json) VALUES 
+    ('flashcard', 'Newton Law', '{"id":1,"front":"Newton Law","back":"F=ma","type":"flashcard"}'),
+    ('flashcard', 'Integration Sin', '{"id":2,"front":"Integral sin(x)","back":"-cos(x)+C","type":"flashcard"}'),
+    ('hack', 'Trig', '{"id":1,"title":"Trig Values","trick":"SOH CAH TOA","tag":"Maths","type":"hack"}'),
+    ('hack', 'Resistor', '{"id":2,"title":"Resistor Codes","trick":"BB ROY of Great Britain","tag":"Physics","type":"hack"}');
+    `;
 
     return sql;
 };
