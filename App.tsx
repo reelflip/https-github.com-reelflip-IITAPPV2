@@ -44,7 +44,7 @@ import { DEFAULT_CHAPTER_NOTES } from './lib/chapterContent';
 import { MOCK_TESTS_DATA, generateInitialQuestionBank } from './lib/mockTestsData';
 import { TrendingUp, Bell, LogOut } from 'lucide-react';
 
-const APP_VERSION = '12.17';
+const APP_VERSION = '12.20';
 
 const ComingSoonScreen = ({ title, icon }: { title: string, icon: string }) => (
   <div className="flex flex-col items-center justify-center h-[70vh] text-center">
@@ -291,8 +291,9 @@ export default function App() {
   const fetchRemoteData = async (userId: string) => {
       try {
           const res = await fetch(`/api/get_dashboard.php?user_id=${userId}`);
-          if (!res.ok) throw new Error();
+          if (!res.ok) throw new Error("API Fetch failed");
           const data = await res.json();
+          
           if (Array.isArray(data.progress)) {
               const progMap: Record<string, UserProgress> = {};
               data.progress.forEach((p: any) => {
@@ -320,7 +321,10 @@ export default function App() {
           if (data.timetable) {
               setTimetableData({ config: data.timetable.config, slots: data.timetable.slots });
           }
-      } catch (e) { loadLocalData(userId); }
+      } catch (e) { 
+          console.error("Using local fallback due to:", e);
+          loadLocalData(userId); 
+      }
   };
 
   const loadLinkedStudent = async (studentId: string) => {
@@ -357,6 +361,7 @@ export default function App() {
     setCurrentScreen(safeScreen);
     setUser(userData);
     
+    // Trigger remote fetch immediately
     fetchRemoteData(userData.id);
     if (userData.role === 'PARENT' && userData.linkedStudentId) loadLinkedStudent(userData.linkedStudentId);
   };

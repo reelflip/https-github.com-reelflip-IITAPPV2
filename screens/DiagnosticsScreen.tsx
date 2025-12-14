@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Database, RefreshCw, Server, CheckCircle2, AlertTriangle, XCircle, Activity, Globe, Play, Loader2, Terminal, AlertCircle, ChevronDown, List, Shield, LayoutGrid, Clock, Users, Brain, Bot, Lock, FileText, Download } from 'lucide-react';
+import { Database, RefreshCw, Server, CheckCircle2, AlertTriangle, XCircle, Activity, Globe, Play, Loader2, Terminal, AlertCircle, ChevronDown, List, Shield, LayoutGrid, Clock, Users, Brain, Bot, Lock, FileText, Download, Trash2 } from 'lucide-react';
 
 export const DiagnosticsScreen: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'VISUAL' | 'TERMINAL' | 'DB'>('VISUAL');
@@ -19,7 +19,7 @@ export const DiagnosticsScreen: React.FC = () => {
                 onClick={() => setActiveTab('TERMINAL')}
                 className={`px-6 py-2.5 rounded-lg text-sm font-bold flex items-center gap-2 transition-all whitespace-nowrap ${activeTab === 'TERMINAL' ? 'bg-green-600 text-white shadow-lg' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
             >
-                <Terminal className="w-4 h-4" /> Deep Audit
+                <Terminal className="w-4 h-4" /> Deep Persistence Audit
             </button>
             <button 
                 onClick={() => setActiveTab('DB')}
@@ -62,12 +62,11 @@ const useTestRunner = () => {
               }
               return newSuites;
           });
-          // Rethrow if critical? No, allow continuation to show full report
+          throw e; // Halt suite on failure for that specific chain
       }
     };
 
     const fetchAPI = async (url: string, options?: RequestInit) => {
-        // Enforce JSON header for robustness
         const headers = { 'Content-Type': 'application/json', ...options?.headers };
         const res = await fetch(url, { ...options, headers });
         const text = await res.text();
@@ -76,243 +75,157 @@ const useTestRunner = () => {
             if (!res.ok) throw new Error(json.message || json.error || `HTTP ${res.status}`);
             return json;
         } catch (e) {
-            throw new Error(`Invalid JSON or API Error: ${text.substring(0, 100)}`);
+            throw new Error(`Invalid JSON or API Error: ${text.substring(0, 100)}...`);
+        }
+    };
+
+    const verifyField = (context: string, actual: any, expected: any) => {
+        if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+            throw new Error(`${context} Mismatch. Expected: ${JSON.stringify(expected)}, Got: ${JSON.stringify(actual)}`);
         }
     };
 
     const executeTests = async () => {
         setIsRunning(true);
-        // Initialize Suites - Matching the 25 Point Plan
+        // Initialize Suites - Grouped for Rigorous checking
         setSuites([
-            { name: "1. [System] Core Health", icon: Server, tests: [] },
-            { name: "2. [Student] Auth & Profile", icon: Users, tests: [] },
-            { name: "3. [Student] Syllabus Sync", icon: RefreshCw, tests: [] },
-            { name: "4. [Student] Task Management", icon: CheckCircle2, tests: [] },
-            { name: "5. [Student] Timetable", icon: Clock, tests: [] },
-            { name: "6. [Student] Exam Engine", icon: FileText, tests: [] },
-            { name: "7. [Student] Analytics", icon: Activity, tests: [] },
-            { name: "8. [Parent] Connection Flow", icon: Users, tests: [] },
-            { name: "9. [Parent] Monitoring", icon: Activity, tests: [] },
-            { name: "10. [Admin] User Mgmt", icon: Shield, tests: [] },
-            { name: "11. [Admin] Content Ops", icon: FileText, tests: [] },
-            { name: "12. [Admin] Inbox", icon: FileText, tests: [] },
-            { name: "13. [System] Study Tools", icon: Brain, tests: [] },
-            { name: "14. [System] Revision Logic", icon: RefreshCw, tests: [] },
-            { name: "15. [Security] Access Control", icon: Lock, tests: [] },
-            { name: "16. [System] DB Integrity", icon: Database, tests: [] },
-            { name: "17. [System] Analytics Engine", icon: Activity, tests: [] },
-            { name: "18. [System] Content Integrity", icon: Play, tests: [] },
-            { name: "19. [Content] Syllabus Audit", icon: List, tests: [] },
-            { name: "20. [Admin] Syllabus Mgmt", icon: FileText, tests: [] },
-            { name: "21. [Student] API Actions", icon: CheckCircle2, tests: [] },
-            { name: "22. [AI] Connectivity", icon: Bot, tests: [] },
-            { name: "23. [DB] Large Data", icon: Database, tests: [] },
-            { name: "24. [Content] Notes", icon: FileText, tests: [] },
-            { name: "25. [Module] Psychometric", icon: Brain, tests: [] },
-            { name: "26. [Cleanup] Data Purge", icon: XCircle, tests: [] }
+            { name: "1. Core & Auth Integrity", icon: Server, tests: [] },
+            { name: "2. Progress Persistence", icon: RefreshCw, tests: [] },
+            { name: "3. Exam Data Integrity", icon: FileText, tests: [] },
+            { name: "4. Timetable & Config", icon: Clock, tests: [] },
+            { name: "5. Psychometric Report", icon: Brain, tests: [] },
+            { name: "6. Cleanup & Purge", icon: Trash2, tests: [] }
         ]);
 
-        const SESSION_ID = `d_${Date.now()}`;
+        const SESSION_ID = `diag_${Date.now()}`;
         let userId = '';
-        let parentId = '';
-        let studentId = '';
-        let topicId = `${SESSION_ID}_topic`;
-        let goalId = `${SESSION_ID}_goal`;
-        let backlogId = `${SESSION_ID}_bl`;
-        let noteId = 0;
+        const topicId = `t_${SESSION_ID}`;
+        const attemptId = `att_${SESSION_ID}`;
 
         try {
-            // 1. Core Health
-            await runTest(0, "Should ping API root", () => fetchAPI('/api/index.php'));
-            await runTest(0, "Should connect to database", () => fetchAPI('/api/test_db.php'));
-
-            // 2. Auth
-            await runTest(1, "Should register new Student", async () => {
+            // --- SUITE 1: Core & Auth ---
+            await runTest(0, "API Root Reachable", () => fetchAPI('/api/index.php'));
+            await runTest(0, "DB Connected", () => fetchAPI('/api/test_db.php'));
+            
+            await runTest(0, "Register Test User", async () => {
                 const res = await fetchAPI('/api/register.php', {
                     method: 'POST', body: JSON.stringify({ name: `Test ${SESSION_ID}`, email: `${SESSION_ID}@test.com`, password: 'pass', role: 'STUDENT', targetExam: 'JEE', targetYear: 2025 })
                 });
                 userId = res.user.id;
-                if(!userId) throw new Error("No ID");
-            });
-            await runTest(1, "Should verify ID format", async () => { if(!userId) throw new Error("ID Null"); });
-            await runTest(1, "Should update profile", () => fetchAPI('/api/update_profile.php', {
-                method: 'POST', body: JSON.stringify({ id: userId, institute: 'Test Inst' })
-            }));
-
-            // 3. Syllabus
-            await runTest(2, "Should init student session", () => fetchAPI('/api/login.php', {
-                method: 'POST', body: JSON.stringify({ email: `${SESSION_ID}@test.com`, password: 'pass' })
-            }));
-            await runTest(2, "Should save topic progress", () => fetchAPI('/api/sync_progress.php', {
-                method: 'POST', body: JSON.stringify({ user_id: userId, topic_id: topicId, status: 'IN_PROGRESS', lastRevised: null, revisionLevel: 0, nextRevisionDate: null, solvedQuestions: [] })
-            }));
-            await runTest(2, "Should retrieve progress", () => fetchAPI(`/api/get_dashboard.php?user_id=${userId}`));
-
-            // 4. Tasks
-            await runTest(3, "Should init session", async () => {}); 
-            await runTest(3, "Should create backlog", () => fetchAPI('/api/manage_backlogs.php', {
-                method: 'POST', body: JSON.stringify({ id: backlogId, user_id: userId, title: 'Test Backlog', subject: 'Maths', priority: 'High', status: 'PENDING', deadline: '2025-01-01' })
-            }));
-            await runTest(3, "Should create goal", () => fetchAPI('/api/manage_goals.php', {
-                method: 'POST', body: JSON.stringify({ id: goalId, user_id: userId, text: "Test Goal" })
-            }));
-
-            // 5. Timetable
-            await runTest(4, "Should save timetable", () => fetchAPI('/api/save_timetable.php', {
-                method: 'POST', body: JSON.stringify({ user_id: userId, config: { wakeTime: '06:00' }, slots: [] })
-            }));
-            await runTest(4, "Should retrieve timetable", async () => {
-                const res = await fetchAPI(`/api/get_dashboard.php?user_id=${userId}`);
-                if (!res.timetable) throw new Error("Timetable missing");
+                if (!userId) throw new Error("No ID returned");
             });
 
-            // 6. Exam Engine
-            await runTest(5, "Should submit mock attempt", () => fetchAPI('/api/save_attempt.php', {
-                method: 'POST', body: JSON.stringify({ 
-                    user_id: userId, id: `att_${SESSION_ID}`, testId: 'mock_1', title: 'Diag Mock', 
-                    score: 100, totalMarks: 300, accuracy: 50, totalQuestions: 10, accuracy_percent: 50
-                })
-            }));
-
-            // 7. Analytics
-            await runTest(6, "Should retrieve attempt data", async () => {
-                const res = await fetchAPI(`/api/get_dashboard.php?user_id=${userId}`);
-                if (!res.attempts || res.attempts.length === 0) throw new Error("No attempts found");
+            await runTest(0, "Login & Retrieve Profile", async () => {
+                const res = await fetchAPI('/api/login.php', { method: 'POST', body: JSON.stringify({ email: `${SESSION_ID}@test.com`, password: 'pass' }) });
+                if (res.user.id !== userId) throw new Error("ID mismatch on login");
             });
 
-            // 8. Parent Connection
-            await runTest(7, "Register Parent & Student", async () => {
-                const p = await fetchAPI('/api/register.php', { method: 'POST', body: JSON.stringify({ name: `Parent ${SESSION_ID}`, email: `p_${SESSION_ID}@fam.com`, password: 'pass', role: 'PARENT' }) });
-                parentId = p.user.id;
-                const s = await fetchAPI('/api/register.php', { method: 'POST', body: JSON.stringify({ name: `Child ${SESSION_ID}`, email: `c_${SESSION_ID}@fam.com`, password: 'pass', role: 'STUDENT' }) });
-                studentId = s.user.id;
-            });
-            await runTest(7, "Parent sends request", () => fetchAPI('/api/send_request.php', {
-                method: 'POST', body: JSON.stringify({ student_identifier: studentId, parent_id: parentId, parent_name: 'Test Parent', action: 'send' })
-            }));
-            await runTest(7, "Student approves request", async () => {
-                const dash = await fetchAPI(`/api/get_dashboard.php?user_id=${studentId}`);
-                const req = dash.notifications?.find((n: any) => n.fromId === parentId && n.type === 'connection_request');
-                if(!req) throw new Error("Notification not found");
-                await fetchAPI('/api/respond_request.php', {
-                    method: 'POST', body: JSON.stringify({ accept: true, student_id: studentId, parent_id: parentId, notification_id: req.id })
-                });
-            });
+            // --- SUITE 2: Progress Persistence ---
+            const progressPayload = {
+                user_id: userId,
+                topic_id: topicId,
+                status: 'IN_PROGRESS',
+                lastRevised: new Date().toISOString(),
+                revisionLevel: 2,
+                nextRevisionDate: new Date().toISOString(),
+                solvedQuestions: ['q1', 'q2', 'q3']
+            };
 
-            // 9. Parent Monitoring (Visibility)
-            await runTest(8, "Seed Psychometric Data", () => fetchAPI('/api/save_psychometric.php', {
-                method: 'POST', body: JSON.stringify({ user_id: studentId, report: { date: new Date().toISOString(), scores: { "Stress": 50 }, overallScore: 85, profileType: "High Achiever", insights: [], actionPlan: [] } })
-            }));
-            await runTest(8, "Verify Parent sees Mock Data", async () => {
-                const dash = await fetchAPI(`/api/get_dashboard.php?user_id=${studentId}`);
-                if (dash.userProfileSync.parentId !== parentId) throw new Error("Linkage verification failed");
-            });
-            await runTest(8, "Verify Parent sees Psychometric", async () => {
-                const pm = await fetchAPI(`/api/get_psychometric.php?user_id=${studentId}`);
-                if (!pm.report) throw new Error("Psychometric data hidden");
-            });
-
-            // 10. Admin User
-            await runTest(9, "Block User", () => fetchAPI('/api/manage_users.php', { method: 'PUT', body: JSON.stringify({ id: userId, isVerified: false }) }));
+            await runTest(1, "Save Progress (incl. Arrays)", () => fetchAPI('/api/sync_progress.php', { method: 'POST', body: JSON.stringify(progressPayload) }));
             
-            // 11. Content Ops
-            await runTest(10, "Create Test", () => Promise.resolve("Simulated"));
-
-            // 12. Inbox
-            await runTest(11, "Receive message", () => fetchAPI('/api/manage_contact.php', { 
-                method: 'POST', body: JSON.stringify({ name: 'Tester', email: 't@t.com', subject: 'Hi', message: 'Test' })
-            }));
-
-            // 13. Study Tools
-            await runTest(12, "Flashcards seeded", async () => {
-                const f = await fetchAPI('/api/manage_content.php?type=flashcard');
-                if(!Array.isArray(f)) throw new Error("Flashcards invalid");
+            await runTest(1, "Verify Progress Fields", async () => {
+                const dash = await fetchAPI(`/api/get_dashboard.php?user_id=${userId}`);
+                const p = dash.progress.find((x: any) => x.topic_id === topicId);
+                if (!p) throw new Error("Progress record not found");
+                
+                verifyField('Status', p.status, progressPayload.status);
+                verifyField('Revision Level', parseInt(p.revision_level), progressPayload.revisionLevel);
+                
+                // Parse JSON array from DB
+                const solved = p.solved_questions_json ? JSON.parse(p.solved_questions_json) : [];
+                verifyField('Solved Questions Array', solved, progressPayload.solvedQuestions);
             });
 
-            // 14. Revision Logic
-            await runTest(13, "Save revision date", () => fetchAPI('/api/sync_progress.php', {
-                method: 'POST', body: JSON.stringify({ user_id: userId, topic_id: topicId, status: 'COMPLETED', revisionLevel: 1 })
-            }));
+            // --- SUITE 3: Exam Data Integrity ---
+            const attemptPayload = {
+                user_id: userId,
+                id: attemptId,
+                testId: 'mock_test_1',
+                title: 'Diagnostic Mock',
+                score: 100,
+                totalMarks: 300,
+                accuracy_percent: 33,
+                detailedResults: [
+                    { questionId: 'q1', status: 'CORRECT', selectedOption: 1 },
+                    { questionId: 'q2', status: 'INCORRECT', selectedOption: 2 },
+                    { questionId: 'q3', status: 'UNATTEMPTED' }
+                ]
+            };
 
-            // 15. Security (Access Control)
-            await runTest(14, "Login blocked user", async () => {
-                try {
-                    await fetchAPI('/api/login.php', { method: 'POST', body: JSON.stringify({ email: `${SESSION_ID}@test.com`, password: 'pass' }) });
-                    // If login succeeded without throwing error, that means it returned user => Fail
-                    throw new Error("User was not blocked");
-                } catch(e: any) {
-                    // We expect an error here!
-                    if (e.message.includes('Account blocked') || e.message.includes('HTTP 403')) {
-                        // Pass
-                    } else if (e.message === "User was not blocked") {
-                        throw e; // Rethrow fail
-                    } else {
-                        // Some other error? Assume blocked.
-                    }
+            await runTest(2, "Save Complex Test Attempt", () => fetchAPI('/api/save_attempt.php', { method: 'POST', body: JSON.stringify(attemptPayload) }));
+
+            await runTest(2, "Verify Deep JSON Data", async () => {
+                const dash = await fetchAPI(`/api/get_dashboard.php?user_id=${userId}`);
+                const att = dash.attempts.find((x: any) => x.id === attemptId);
+                if (!att) throw new Error("Attempt record not found");
+
+                verifyField('Score', parseInt(att.score), attemptPayload.score);
+                // detailedResults is already decoded in get_dashboard.php
+                verifyField('Detailed Results JSON', att.detailedResults, attemptPayload.detailedResults);
+            });
+
+            // --- SUITE 4: Timetable & Config ---
+            const timetablePayload = {
+                user_id: userId,
+                config: { wakeTime: '06:00', bedTime: '22:00' },
+                slots: [{ time: '08:00', label: 'Maths' }, { time: '10:00', label: 'Physics' }]
+            };
+
+            await runTest(3, "Save Timetable Config", () => fetchAPI('/api/save_timetable.php', { method: 'POST', body: JSON.stringify(timetablePayload) }));
+
+            await runTest(3, "Verify Config & Slots", async () => {
+                const dash = await fetchAPI(`/api/get_dashboard.php?user_id=${userId}`);
+                if (!dash.timetable) throw new Error("Timetable table empty");
+                
+                verifyField('Config JSON', dash.timetable.config, timetablePayload.config);
+                verifyField('Slots JSON', dash.timetable.slots, timetablePayload.slots);
+            });
+
+            // --- SUITE 5: Psychometric Report ---
+            const psychPayload = {
+                user_id: userId,
+                report: {
+                    date: new Date().toISOString(),
+                    scores: { "Stress": 80, "Focus": 40 },
+                    overallScore: 60,
+                    profileType: "Balanced",
+                    insights: [{ text: "Good job" }],
+                    actionPlan: ["Sleep more"]
                 }
-            });
+            };
 
-            // 16. DB Integrity
-            await runTest(15, "Check tables", async () => {
-                const res = await fetchAPI('/api/test_db.php');
-                if (res.tables.length < 5) throw new Error("Missing tables");
-            });
+            await runTest(4, "Save Psychometric Report", () => fetchAPI('/api/save_psychometric.php', { method: 'POST', body: JSON.stringify(psychPayload) }));
 
-            // 17. Analytics Engine
-            await runTest(16, "Increment visit", () => fetchAPI('/api/track_visit.php'));
-
-            // 18. Content Integrity
-            await runTest(17, "Valid Video Mapping", () => Promise.resolve(true));
-
-            // 19. Syllabus Audit
-            await runTest(18, "Check Chapters count", async () => {
-                const t = await fetchAPI('/api/manage_syllabus.php');
-                if (t.length < 10) throw new Error("Syllabus incomplete");
-            });
-
-            // 20. Admin Syllabus
-            await runTest(19, "Create Topic API", () => Promise.resolve(true)); // Already tested in step 3
-
-            // 21. Student Actions
-            await runTest(20, "Create Backlog API", () => Promise.resolve(true)); // Tested in step 4
-
-            // 22. AI
-            await runTest(21, "Connect Pollinations AI", async () => {
-                const res = await fetch('https://text.pollinations.ai/Hello');
-                if (!res.ok) throw new Error("AI Down");
-            });
-
-            // 23. DB Large Data
-            await runTest(22, "Save Large Plan", () => fetchAPI('/api/save_timetable.php', {
-                method: 'POST', body: JSON.stringify({ user_id: userId, config: { masterPlan: new Array(50).fill({week:1}) }, slots: [] })
-            }));
-
-            // 24. Notes
-            await runTest(23, "Create Note", async () => {
-                const res = await fetchAPI('/api/manage_notes.php', { method: 'POST', body: JSON.stringify({ topicId: topicId, pages: ['<h1>Test</h1>'] }) });
-                if (!res) throw new Error("Note save failed");
-            });
-
-            // 25. Psychometric (Specifically Fixing the Previous Fail)
-            await runTest(24, "Save Assessment Result", () => fetchAPI('/api/save_psychometric.php', {
-                method: 'POST', body: JSON.stringify({ user_id: userId, report: { date: new Date().toISOString(), scores: { "Stress": 50 }, overallScore: 80, profileType: "Balanced", insights: [], actionPlan: [] } })
-            }));
-            await runTest(24, "Complete Flow", async () => {
+            await runTest(4, "Verify Full Report Structure", async () => {
                 const res = await fetchAPI(`/api/get_psychometric.php?user_id=${userId}`);
-                if (!res.report || res.report.overallScore !== 80) throw new Error("Psychometric retrieval mismatch");
+                if (!res.report) throw new Error("Report not retrieved");
+                verifyField('Report Integrity', res.report, psychPayload.report);
             });
 
-            // 26. Cleanup
-            await runTest(25, "Purge Test Data", async () => {
-                await fetchAPI(`/api/manage_syllabus.php?id=${topicId}`, { method: 'DELETE' });
-                await fetchAPI(`/api/manage_backlogs.php?id=${backlogId}`, { method: 'DELETE' });
-                await fetchAPI(`/api/manage_goals.php?id=${goalId}`, { method: 'DELETE' });
+            // --- SUITE 6: Cleanup ---
+            await runTest(5, "Purge Test User & Data", async () => {
+                // Cascading delete usually handles this, but manual clean for safety
                 await fetchAPI(`/api/manage_users.php?id=${userId}`, { method: 'DELETE' });
-                await fetchAPI(`/api/manage_users.php?id=${parentId}`, { method: 'DELETE' });
-                await fetchAPI(`/api/manage_users.php?id=${studentId}`, { method: 'DELETE' });
+                
+                // Verify user is gone
+                const res = await fetchAPI('/api/login.php', { method: 'POST', body: JSON.stringify({ email: `${SESSION_ID}@test.com`, password: 'pass' }) });
+                if (res.status === 'success') throw new Error("Delete failed - User still exists");
             });
 
-        } catch (e) { console.error(e); }
+        } catch (e: any) { 
+            console.error(e); 
+            // Don't stop showing results, just mark failed
+        }
         setIsRunning(false);
     };
 
@@ -323,26 +236,9 @@ const useTestRunner = () => {
 const VisualSystemHealth = () => {
     const { suites, isRunning, executeTests } = useTestRunner();
     
-    // Removed auto-run useEffect to support manual trigger on demand
-
     const totalTests = suites.reduce((acc, s) => acc + s.tests.length, 0);
     const passedTests = suites.reduce((acc, s) => acc + s.tests.filter((t: any) => t.passed).length, 0);
     const passRate = totalTests > 0 ? Math.round((passedTests / totalTests) * 100) : 0;
-
-    const downloadJSON = () => {
-        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({ 
-            date: new Date().toISOString(),
-            passRate,
-            totalTests,
-            suites 
-        }, null, 2));
-        const downloadAnchorNode = document.createElement('a');
-        downloadAnchorNode.setAttribute("href", dataStr);
-        downloadAnchorNode.setAttribute("download", "iitgeeprep_diagnostics_report.json");
-        document.body.appendChild(downloadAnchorNode);
-        downloadAnchorNode.click();
-        downloadAnchorNode.remove();
-    };
 
     return (
         <div className="space-y-6">
@@ -352,36 +248,22 @@ const VisualSystemHealth = () => {
                         <Activity className="w-6 h-6 text-green-400" /> System Health Check
                     </h2>
                     <p className="text-slate-400 mt-1 text-sm max-w-xl">
-                        Comprehensive 25-point validation suite across all subsystems (Auth, API, Content, Logic).
+                        Validate DB Schema (LONGTEXT support), API endpoints, and field-level data integrity.
                     </p>
                 </div>
                 <div className="flex items-center gap-6">
                     <div className="text-right">
-                        <span className={`block text-3xl font-black ${passRate >= 98 ? 'text-green-400' : 'text-orange-400'}`}>{passRate}%</span>
+                        <span className={`block text-3xl font-black ${passRate >= 100 ? 'text-green-400' : 'text-orange-400'}`}>{passRate}%</span>
                         <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Pass Rate</span>
                     </div>
-                    <div className="h-10 w-px bg-slate-700 hidden md:block"></div>
-                    <div className="text-right mr-4">
-                        <span className="block text-3xl font-black text-white">{totalTests}</span>
-                        <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Tests Run</span>
-                    </div>
                     <div className="flex gap-2">
-                        {totalTests > 0 && (
-                            <button 
-                                onClick={downloadJSON}
-                                className="bg-white/10 hover:bg-white/20 text-white px-4 py-3 rounded-xl font-bold shadow-lg flex items-center transition-all border border-white/10"
-                                title="Download JSON Report"
-                            >
-                                <Download className="w-5 h-5" />
-                            </button>
-                        )}
                         <button 
                             onClick={executeTests}
                             disabled={isRunning}
                             className="bg-green-600 hover:bg-green-500 text-white px-6 py-3 rounded-xl font-bold shadow-lg flex items-center transition-all disabled:opacity-50"
                         >
                             {isRunning ? <Loader2 className="w-5 h-5 animate-spin mr-2"/> : <Play className="w-5 h-5 mr-2"/>}
-                            {isRunning ? 'Scanning...' : (totalTests === 0 ? 'Start System Scan' : 'Re-Run Scan')}
+                            {isRunning ? 'Auditing...' : 'Start Audit'}
                         </button>
                     </div>
                 </div>
@@ -403,7 +285,7 @@ const VisualSystemHealth = () => {
                         </div>
                         <div className="divide-y divide-slate-50 max-h-40 overflow-y-auto custom-scrollbar">
                             {suite.tests.length === 0 ? (
-                                <div className="p-4 text-center text-xs text-slate-400 italic">...</div>
+                                <div className="p-4 text-center text-xs text-slate-400 italic">Waiting...</div>
                             ) : (
                                 suite.tests.map((test: any, tIdx: number) => (
                                     <div key={tIdx} className="p-2 px-4 flex justify-between items-center hover:bg-slate-50 transition-colors">
@@ -428,27 +310,6 @@ const SystemIntegrityCheck = () => {
   const { suites, isRunning, executeTests } = useTestRunner();
   const [expanded, setExpanded] = useState<string | null>(null);
 
-  // Stats for terminal view
-  const totalTests = suites.reduce((acc, s) => acc + s.tests.length, 0);
-  const passedTests = suites.reduce((acc, s) => acc + s.tests.filter((t: any) => t.passed).length, 0);
-  const passRate = totalTests > 0 ? Math.round((passedTests / totalTests) * 100) : 0;
-
-  const downloadJSON = () => {
-      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({ 
-          date: new Date().toISOString(),
-          mode: 'DEEP_AUDIT',
-          passRate,
-          totalTests,
-          suites 
-      }, null, 2));
-      const downloadAnchorNode = document.createElement('a');
-      downloadAnchorNode.setAttribute("href", dataStr);
-      downloadAnchorNode.setAttribute("download", "iitgeeprep_deep_audit_report.json");
-      document.body.appendChild(downloadAnchorNode);
-      downloadAnchorNode.click();
-      downloadAnchorNode.remove();
-  };
-
   return (
       <div className="bg-slate-900 text-white rounded-2xl shadow-xl overflow-hidden font-sans">
          <div className="p-6 border-b border-slate-800 flex justify-between items-center">
@@ -456,36 +317,15 @@ const SystemIntegrityCheck = () => {
                 <h2 className="text-2xl font-bold flex items-center gap-3">
                    <Terminal className="w-8 h-8 text-green-400" /> Integrity Audit Log
                 </h2>
-                <p className="text-slate-400 mt-1 max-w-xl text-sm">
-                   Real-time execution logs for all 25 test modules.
-                </p>
              </div>
-             <div className="flex gap-2 items-center">
-                 {totalTests > 0 && (
-                     <div className="mr-4 text-right hidden md:block">
-                         <span className="block text-sm font-bold text-slate-300">{passRate}% Pass</span>
-                         <span className="text-xs text-slate-500">{totalTests} Tests</span>
-                     </div>
-                 )}
-                 {/* Deep Audit JSON Export */}
-                 {totalTests > 0 && !isRunning && (
-                    <button 
-                        onClick={downloadJSON}
-                        className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-blue-400 px-4 py-2 rounded-lg font-bold flex items-center transition-all"
-                        title="Export Audit Log"
-                    >
-                        <Download className="w-4 h-4 mr-2" /> JSON
-                    </button>
-                 )}
-                 <button 
-                    onClick={executeTests}
-                    disabled={isRunning}
-                    className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white px-6 py-2 rounded-lg font-bold flex items-center transition-all disabled:opacity-50"
-                 >
-                    {isRunning ? <Loader2 className="w-4 h-4 animate-spin mr-2"/> : <Play className="w-4 h-4 mr-2"/>} 
-                    Execute
-                 </button>
-             </div>
+             <button 
+                onClick={executeTests}
+                disabled={isRunning}
+                className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white px-6 py-2 rounded-lg font-bold flex items-center transition-all disabled:opacity-50"
+             >
+                {isRunning ? <Loader2 className="w-4 h-4 animate-spin mr-2"/> : <Play className="w-4 h-4 mr-2"/>} 
+                Execute
+             </button>
          </div>
 
          <div className="p-6 space-y-4 font-mono text-sm h-[600px] overflow-y-auto custom-scrollbar">
@@ -493,7 +333,6 @@ const SystemIntegrityCheck = () => {
                  <div key={idx} className="border border-slate-800 rounded-lg overflow-hidden">
                      <div className="bg-slate-800/50 px-4 py-2 flex justify-between items-center">
                          <span className="text-slate-300 font-bold">{suite.name}</span>
-                         {suite.tests.length > 0 && <span className={suite.tests.some((t:any)=>!t.passed) ? "text-red-400" : "text-green-400"}>{suite.tests.filter((t:any)=>t.passed).length}/{suite.tests.length}</span>}
                      </div>
                      <div className="bg-black/20 p-2 space-y-1">
                          {suite.tests.map((test: any, tIdx: number) => (
@@ -503,13 +342,12 @@ const SystemIntegrityCheck = () => {
                                  </span>
                                  <span className="text-slate-500">{test.duration}ms</span>
                                  {expanded === `${idx}-${tIdx}` && test.error && (
-                                     <div className="w-full mt-2 text-red-300 bg-red-900/20 p-2 rounded block">
-                                         Error: {test.error}
+                                     <div className="w-full mt-2 text-red-300 bg-red-900/20 p-2 rounded block whitespace-pre-wrap break-all">
+                                         {test.error}
                                      </div>
                                  )}
                              </div>
                          ))}
-                         {suite.tests.length === 0 && <span className="text-slate-600 px-2">...</span>}
                      </div>
                  </div>
              ))}

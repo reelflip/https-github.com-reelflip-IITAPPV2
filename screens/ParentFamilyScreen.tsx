@@ -35,11 +35,17 @@ export const ParentFamilyScreen: React.FC<Props> = ({ user, onSendRequest, linke
         if(res.ok) {
             const data = await res.json();
             setSearchResults(data);
-            if (data.length === 0) {
+            if (Array.isArray(data) && data.length === 0) {
                 setStatusMsg({ type: 'error', text: 'No matching students found.' });
             }
         } else {
-            setStatusMsg({ type: 'error', text: 'Search failed. Please try searching by Name or ID.' });
+            // Attempt to parse error
+            try {
+                const err = await res.json();
+                setStatusMsg({ type: 'error', text: err.error || 'Server error occurred.' });
+            } catch {
+                setStatusMsg({ type: 'error', text: 'Search failed. Please try searching by Name or ID.' });
+            }
         }
     } catch(e) { 
         setStatusMsg({ type: 'error', text: 'Connection error. Check your internet.' }); 
