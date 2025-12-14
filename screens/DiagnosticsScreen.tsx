@@ -107,7 +107,7 @@ const useTestRunner = () => {
 
     const executeTests = async () => {
         setIsRunning(true);
-        // Reset Suites
+        // Reset Suites - Full 21 Suite Configuration
         setSuites([
             { name: "1. [System] Core Health", icon: Server, tests: [] },
             { name: "2. [Student] Auth & Profile", icon: Shield, tests: [] },

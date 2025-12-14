@@ -733,7 +733,7 @@ export default function App() {
                 </div>
                 <div className="flex gap-4">
                     {syncErrorMsg.includes("404") && (
-                        <button onClick={() => setCurrentScreen('deployment')} className="text-xs font-bold underline hover:text-red-900">Check Setup</button>
+                        <button onClick={() => setCurrentScreen('deployment')} className="text-xs font-bold underline hover:text-red-900 bg-red-100 px-2 py-1 rounded">Check Setup</button>
                     )}
                     <button onClick={() => fetchRemoteData(user.id)} className="text-xs font-bold underline hover:text-red-900">Retry</button>
                 </div>
