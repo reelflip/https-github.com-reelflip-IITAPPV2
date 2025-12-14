@@ -10,6 +10,7 @@ import {
 
 interface SyllabusTrackerProps {
   user: User;
+  viewingStudentName?: string;
   subjects: Topic[]; 
   progress: Record<string, UserProgress>;
   onUpdateProgress: (topicId: string, updates: Partial<UserProgress>) => void;
@@ -41,7 +42,7 @@ const statusLabels: Record<TopicStatus, string> = {
 };
 
 export const SyllabusScreen: React.FC<SyllabusTrackerProps> = ({ 
-  user, subjects, progress, onUpdateProgress, readOnly = false, 
+  user, viewingStudentName, subjects, progress, onUpdateProgress, readOnly = false, 
   videoMap = {}, chapterNotes = {}, questionBank = [], onToggleQuestion, addTestAttempt, testAttempts = []
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -112,6 +113,8 @@ export const SyllabusScreen: React.FC<SyllabusTrackerProps> = ({
       solvedQuestions: []
     };
   };
+
+  const displayUserName = viewingStudentName || user.name.split(' ')[0];
 
   // --- TOPIC DETAIL VIEW COMPONENT ---
   const TopicDetailView = ({ topic, onClose }: { topic: Topic, onClose: () => void }) => {
@@ -716,9 +719,9 @@ export const SyllabusScreen: React.FC<SyllabusTrackerProps> = ({
       {/* Stats Overview */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="md:col-span-1 bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex flex-col justify-center">
-          <h3 className="text-sm font-semibold text-slate-900 mb-1">Student Overview: <span className="text-blue-600">{user.name.split(' ')[0]}</span></h3>
+          <h3 className="text-sm font-semibold text-slate-900 mb-1">Student Overview: <span className="text-blue-600">{displayUserName}</span></h3>
           <p className="text-xs text-slate-500">
-            {user.name.split(' ')[0]} has completed <span className="font-bold text-slate-700">{stats.completed}</span> out of <span className="font-bold text-slate-700">{stats.total}</span> major topics.
+            {displayUserName} has completed <span className="font-bold text-slate-700">{stats.completed}</span> out of <span className="font-bold text-slate-700">{stats.total}</span> major topics.
           </p>
         </div>
 

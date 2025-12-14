@@ -44,7 +44,7 @@ import { DEFAULT_CHAPTER_NOTES } from './lib/chapterContent';
 import { MOCK_TESTS_DATA, generateInitialQuestionBank } from './lib/mockTestsData';
 import { TrendingUp, Bell, LogOut } from 'lucide-react';
 
-const APP_VERSION = '12.14';
+const APP_VERSION = '12.17';
 
 const ComingSoonScreen = ({ title, icon }: { title: string, icon: string }) => (
   <div className="flex flex-col items-center justify-center h-[70vh] text-center">
@@ -680,7 +680,7 @@ export default function App() {
   if (currentScreen === 'public-blog' || currentScreen === 'blog') return <PublicBlogScreen blogs={blogs} onBack={() => user ? setCurrentScreen('dashboard') : setCurrentScreen('dashboard')} />;
   if (currentScreen === 'about') return <PublicLayout onNavigate={handleNavigation} currentScreen="about" socialConfig={socialConfig}><AboutUsScreen /></PublicLayout>;
   if (currentScreen === 'contact') return <PublicLayout onNavigate={handleNavigation} currentScreen="contact" socialConfig={socialConfig}><ContactUsScreen /></PublicLayout>;
-  if (currentScreen === 'exams') return <PublicLayout onNavigate={handleNavigation} currentScreen="exams" socialConfig={socialConfig}><ExamGuideScreen /></PublicLayout>;
+  if (currentScreen === 'exams' && !user) return <PublicLayout onNavigate={handleNavigation} currentScreen="exams" socialConfig={socialConfig}><ExamGuideScreen /></PublicLayout>;
   if (currentScreen === 'privacy') return <PublicLayout onNavigate={handleNavigation} currentScreen="privacy" socialConfig={socialConfig}><PrivacyPolicyScreen /></PublicLayout>;
   if (currentScreen === 'features') return <PublicLayout onNavigate={handleNavigation} currentScreen="features" socialConfig={socialConfig}><FeaturesScreen /></PublicLayout>;
 
@@ -703,11 +703,11 @@ export default function App() {
         <div className="max-w-6xl mx-auto">
           {user.role === 'PARENT' && (
              <>
-                {currentScreen === 'dashboard' && <DashboardScreen user={user} progress={linkedStudentData?.progress || {}} testAttempts={linkedStudentData?.tests || []} goals={[]} addGoal={()=>{}} toggleGoal={()=>{}} setScreen={setCurrentScreen} />}
+                {currentScreen === 'dashboard' && <DashboardScreen user={user} viewingStudentName={linkedStudentData?.studentName} progress={linkedStudentData?.progress || {}} testAttempts={linkedStudentData?.tests || []} goals={[]} addGoal={()=>{}} toggleGoal={()=>{}} setScreen={setCurrentScreen} />}
                 {currentScreen === 'family' && <ParentFamilyScreen user={user} onSendRequest={sendConnectionRequest} linkedData={linkedStudentData} />}
-                {currentScreen === 'analytics' && <AnalyticsScreen user={user} progress={linkedStudentData?.progress || {}} testAttempts={linkedStudentData?.tests || []} />}
+                {currentScreen === 'analytics' && <AnalyticsScreen user={user} viewingStudentName={linkedStudentData?.studentName} progress={linkedStudentData?.progress || {}} testAttempts={linkedStudentData?.tests || []} />}
                 {currentScreen === 'tests' && <TestScreen user={user} history={linkedStudentData?.tests || []} addTestAttempt={()=>{}} availableTests={adminTests} />}
-                {currentScreen === 'syllabus' && <SyllabusScreen user={user} subjects={syllabus} progress={linkedStudentData?.progress || {}} onUpdateProgress={()=>{}} readOnly={true} videoMap={videoMap} chapterNotes={chapterNotes} questionBank={questionBank} addTestAttempt={()=>{}} testAttempts={linkedStudentData?.tests || []} />}
+                {currentScreen === 'syllabus' && <SyllabusScreen user={user} viewingStudentName={linkedStudentData?.studentName} subjects={syllabus} progress={linkedStudentData?.progress || {}} onUpdateProgress={()=>{}} readOnly={true} videoMap={videoMap} chapterNotes={chapterNotes} questionBank={questionBank} addTestAttempt={()=>{}} testAttempts={linkedStudentData?.tests || []} />}
                 {currentScreen === 'profile' && <ProfileScreen user={user} onAcceptRequest={()=>{}} onUpdateUser={(u) => { const updated = { ...user, ...u }; setUser(updated); }} linkedStudentName={linkedStudentData?.studentName} />} 
              </>
           )}

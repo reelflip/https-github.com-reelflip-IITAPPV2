@@ -39,7 +39,7 @@ export const ParentFamilyScreen: React.FC<Props> = ({ user, onSendRequest, linke
                 setStatusMsg({ type: 'error', text: 'No matching students found.' });
             }
         } else {
-            setStatusMsg({ type: 'error', text: 'Search failed. Please try searching by ID.' });
+            setStatusMsg({ type: 'error', text: 'Search failed. Please try searching by Name or ID.' });
         }
     } catch(e) { 
         setStatusMsg({ type: 'error', text: 'Connection error. Check your internet.' }); 
@@ -70,8 +70,7 @@ export const ParentFamilyScreen: React.FC<Props> = ({ user, onSendRequest, linke
   const recentTest = linkedData && linkedData.tests.length > 0 ? linkedData.tests[linkedData.tests.length - 1] : null;
 
   if (viewingPsychReport && user.linkedStudentId) {
-      // Mock a user object for the student ID to reuse the component
-      const studentUser: User = { ...user, id: user.linkedStudentId, role: 'STUDENT' };
+      // Pass the actual parent user object so the component knows to render Parent View
       return (
           <div className="space-y-6">
               <button 
@@ -80,7 +79,7 @@ export const ParentFamilyScreen: React.FC<Props> = ({ user, onSendRequest, linke
               >
                   ← Back to Family Dashboard
               </button>
-              <PsychometricScreen user={studentUser} />
+              <PsychometricScreen user={user} />
           </div>
       );
   }
@@ -138,7 +137,7 @@ export const ParentFamilyScreen: React.FC<Props> = ({ user, onSendRequest, linke
                         onClick={() => setViewingPsychReport(true)}
                         className="flex-1 bg-violet-600 text-white font-bold py-3 rounded-lg hover:bg-violet-700 transition-colors flex items-center justify-center gap-2 shadow-sm"
                     >
-                        <Brain className="w-5 h-5" /> View Psychometric Profile
+                        <Brain className="w-5 h-5" /> View Psychometric Profile & Suggestions
                     </button>
                 </div>
             </div>
@@ -151,7 +150,7 @@ export const ParentFamilyScreen: React.FC<Props> = ({ user, onSendRequest, linke
                </div>
                <h3 className="font-bold text-lg text-slate-800 mb-2">Find Your Student</h3>
                <p className="text-slate-500 max-w-md mx-auto">
-                 Search by Name or Student ID to send a connection request. 
+                 Enter the Student Name or their 6-digit Student ID to connect.
                </p>
            </div>
            
@@ -164,7 +163,7 @@ export const ParentFamilyScreen: React.FC<Props> = ({ user, onSendRequest, linke
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
-                        placeholder="Enter Name or ID..."
+                        placeholder="Enter Name or 6-digit ID..."
                       />
                   </div>
                   <button 

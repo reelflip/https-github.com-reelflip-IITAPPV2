@@ -1,5 +1,5 @@
 
-# IITGEEPrep Deployment Guide (v12.2)
+# IITGEEPrep Deployment Guide (v12.17)
 
 This guide explains how to deploy the IITGEEPrep application to a LAMP stack server (e.g., Hostinger, Bluehost, AWS EC2).
 

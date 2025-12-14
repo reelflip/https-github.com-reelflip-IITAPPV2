@@ -5,6 +5,7 @@ import { SYLLABUS_DATA } from '../lib/syllabusData';
 
 interface Props {
   user: User;
+  viewingStudentName?: string;
   progress: Record<string, UserProgress>;
   testAttempts: TestAttempt[];
   goals: Goal[];
@@ -13,7 +14,7 @@ interface Props {
   setScreen: (screen: any) => void;
 }
 
-export const DashboardScreen: React.FC<Props> = ({ user, progress, testAttempts, goals, toggleGoal, addGoal, setScreen }) => {
+export const DashboardScreen: React.FC<Props> = ({ user, viewingStudentName, progress, testAttempts, goals, toggleGoal, addGoal, setScreen }) => {
   const [newGoalText, setNewGoalText] = useState('');
 
   const totalTopics = SYLLABUS_DATA.length;
@@ -45,7 +46,9 @@ export const DashboardScreen: React.FC<Props> = ({ user, progress, testAttempts,
         
         <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-bold mb-2">Hello, {user.name.split(' ')[0]}! 👋</h1>
+            <h1 className="text-3xl font-bold mb-2">
+                {viewingStudentName ? `Monitoring: ${viewingStudentName}` : `Hello, ${user.name.split(' ')[0]}! 👋`}
+            </h1>
             <p className="text-blue-100 italic text-sm md:text-base max-w-xl">
               "Success is the sum of small efforts, repeated day in and day out."
               <br/><span className="text-xs opacity-75 font-semibold not-italic mt-1 block">- ROBERT COLLIER</span>
@@ -140,60 +143,62 @@ export const DashboardScreen: React.FC<Props> = ({ user, progress, testAttempts,
         </div>
       </div>
 
-      {/* Goals Section */}
-      <div className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm">
-        <div className="flex justify-between items-center mb-4">
-           <div className="flex items-center gap-2">
-              <span className="text-xl text-blue-600">🎯</span>
-              <h3 className="font-bold text-slate-700 uppercase tracking-wider text-sm">Today's Goals</h3>
-           </div>
-           <span className="text-xs font-bold text-slate-400">{goals.filter(g => g.completed).length}/{goals.length}</span>
-        </div>
-
-        {goals.length === 0 && (
-           <p className="text-slate-400 text-sm italic mb-4">No goals set for today.</p>
-        )}
-
-        <div className="space-y-2 mb-4">
-          {goals.map(goal => (
-            <div key={goal.id} className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-lg group">
-              <button 
-                 onClick={() => toggleGoal(goal.id)}
-                 className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${
-                    goal.completed ? 'bg-blue-500 border-blue-500 text-white' : 'border-slate-300 text-transparent hover:border-blue-400'
-                 }`}
-              >
-                 ✓
-              </button>
-              <span className={`text-sm ${goal.completed ? 'text-slate-400 line-through' : 'text-slate-700'}`}>
-                 {goal.text}
-              </span>
+      {/* Goals Section - Hidden for Parents as they can't set goals for students */}
+      {!viewingStudentName && (
+          <div className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm">
+            <div className="flex justify-between items-center mb-4">
+               <div className="flex items-center gap-2">
+                  <span className="text-xl text-blue-600">🎯</span>
+                  <h3 className="font-bold text-slate-700 uppercase tracking-wider text-sm">Today's Goals</h3>
+               </div>
+               <span className="text-xs font-bold text-slate-400">{goals.filter(g => g.completed).length}/{goals.length}</span>
             </div>
-          ))}
-        </div>
 
-        <form onSubmit={handleAddGoal} className="flex gap-2">
-           <input 
-              type="text" 
-              placeholder="Add new goal..." 
-              className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-              value={newGoalText}
-              onChange={e => setNewGoalText(e.target.value)}
-           />
-           <button 
-              type="submit"
-              className="bg-blue-50 text-blue-600 px-4 py-2 rounded-lg text-lg font-bold hover:bg-blue-100 transition"
-           >
-              +
-           </button>
-        </form>
-      </div>
+            {goals.length === 0 && (
+               <p className="text-slate-400 text-sm italic mb-4">No goals set for today.</p>
+            )}
+
+            <div className="space-y-2 mb-4">
+              {goals.map(goal => (
+                <div key={goal.id} className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-lg group">
+                  <button 
+                     onClick={() => toggleGoal(goal.id)}
+                     className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${
+                        goal.completed ? 'bg-blue-500 border-blue-500 text-white' : 'border-slate-300 text-transparent hover:border-blue-400'
+                     }`}
+                  >
+                     ✓
+                  </button>
+                  <span className={`text-sm ${goal.completed ? 'text-slate-400 line-through' : 'text-slate-700'}`}>
+                     {goal.text}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <form onSubmit={handleAddGoal} className="flex gap-2">
+               <input 
+                  type="text" 
+                  placeholder="Add new goal..." 
+                  className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                  value={newGoalText}
+                  onChange={e => setNewGoalText(e.target.value)}
+               />
+               <button 
+                  type="submit"
+                  className="bg-blue-50 text-blue-600 px-4 py-2 rounded-lg text-lg font-bold hover:bg-blue-100 transition"
+               >
+                  +
+               </button>
+            </form>
+          </div>
+      )}
 
       {/* Notice Board */}
       <div className="bg-yellow-50 p-6 rounded-xl border border-yellow-100">
          <div className="flex items-center gap-2 mb-3">
             <span className="text-orange-500">🔔</span>
-            <h3 className="font-bold text-yellow-800 text-sm">Student Notice Board</h3>
+            <h3 className="font-bold text-yellow-800 text-sm">{viewingStudentName ? 'Parent Alerts' : 'Student Notice Board'}</h3>
          </div>
          <div className="text-sm text-yellow-700 italic">
             No new notices.

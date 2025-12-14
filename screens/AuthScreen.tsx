@@ -454,7 +454,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate, ena
           <button onClick={() => onNavigate('features')} className="hover:text-blue-600">Features</button>
           <button onClick={() => onNavigate('contact')} className="hover:text-blue-600">Contact</button>
       </div>
-      <div className="mt-4 text-[10px] font-mono text-slate-300 relative z-10">v12.14</div>
+      <div className="mt-4 text-[10px] font-mono text-slate-300 relative z-10">v12.15</div>
     </div>
   );
 };

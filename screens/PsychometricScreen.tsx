@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { User, PsychometricReport } from '../lib/types';
 import { PSYCHOMETRIC_QUESTIONS, generatePsychometricReport, PSYCHOMETRIC_DIMENSIONS } from '../lib/psychometricData';
-import { Brain, ArrowRight, CheckCircle, AlertTriangle, Activity, Loader2, Sparkles, HeartPulse, ChevronRight, RefreshCw, BarChart2, FileText, Users, Lightbulb } from 'lucide-react';
+import { Brain, ArrowRight, CheckCircle, AlertTriangle, Activity, Loader2, Sparkles, HeartPulse, ChevronRight, RefreshCw, BarChart2, FileText, Users, Lightbulb, Heart, Zap, Clock } from 'lucide-react';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
 
 interface Props {
@@ -36,7 +36,6 @@ export const PsychometricScreen: React.FC<Props> = ({ user, reportData: initialR
                             setReport(data.report);
                         } else {
                             // Only fallback to local if API explicitly returns nothing AND we are same user
-                            // Parents should NEVER fallback to local storage of their own machine
                             if (!isParent) {
                                 const saved = localStorage.getItem(`psych_report_${user.id}`);
                                 if(saved) setReport(JSON.parse(saved));
@@ -111,6 +110,14 @@ export const PsychometricScreen: React.FC<Props> = ({ user, reportData: initialR
         }
     };
 
+    const getParentTipIcon = (tip: string) => {
+        if (tip.includes("Stress") || tip.includes("Burnout")) return <Heart className="w-5 h-5 text-rose-500" />;
+        if (tip.includes("Study Support") || tip.includes("Strategy")) return <Brain className="w-5 h-5 text-blue-500" />;
+        if (tip.includes("Focus") || tip.includes("Habits")) return <Zap className="w-5 h-5 text-amber-500" />;
+        if (tip.includes("Motivation") || tip.includes("Mindset")) return <Sparkles className="w-5 h-5 text-purple-500" />;
+        return <Lightbulb className="w-5 h-5 text-slate-500" />;
+    };
+
     if (analyzing) {
         return (
             <div className="flex flex-col items-center justify-center h-[70vh] animate-in fade-in">
@@ -162,6 +169,45 @@ export const PsychometricScreen: React.FC<Props> = ({ user, reportData: initialR
                     <div className="absolute right-0 top-0 w-64 h-64 bg-violet-600/20 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
                 </div>
 
+                {/* PARENT SPECIFIC GUIDANCE ZONE */}
+                {isParent && report.parentTips && (
+                    <div className="bg-gradient-to-r from-amber-50 to-orange-50 rounded-2xl border border-amber-200 p-8 shadow-sm animate-in slide-in-from-top-4 relative overflow-hidden">
+                        <div className="relative z-10">
+                            <div className="flex items-center gap-3 mb-6">
+                                <div className="p-2 bg-amber-100 rounded-lg text-amber-700">
+                                    <Users className="w-6 h-6" />
+                                </div>
+                                <div>
+                                    <h3 className="font-bold text-amber-900 text-xl">Parental Guidance Zone</h3>
+                                    <p className="text-amber-800/80 text-sm">Actionable ways you can support your child based on their specific psychological profile.</p>
+                                </div>
+                            </div>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {report.parentTips.map((tip, idx) => {
+                                    const parts = tip.split(':');
+                                    const title = parts.length > 1 ? parts[0] : 'General Tip';
+                                    const content = parts.length > 1 ? parts.slice(1).join(':') : parts[0];
+                                    
+                                    return (
+                                        <div key={idx} className="bg-white p-4 rounded-xl border border-amber-100 shadow-sm flex gap-4 transition-all hover:shadow-md">
+                                            <div className="shrink-0 mt-1">
+                                                {getParentTipIcon(tip)}
+                                            </div>
+                                            <div>
+                                                <h4 className="font-bold text-slate-800 text-sm mb-1 uppercase tracking-wide">{title}</h4>
+                                                <p className="text-sm text-slate-600 leading-relaxed">{content}</p>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                        {/* Decor */}
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-amber-200/20 rounded-full blur-2xl -mr-10 -mt-10"></div>
+                    </div>
+                )}
+
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     {/* Left Col: Radar & Overall */}
                     <div className="space-y-6">
@@ -192,25 +238,6 @@ export const PsychometricScreen: React.FC<Props> = ({ user, reportData: initialR
 
                     {/* Middle: Summary & Insights */}
                     <div className="lg:col-span-2 space-y-6">
-                        
-                        {/* PARENT SPECIFIC SECTION - Visible ONLY to Parents */}
-                        {isParent && report.parentTips && (
-                            <div className="bg-amber-50 rounded-xl border border-amber-200 p-6 shadow-sm animate-in slide-in-from-right-4">
-                                <h3 className="font-bold text-amber-900 text-lg mb-4 flex items-center">
-                                    <Users className="w-6 h-6 mr-2 text-amber-600" /> Parental Guidance Zone
-                                </h3>
-                                <div className="space-y-3">
-                                    <p className="text-sm text-amber-800 mb-2 font-medium">Based on your child's psychometric profile, here are personalized ways you can support them:</p>
-                                    {report.parentTips.map((tip, idx) => (
-                                        <div key={idx} className="flex items-start gap-3 bg-white p-3 rounded-lg border border-amber-100">
-                                            <Lightbulb className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
-                                            <p className="text-sm text-slate-700 leading-relaxed">{tip}</p>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-
                         <div className="bg-violet-50 p-6 rounded-xl border border-violet-100">
                             <h3 className="text-lg font-bold text-violet-900 mb-3 flex items-center">
                                 <Sparkles className="w-5 h-5 mr-2" /> Executive Summary
@@ -262,11 +289,11 @@ export const PsychometricScreen: React.FC<Props> = ({ user, reportData: initialR
                             ))}
                         </div>
 
-                        {/* Hide Action Plan for parents if too granular, or show it. Keeping it as it gives context. */}
+                        {/* Action Plan - Visible to Student & Parent */}
                         <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
                             <h3 className="font-bold text-slate-800 text-lg mb-4 flex items-center">
                                 <Activity className="w-5 h-5 mr-2 text-blue-600" /> 
-                                {isParent ? "Student's Action Plan" : "Personalized Action Plan"}
+                                {isParent ? "Student's Action Plan" : "Your Personalized Action Plan"}
                             </h3>
                             <ul className="space-y-3">
                                 {report.actionPlan.map((action, idx) => (

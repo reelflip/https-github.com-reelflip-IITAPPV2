@@ -7,11 +7,12 @@ import { TrendingUp, AlertTriangle, CheckCircle2, Target, BarChart3, ListChecks 
 
 interface Props {
   user?: User; // Optional now to support generic use
+  viewingStudentName?: string;
   progress?: Record<string, UserProgress>;
   testAttempts?: TestAttempt[];
 }
 
-export const AnalyticsScreen: React.FC<Props> = ({ user, progress = {}, testAttempts = [] }) => {
+export const AnalyticsScreen: React.FC<Props> = ({ user, viewingStudentName, progress = {}, testAttempts = [] }) => {
   
   // --- 1. Subject Proficiency (Radar/Radial) ---
   const subjectStats = ['Physics', 'Chemistry', 'Maths'].map(subject => {
@@ -118,6 +119,8 @@ export const AnalyticsScreen: React.FC<Props> = ({ user, progress = {}, testAtte
       { date: 'Test 4', score: 160 }, { date: 'Test 5', score: 185 }
   ] : scoreTrendData;
 
+  const displayUserName = viewingStudentName || (user ? user.name.split(' ')[0] : 'Student');
+
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
       {/* Header Banner */}
@@ -128,12 +131,22 @@ export const AnalyticsScreen: React.FC<Props> = ({ user, progress = {}, testAtte
                   <h1 className="text-3xl font-bold">Performance Analytics</h1>
               </div>
               <p className="text-slate-200 text-lg opacity-90 max-w-2xl">
-                  Deep dive into your study metrics, question volume, and test score trends.
+                  Deep dive into study metrics, question volume, and test score trends.
               </p>
           </div>
           <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 rounded-full bg-white opacity-10"></div>
           <div className="absolute bottom-0 right-20 w-32 h-32 rounded-full bg-white opacity-10"></div>
       </div>
+
+      {/* Overview Tag */}
+      {viewingStudentName && (
+          <div className="bg-blue-50 border border-blue-200 p-4 rounded-xl flex items-center gap-3">
+              <Target className="w-5 h-5 text-blue-600" />
+              <span className="text-blue-800 font-bold text-sm">
+                  Viewing Report for: <span className="text-lg ml-1">{viewingStudentName}</span>
+              </span>
+          </div>
+      )}
 
       {/* Top Row: Syllabus Radar & Score Trend */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -254,10 +267,10 @@ export const AnalyticsScreen: React.FC<Props> = ({ user, progress = {}, testAtte
               
               <div className="space-y-4 relative z-10 text-sm text-indigo-100">
                   <p>
-                      • <strong>Consistency:</strong> Your test frequency is {testAttempts.length > 2 ? 'good' : 'low'}. Try to take at least one mock test every Sunday.
+                      • <strong>Consistency:</strong> {displayUserName}'s test frequency is {testAttempts.length > 2 ? 'good' : 'low'}.
                   </p>
                   <p>
-                      • <strong>Syllabus Pace:</strong> Based on your current completion rate, ensure you finish Mechanics by next month.
+                      • <strong>Syllabus Pace:</strong> Based on current completion rate, ensure Mechanics is finished by next month.
                   </p>
                   <p>
                       • <strong>Revision Alert:</strong> Regular revision cycles are key. Check the Revision tab for pending topics.
