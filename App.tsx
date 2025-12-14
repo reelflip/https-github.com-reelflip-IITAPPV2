@@ -67,7 +67,7 @@ const SyncIndicator = ({ status, onRetry }: { status: 'SYNCED' | 'SAVING' | 'ERR
         </div>
     );
     if (status === 'OFFLINE') return (
-        <div className="flex items-center gap-1 text-slate-500 bg-slate-100 px-2 py-1 rounded text-[10px] font-bold border border-slate-200" title="Offline Mode: Data saved locally">
+        <div className="flex items-center gap-1 text-slate-500 bg-slate-100 px-2 py-1 rounded text-[10px] font-bold border border-slate-200 cursor-help" title="Offline Mode: Backend not found. Data saved locally.">
             <WifiOff className="w-3 h-3" /> <span>Offline Mode</span>
         </div>
     );
@@ -350,8 +350,6 @@ export default function App() {
   }, [user, progress, testAttempts, goals, mistakes, backlogs, timetableData]);
 
   const loadLocalData = (userId: string) => {
-    // Only fall back if explicitly requested or needed
-    console.warn("Falling back to local storage data for User:", userId);
     const savedProgress = localStorage.getItem(`iitjee_progress_${userId}`);
     const savedTests = localStorage.getItem(`iitjee_tests_${userId}`);
     const savedGoals = localStorage.getItem(`iitjee_goals_${userId}`);
@@ -368,24 +366,25 @@ export default function App() {
   };
 
   const fetchRemoteData = async (userId: string) => {
-      setSyncStatus('SAVING'); // Show spinner while fetching
+      setSyncStatus('SAVING'); 
       setSyncErrorMsg(null);
       try {
           const res = await fetch(`/api/get_dashboard.php?user_id=${userId}`);
           
-          const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-
           if (!res.ok) {
               if (res.status === 404) {
-                  // Only go silently offline if we are on localhost (dev mode)
-                  if (isLocalhost) {
-                      setIsOfflineMode(true);
-                      setSyncStatus('OFFLINE');
-                      loadLocalData(userId);
-                      return;
-                  } else {
-                      throw new Error("API Endpoint Not Found (404). Check if /api/ folder exists on server.");
+                  // Gracefully switch to Offline Mode without crashing the UI
+                  console.warn("Backend API not found. Switching to Offline Mode.");
+                  setIsOfflineMode(true);
+                  setSyncStatus('OFFLINE');
+                  // Do NOT throw error, just load local and continue
+                  loadLocalData(userId);
+                  
+                  // Only warn admin users to reduce noise for regular students using static site
+                  if (user?.role === 'ADMIN') {
+                      setSyncErrorMsg("Backend API missing. Deploy PHP files to enable sync.");
                   }
+                  return;
               } else if (res.status === 500) {
                   throw new Error("Server Error (500). Check Database Credentials in config.php.");
               }
@@ -398,7 +397,6 @@ export default function App() {
               data = JSON.parse(text);
           } catch(e) {
               console.error("Invalid JSON response:", text.substring(0, 100));
-              // Detect HTML error pages
               if (text.includes("<!DOCTYPE html>") || text.includes("<html>")) {
                   throw new Error("Server returned HTML instead of JSON. Check .htaccess configuration.");
               }
@@ -440,16 +438,10 @@ export default function App() {
           setIsOfflineMode(false);
       } catch (e: any) { 
           console.error("Remote Fetch Failed:", e);
-          
-          // Switch to offline for functionality
           setIsOfflineMode(true);
           setSyncStatus('OFFLINE');
-          
-          // Show error banner if NOT localhost
-          if (window.location.hostname !== 'localhost') {
-              setSyncErrorMsg(`Connection Failed: ${e.message}`);
-          }
-          
+          // Only show banner for non-404 errors (like network/500/syntax)
+          setSyncErrorMsg(`Connection Failed: ${e.message}`);
           loadLocalData(userId); 
       }
   };
@@ -724,7 +716,7 @@ export default function App() {
             <SyncIndicator status={syncStatus} onRetry={() => fetchRemoteData(user.id)} />
         </div>
 
-        {/* Sync Error Banner */}
+        {/* Sync Error Banner - Only display if NOT 404 (Offline Mode handled silently/gracefully) or if user is admin */}
         {syncErrorMsg && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl mb-4 flex items-center justify-between shadow-sm animate-in slide-in-from-top-2">
                 <div className="flex items-center gap-2">
@@ -732,7 +724,7 @@ export default function App() {
                     <span className="font-bold text-sm">{syncErrorMsg}</span>
                 </div>
                 <div className="flex gap-4">
-                    {syncErrorMsg.includes("404") && (
+                    {syncErrorMsg.includes("404") || syncErrorMsg.includes("missing") && (
                         <button onClick={() => setCurrentScreen('deployment')} className="text-xs font-bold underline hover:text-red-900 bg-red-100 px-2 py-1 rounded">Check Setup</button>
                     )}
                     <button onClick={() => fetchRemoteData(user.id)} className="text-xs font-bold underline hover:text-red-900">Retry</button>
