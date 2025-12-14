@@ -1,5 +1,7 @@
 
-import { MOCK_TESTS_DATA } from '../lib/mockTestsData';
+import { MOCK_TESTS_DATA, generateInitialQuestionBank } from '../lib/mockTestsData';
+import { SYLLABUS_DATA } from '../lib/syllabusData';
+import { DEFAULT_CHAPTER_NOTES } from '../lib/chapterContent';
 
 const phpHeader = `<?php
 // CRITICAL: Disable error display to client, log to file instead
@@ -902,7 +904,14 @@ echo json_encode([
     }
 ];
 
-export const generateSQLSchema = () => `
+// Helper to escape SQL strings
+const esc = (str: string | undefined) => {
+    if (!str) return '';
+    return str.replace(/\\/g, '\\\\').replace(/'/g, "''");
+};
+
+export const generateSQLSchema = () => {
+    let sql = `
 CREATE TABLE IF NOT EXISTS users (
     id VARCHAR(255) PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
@@ -1058,7 +1067,51 @@ CREATE TABLE IF NOT EXISTS analytics_visits (
     date DATE PRIMARY KEY,
     count INT DEFAULT 0
 );
+
+-- SEED DATA --
 `;
+
+    // 1. Seed Topics
+    if (SYLLABUS_DATA.length > 0) {
+        sql += `INSERT IGNORE INTO topics (id, name, chapter, subject) VALUES \n`;
+        const values = SYLLABUS_DATA.map(t => `('${esc(t.id)}', '${esc(t.name)}', '${esc(t.chapter)}', '${esc(t.subject)}')`).join(',\n');
+        sql += values + ';\n';
+    }
+
+    // 2. Seed Questions
+    const questions = generateInitialQuestionBank();
+    if (questions.length > 0) {
+        sql += `INSERT IGNORE INTO questions (id, subject_id, topic_id, text, options_json, correct_idx, difficulty, source, year) VALUES \n`;
+        const values = questions.map(q => {
+            const opts = JSON.stringify(q.options).replace(/'/g, "''"); // Escape single quotes inside JSON string
+            return `('${esc(q.id)}', '${esc(q.subjectId)}', '${esc(q.topicId)}', '${esc(q.text)}', '${opts}', ${q.correctOptionIndex}, '${esc(q.difficulty)}', '${esc(q.source)}', ${q.year || 0})`;
+        }).join(',\n');
+        sql += values + ';\n';
+    }
+
+    // 3. Seed Tests
+    if (MOCK_TESTS_DATA.length > 0) {
+        sql += `INSERT IGNORE INTO tests (id, title, duration, category, difficulty, exam_type, questions_json) VALUES \n`;
+        const values = MOCK_TESTS_DATA.map(t => {
+            const qs = JSON.stringify(t.questions).replace(/\\/g, '\\\\').replace(/'/g, "''");
+            return `('${esc(t.id)}', '${esc(t.title)}', ${t.durationMinutes}, '${esc(t.category)}', '${esc(t.difficulty)}', '${esc(t.examType)}', '${qs}')`;
+        }).join(',\n');
+        sql += values + ';\n';
+    }
+
+    // 4. Seed Chapter Notes
+    const noteEntries = Object.entries(DEFAULT_CHAPTER_NOTES);
+    if (noteEntries.length > 0) {
+        sql += `INSERT IGNORE INTO chapter_notes (topic_id, content_json, updated_at) VALUES \n`;
+        const values = noteEntries.map(([topicId, note]) => {
+            const content = JSON.stringify(note.pages).replace(/\\/g, '\\\\').replace(/'/g, "''");
+            return `('${esc(topicId)}', '${content}', NOW())`;
+        }).join(',\n');
+        sql += values + ';\n';
+    }
+
+    return sql;
+};
 
 export const generateHtaccess = () => `
 <IfModule mod_rewrite.c>
