@@ -242,7 +242,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate, ena
             <div className="flex justify-between items-baseline mb-6 mt-4">
                 <h2 className="text-xl font-bold text-slate-800">{view === 'REGISTER' ? 'Create Account' : view === 'RECOVERY' ? 'Recovery' : 'Welcome Back'}</h2>
                 {view !== 'RECOVERY' && (
-                    <button type="button" onClick={() => setView(view === 'LOGIN' ? 'REGISTER' : 'LOGIN')} className="text-sm font-medium text-blue-600 hover:text-blue-800 transition-colors">
+                    <button type="button" onClick={() => { setView(view === 'LOGIN' ? 'REGISTER' : 'LOGIN'); setError(''); }} className="text-sm font-medium text-blue-600 hover:text-blue-800 transition-colors">
                         {view === 'REGISTER' ? 'Back to Login' : 'Create Account'}
                     </button>
                 )}
@@ -415,7 +415,20 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate, ena
                             </div>
                         )}
 
-                        {error && <div className="p-3 bg-red-50 text-red-600 text-xs rounded-lg flex items-center gap-2"><WifiOff className="w-4 h-4" /> {error}</div>}
+                        {error && (
+                            <div className="p-3 bg-red-50 text-red-600 text-xs rounded-lg flex flex-col gap-2">
+                                <div className="flex items-center gap-2"><WifiOff className="w-4 h-4" /> {error}</div>
+                                {(error.includes('User not found') || error.includes('Invalid credentials')) && (
+                                    <button 
+                                        type="button" 
+                                        onClick={() => setView('REGISTER')} 
+                                        className="text-left underline font-bold hover:text-red-800"
+                                    >
+                                        Ghost account? Create a new one here.
+                                    </button>
+                                )}
+                            </div>
+                        )}
                         {successMessage && <div className="p-3 bg-green-50 text-green-600 text-xs rounded-lg flex items-center gap-2"><CheckCircle2 className="w-4 h-4" /> {successMessage}</div>}
                         
                         <button type="submit" disabled={isLoading} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2">
@@ -427,7 +440,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate, ena
         </div>
       </div>
 
-      {/* Restored Footer Navigation */}
+      {/* Footer Navigation */}
       <div className="mt-8 text-center space-x-6 text-sm font-bold text-slate-500 relative z-10 hidden md:block">
           <button onClick={() => onNavigate('about')} className="hover:text-blue-600 transition-colors">About Us</button>
           <button onClick={() => onNavigate('features')} className="hover:text-blue-600 transition-colors">Features</button>
@@ -441,7 +454,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate, ena
           <button onClick={() => onNavigate('features')} className="hover:text-blue-600">Features</button>
           <button onClick={() => onNavigate('contact')} className="hover:text-blue-600">Contact</button>
       </div>
-      <div className="mt-4 text-[10px] font-mono text-slate-300 relative z-10">v12.20</div>
+      <div className="mt-4 text-[10px] font-mono text-slate-300 relative z-10">v12.21</div>
     </div>
   );
 };

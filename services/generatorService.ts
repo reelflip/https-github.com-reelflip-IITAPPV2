@@ -54,7 +54,7 @@ try {
     {
         name: 'index.php',
         folder: 'deployment/api',
-        content: `${phpHeader} echo json_encode(["status" => "active", "version" => "12.20"]); ?>`
+        content: `${phpHeader} echo json_encode(["status" => "active", "version" => "12.21"]); ?>`
     },
     {
         name: 'test_db.php',
