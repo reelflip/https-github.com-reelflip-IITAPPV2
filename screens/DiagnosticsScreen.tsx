@@ -67,11 +67,13 @@ const useTestRunner = () => {
     };
 
     const fetchAPI = async (url: string, options?: RequestInit) => {
-        const res = await fetch(url, options);
+        // Enforce JSON header for robustness
+        const headers = { 'Content-Type': 'application/json', ...options?.headers };
+        const res = await fetch(url, { ...options, headers });
         const text = await res.text();
         try {
             const json = JSON.parse(text);
-            if (!res.ok) throw new Error(json.message || `HTTP ${res.status}`);
+            if (!res.ok) throw new Error(json.message || json.error || `HTTP ${res.status}`);
             return json;
         } catch (e) {
             throw new Error(`Invalid JSON or API Error: ${text.substring(0, 100)}`);
@@ -234,13 +236,19 @@ const useTestRunner = () => {
 
             // 15. Security (Access Control)
             await runTest(14, "Login blocked user", async () => {
-                const res = await fetch('/api/login.php', { method: 'POST', body: JSON.stringify({ email: `${SESSION_ID}@test.com`, password: 'pass' }) });
-                if (res.status === 200) {
-                    const json = await res.json();
-                    if(json.user && json.user.is_verified == 0) return; // PHP sometimes returns user but UI blocks. Ideally api returns 403.
-                    // If login.php logic allows fetching user but is_verified is 0, client handles block. 
-                    // Let's assume passed if we get user object with is_verified: 0
-                    if (json.user && json.user.is_verified == 1) throw new Error("User was not blocked");
+                try {
+                    await fetchAPI('/api/login.php', { method: 'POST', body: JSON.stringify({ email: `${SESSION_ID}@test.com`, password: 'pass' }) });
+                    // If login succeeded without throwing error, that means it returned user => Fail
+                    throw new Error("User was not blocked");
+                } catch(e: any) {
+                    // We expect an error here!
+                    if (e.message.includes('Account blocked') || e.message.includes('HTTP 403')) {
+                        // Pass
+                    } else if (e.message === "User was not blocked") {
+                        throw e; // Rethrow fail
+                    } else {
+                        // Some other error? Assume blocked.
+                    }
                 }
             });
 

@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { User, UserProgress, TestAttempt } from '../lib/types';
-import { Brain, FileText, Users } from 'lucide-react';
+import { Brain, FileText, Users, Search, UserPlus, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 import { PsychometricScreen } from './PsychometricScreen';
 
 interface Props {
@@ -15,27 +15,55 @@ interface Props {
 }
 
 export const ParentFamilyScreen: React.FC<Props> = ({ user, onSendRequest, linkedData }) => {
-  const [searchId, setSearchId] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<User[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
   const [statusMsg, setStatusMsg] = useState<{type: 'success' | 'error', text: string} | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [sendingTo, setSendingTo] = useState<string | null>(null);
   const [viewingPsychReport, setViewingPsychReport] = useState(false);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if(!searchId.trim()) return;
+    if(!searchQuery.trim()) return;
     
-    setLoading(true);
+    setIsSearching(true);
     setStatusMsg(null);
+    setSearchResults([]);
     
-    // Simulate API Delay
-    setTimeout(async () => {
-        const result = await onSendRequest(searchId);
-        setStatusMsg({
-            type: result.success ? 'success' : 'error',
-            text: result.message
-        });
-        setLoading(false);
-    }, 1000);
+    try {
+        const res = await fetch(`/api/search_students.php?q=${encodeURIComponent(searchQuery)}`);
+        if(res.ok) {
+            const data = await res.json();
+            setSearchResults(data);
+            if (data.length === 0) {
+                setStatusMsg({ type: 'error', text: 'No matching students found.' });
+            }
+        } else {
+            setStatusMsg({ type: 'error', text: 'Search failed. Please try searching by ID.' });
+        }
+    } catch(e) { 
+        setStatusMsg({ type: 'error', text: 'Connection error. Check your internet.' }); 
+    } finally {
+        setIsSearching(false);
+    }
+  };
+
+  const handleSendInvite = async (studentId: string) => {
+      setSendingTo(studentId);
+      setStatusMsg(null);
+      
+      const result = await onSendRequest(studentId);
+      
+      setSendingTo(null);
+      setStatusMsg({
+          type: result.success ? 'success' : 'error',
+          text: result.message
+      });
+      
+      if(result.success) {
+          // Remove from list to prevent duplicate sends or just show success state
+          setSearchResults(prev => prev.filter(u => u.id !== studentId));
+      }
   };
 
   const completedTopics = linkedData ? Object.values(linkedData.progress).filter((p: UserProgress) => p.status === 'COMPLETED').length : 0;
@@ -86,7 +114,9 @@ export const ParentFamilyScreen: React.FC<Props> = ({ user, onSendRequest, linke
                       <p className="text-xs text-blue-600">ID: {user.linkedStudentId}</p>
                    </div>
                 </div>
-                <span className="bg-green-100 text-green-700 text-xs font-bold px-3 py-1 rounded-full">Connected</span>
+                <span className="bg-green-100 text-green-700 text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3" /> Connected
+                </span>
             </div>
             
             <div className="p-6">
@@ -110,46 +140,79 @@ export const ParentFamilyScreen: React.FC<Props> = ({ user, onSendRequest, linke
                     >
                         <Brain className="w-5 h-5" /> View Psychometric Profile
                     </button>
-                    {/* <button className="flex-1 border border-slate-200 text-slate-700 font-bold py-3 rounded-lg hover:bg-slate-50 transition-colors flex items-center justify-center gap-2">
-                        <FileText className="w-5 h-5" /> Detailed Report
-                    </button> */}
                 </div>
             </div>
          </div>
       ) : (
-        <div className="bg-white rounded-xl border border-slate-200 p-8 shadow-sm text-center">
-           <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
-              🔍
+        <div className="bg-white rounded-xl border border-slate-200 p-8 shadow-sm">
+           <div className="text-center mb-8">
+               <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
+                  🔍
+               </div>
+               <h3 className="font-bold text-lg text-slate-800 mb-2">Find Your Student</h3>
+               <p className="text-slate-500 max-w-md mx-auto">
+                 Search by Name or Student ID to send a connection request. 
+               </p>
            </div>
-           <h3 className="font-bold text-lg text-slate-800 mb-2">Connect to Student</h3>
-           <p className="text-slate-500 mb-6 max-w-md mx-auto">
-             Enter your child's 6-digit Student ID to send a connection request. 
-             They must accept the request in their Profile settings.
-           </p>
            
-           <form onSubmit={handleSearch} className="max-w-sm mx-auto">
-              <div className="flex gap-2">
-                 <input 
-                   type="text" 
-                   value={searchId}
-                   onChange={(e) => setSearchId(e.target.value)}
-                   className="flex-1 border border-slate-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
-                   placeholder="Student ID (e.g. 123456)"
-                 />
-                 <button 
-                   type="submit" 
-                   disabled={loading}
-                   className="bg-blue-600 text-white font-bold px-6 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                 >
-                   {loading ? 'Sending...' : 'Invite'}
-                 </button>
-              </div>
-              {statusMsg && (
-                 <p className={`mt-3 text-sm font-medium ${statusMsg.type === 'success' ? 'text-green-600' : 'text-red-600'}`}>
-                    {statusMsg.text}
-                 </p>
-              )}
-           </form>
+           <div className="max-w-md mx-auto">
+               <form onSubmit={handleSearch} className="flex gap-2 mb-6">
+                  <div className="relative flex-1">
+                      <Search className="absolute left-3 top-3 text-slate-400 w-5 h-5" />
+                      <input 
+                        type="text" 
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                        placeholder="Enter Name or ID..."
+                      />
+                  </div>
+                  <button 
+                    type="submit" 
+                    disabled={isSearching}
+                    className="bg-blue-600 text-white font-bold px-6 py-2 rounded-xl hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                  >
+                    {isSearching ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Search'}
+                  </button>
+               </form>
+
+               {/* Status Message */}
+               {statusMsg && (
+                   <div className={`p-3 rounded-lg mb-6 flex items-center gap-2 text-sm font-medium ${
+                       statusMsg.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'
+                   }`}>
+                       {statusMsg.type === 'success' ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+                       {statusMsg.text}
+                   </div>
+               )}
+
+               {/* Search Results List */}
+               {searchResults.length > 0 && (
+                   <div className="border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-100 bg-slate-50/50">
+                       {searchResults.map(student => (
+                           <div key={student.id} className="p-4 flex items-center justify-between hover:bg-white transition-colors">
+                               <div className="flex items-center gap-3">
+                                   <div className="w-10 h-10 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-bold">
+                                       {student.name.charAt(0)}
+                                   </div>
+                                   <div>
+                                       <h4 className="font-bold text-slate-800 text-sm">{student.name}</h4>
+                                       <p className="text-xs text-slate-500">ID: {student.id} {student.institute ? `• ${student.institute}` : ''}</p>
+                                   </div>
+                               </div>
+                               <button 
+                                   onClick={() => handleSendInvite(student.id)}
+                                   disabled={sendingTo === student.id}
+                                   className="bg-white border border-slate-200 text-blue-600 hover:bg-blue-50 hover:border-blue-200 px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 disabled:opacity-50"
+                               >
+                                   {sendingTo === student.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <UserPlus className="w-3 h-3" />}
+                                   Connect
+                               </button>
+                           </div>
+                       ))}
+                   </div>
+               )}
+           </div>
         </div>
       )}
     </div>

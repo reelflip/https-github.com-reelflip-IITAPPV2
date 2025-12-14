@@ -208,7 +208,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate, ena
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-inter relative overflow-hidden">
+    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4 font-inter relative overflow-hidden">
       <EducationSketchBackground />
 
       {showRoleModal && (
@@ -224,17 +224,18 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate, ena
           </div>
       )}
 
-      <div className="bg-white/90 backdrop-blur-xl w-full max-w-[480px] rounded-[2rem] shadow-2xl overflow-hidden border border-slate-100 flex flex-col relative z-10">
-        <div className="pt-10 pb-4 text-center">
+      <div className="bg-white/90 backdrop-blur-xl w-full max-w-[480px] rounded-[2rem] shadow-2xl overflow-hidden border border-slate-100 flex flex-col relative z-10 my-4">
+        <div className="pt-8 pb-2 text-center">
             <h1 className="flex flex-col items-center">
-                <div className="w-20 h-20 bg-slate-900 rounded-full flex items-center justify-center ring-4 ring-slate-50 shadow-lg relative mb-4">
-                     <TrendingUp className="w-10 h-10 text-blue-400 relative z-10" strokeWidth={2.5} />
+                <div className="w-16 h-16 bg-slate-900 rounded-full flex items-center justify-center ring-4 ring-slate-50 shadow-lg relative mb-3">
+                     <TrendingUp className="w-8 h-8 text-blue-400 relative z-10" strokeWidth={2.5} />
                 </div>
-                <span className="text-3xl font-bold text-slate-900 tracking-tight">IIT<span className="text-blue-600">GEE</span>Prep</span>
+                <span className="text-2xl font-bold text-slate-900 tracking-tight">IIT<span className="text-blue-600">GEE</span>Prep</span>
+                <span className="text-[10px] text-slate-400 uppercase tracking-widest mt-1">Your Journey. Your Data.</span>
             </h1>
         </div>
 
-        <div className="px-8 pb-10 flex-1">
+        <div className="px-8 pb-10 flex-1 overflow-y-auto max-h-[75vh] custom-scrollbar">
             <div className="flex justify-between items-baseline mb-6 mt-4">
                 <h2 className="text-xl font-bold text-slate-800">{view === 'REGISTER' ? 'Create Account' : view === 'RECOVERY' ? 'Recovery' : 'Welcome Back'}</h2>
                 {view !== 'RECOVERY' && (
@@ -248,7 +249,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate, ena
                 {view === 'REGISTER' && (
                     <div className="flex p-1 bg-slate-50 rounded-lg border border-slate-200 mb-6">
                         {['STUDENT', 'PARENT'].map((r) => (
-                            <button key={r} type="button" onClick={() => setRole(r as Role)} className={`flex-1 py-2.5 text-xs font-bold rounded-md transition-all ${role === r ? 'bg-white text-blue-600 shadow-sm border border-slate-100' : 'text-slate-500'}`}>{r}</button>
+                            <button key={r} type="button" onClick={() => setRole(r as Role)} className={`flex-1 py-2.5 text-xs font-bold rounded-md transition-all ${role === r ? 'bg-white text-blue-600 shadow-sm border border-slate-100' : 'text-slate-500'}`}>{r === 'STUDENT' ? 'I am a Student' : 'I am a Parent'}</button>
                         ))}
                     </div>
                 )}
@@ -260,30 +261,162 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate, ena
                 ) : (
                     <form onSubmit={handleAuth} className="space-y-5">
                         {view === 'REGISTER' && (
-                            <div className="space-y-1">
-                                <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Full Name</label>
-                                <input type="text" placeholder={role === 'PARENT' ? "Parent Name" : "Student Name"} className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-100" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} required />
-                            </div>
+                            <>
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Full Name</label>
+                                    <div className="relative">
+                                        <UserIcon className="absolute left-3 top-3.5 text-slate-400 w-4 h-4" />
+                                        <input type="text" placeholder={role === 'PARENT' ? "Parent Name" : "Student Name"} className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-100" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} required />
+                                    </div>
+                                </div>
+
+                                {role === 'STUDENT' && (
+                                    <>
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Institute</label>
+                                            <div className="relative">
+                                                <Building className="absolute left-3 top-3.5 text-slate-400 w-4 h-4" />
+                                                <select 
+                                                    className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-100 bg-white appearance-none"
+                                                    value={formData.institute}
+                                                    onChange={(e) => setFormData({...formData, institute: e.target.value})}
+                                                >
+                                                    <option value="">Select Institute</option>
+                                                    {COACHING_INSTITUTES.map(inst => <option key={inst} value={inst}>{inst}</option>)}
+                                                </select>
+                                                <ChevronDown className="absolute right-3 top-3.5 text-slate-400 w-4 h-4 pointer-events-none" />
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="space-y-1">
+                                                <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Target Exam</label>
+                                                <div className="relative">
+                                                    <Target className="absolute left-3 top-3.5 text-slate-400 w-4 h-4" />
+                                                    <select 
+                                                        className="w-full pl-9 pr-4 py-3 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-100 bg-white appearance-none"
+                                                        value={formData.targetExam}
+                                                        onChange={(e) => setFormData({...formData, targetExam: e.target.value})}
+                                                    >
+                                                        {TARGET_EXAMS.map(exam => <option key={exam} value={exam}>{exam}</option>)}
+                                                    </select>
+                                                    <ChevronDown className="absolute right-2 top-3.5 text-slate-400 w-3 h-3 pointer-events-none" />
+                                                </div>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Year</label>
+                                                <div className="relative">
+                                                    <Calendar className="absolute left-3 top-3.5 text-slate-400 w-4 h-4" />
+                                                    <select 
+                                                        className="w-full pl-9 pr-4 py-3 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-100 bg-white appearance-none"
+                                                        value={formData.targetYear}
+                                                        onChange={(e) => setFormData({...formData, targetYear: e.target.value})}
+                                                    >
+                                                        {TARGET_YEARS.map(year => <option key={year} value={year}>{year}</option>)}
+                                                    </select>
+                                                    <ChevronDown className="absolute right-2 top-3.5 text-slate-400 w-3 h-3 pointer-events-none" />
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="space-y-1">
+                                                <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">DOB <span className="text-[9px] lowercase font-normal text-slate-300">(optional)</span></label>
+                                                <input 
+                                                    type="date" 
+                                                    className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-100 text-slate-600"
+                                                    value={formData.dob}
+                                                    onChange={(e) => setFormData({...formData, dob: e.target.value})}
+                                                />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Gender <span className="text-[9px] lowercase font-normal text-slate-300">(optional)</span></label>
+                                                <div className="relative">
+                                                    <select 
+                                                        className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-100 bg-white appearance-none"
+                                                        value={formData.gender}
+                                                        onChange={(e) => setFormData({...formData, gender: e.target.value})}
+                                                    >
+                                                        <option value="">Select</option>
+                                                        <option value="Male">Male</option>
+                                                        <option value="Female">Female</option>
+                                                        <option value="Other">Other</option>
+                                                    </select>
+                                                    <ChevronDown className="absolute right-3 top-3.5 text-slate-400 w-4 h-4 pointer-events-none" />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
+                            </>
                         )}
+
                         <div className="space-y-1">
-                            <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Email</label>
-                            <input type="email" placeholder="you@example.com" className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-100" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} required />
+                            <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Email Address</label>
+                            <div className="relative">
+                                <Mail className="absolute left-3 top-3.5 text-slate-400 w-4 h-4" />
+                                <input type="email" placeholder="student@example.com" className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-100" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} required />
+                            </div>
                         </div>
                         <div className="space-y-1">
                             <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Password</label>
-                            <input type="password" placeholder="••••••••" className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-100" value={formData.password} onChange={(e) => setFormData({...formData, password: e.target.value})} required />
+                            <div className="relative">
+                                <Lock className="absolute left-3 top-3.5 text-slate-400 w-4 h-4" />
+                                <input type="password" placeholder="Create password" className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-100" value={formData.password} onChange={(e) => setFormData({...formData, password: e.target.value})} required />
+                            </div>
                         </div>
                         {view === 'REGISTER' && (
                             <div className="space-y-1">
                                 <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Confirm Password</label>
-                                <input type="password" placeholder="••••••••" className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-100" value={formData.confirmPassword} onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})} required />
+                                <div className="relative">
+                                    <Lock className="absolute left-3 top-3.5 text-slate-400 w-4 h-4" />
+                                    <input type="password" placeholder="Re-enter password" className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-100" value={formData.confirmPassword} onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})} required />
+                                </div>
                             </div>
                         )}
+
+                        {view === 'REGISTER' && (
+                            <div className="p-4 bg-blue-50/50 rounded-xl border border-blue-100 space-y-3">
+                                <div className="flex items-center gap-2 text-blue-800 text-xs font-bold uppercase tracking-wider">
+                                    <Shield size={12} /> Account Recovery Setup
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Security Question</label>
+                                    <div className="relative">
+                                        <div className="absolute left-3 top-3.5 text-slate-400"><Key size={14} /></div>
+                                        <select 
+                                            className="w-full pl-9 pr-8 py-3 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-100 bg-white appearance-none truncate"
+                                            value={formData.securityQuestion}
+                                            onChange={(e) => setFormData({...formData, securityQuestion: e.target.value})}
+                                        >
+                                            <option>What is the name of your first pet?</option>
+                                            <option>What is your mother's maiden name?</option>
+                                            <option>What was your first car?</option>
+                                            <option>What elementary school did you attend?</option>
+                                            <option>What is the name of the town where you were born?</option>
+                                        </select>
+                                        <ChevronDown className="absolute right-3 top-3.5 text-slate-400 w-4 h-4 pointer-events-none" />
+                                    </div>
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Answer</label>
+                                    <input 
+                                        type="text" 
+                                        placeholder="e.g. Fluffy" 
+                                        className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-100" 
+                                        value={formData.securityAnswer} 
+                                        onChange={(e) => setFormData({...formData, securityAnswer: e.target.value})} 
+                                        required 
+                                    />
+                                </div>
+                            </div>
+                        )}
+
                         {error && <div className="p-3 bg-red-50 text-red-600 text-xs rounded-lg flex items-center gap-2"><AlertCircle className="w-4 h-4" /> {error}</div>}
                         {successMessage && <div className="p-3 bg-green-50 text-green-600 text-xs rounded-lg flex items-center gap-2"><CheckCircle2 className="w-4 h-4" /> {successMessage}</div>}
                         
                         <button type="submit" disabled={isLoading} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2">
-                            {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : (view === 'REGISTER' ? 'Create Account' : 'Sign In')}
+                            {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : (view === 'REGISTER' ? 'Create Account' : 'Sign In')} {view === 'REGISTER' && !isLoading && <ArrowRight className="w-4 h-4" />}
                         </button>
                     </form>
                 )}
@@ -306,6 +439,22 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate, ena
             </div>
         </div>
       </div>
+
+      {/* Restored Footer Navigation */}
+      <div className="mt-8 text-center space-x-6 text-sm font-bold text-slate-500 relative z-10 hidden md:block">
+          <button onClick={() => onNavigate('about')} className="hover:text-blue-600 transition-colors">About Us</button>
+          <button onClick={() => onNavigate('features')} className="hover:text-blue-600 transition-colors">Features</button>
+          <button onClick={() => onNavigate('exams')} className="hover:text-blue-600 transition-colors">Exam Guide</button>
+          <button onClick={() => onNavigate('blog')} className="hover:text-blue-600 transition-colors">Blog</button>
+          <button onClick={() => onNavigate('contact')} className="hover:text-blue-600 transition-colors">Contact</button>
+          <button onClick={() => onNavigate('privacy')} className="hover:text-blue-600 transition-colors">Privacy Policy</button>
+      </div>
+      <div className="mt-4 text-xs text-slate-400 relative z-10 md:hidden flex flex-wrap justify-center gap-4">
+          <button onClick={() => onNavigate('about')} className="hover:text-blue-600">About</button>
+          <button onClick={() => onNavigate('features')} className="hover:text-blue-600">Features</button>
+          <button onClick={() => onNavigate('contact')} className="hover:text-blue-600">Contact</button>
+      </div>
+      <div className="mt-4 text-[10px] font-mono text-slate-300 relative z-10">v12.14</div>
     </div>
   );
 };

@@ -3,7 +3,7 @@ import React from 'react';
 import { 
   BookOpen, Target, Brain, BarChart2, Calendar, 
   RotateCw, Users, ShieldCheck, Zap, Layers, 
-  CheckCircle2, TrendingUp, Clock, FileText, Activity 
+  CheckCircle2, TrendingUp, Clock, FileText, Activity, Heart, Bell, Layout 
 } from 'lucide-react';
 
 export const FeaturesScreen: React.FC = () => {
@@ -15,7 +15,7 @@ export const FeaturesScreen: React.FC = () => {
         <div className="absolute top-0 right-0 w-1/2 h-full opacity-10 bg-gradient-to-l from-blue-600 to-transparent pointer-events-none"></div>
         <div className="max-w-5xl mx-auto text-center relative z-10">
             <span className="inline-block py-1 px-3 rounded-full bg-blue-900 text-blue-200 text-xs font-bold uppercase tracking-wider mb-4 border border-blue-800">
-                v12.12 Platform Overview
+                v12.14 Platform Overview
             </span>
             <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight leading-tight mb-6">
                 The Complete Toolkit for <br/>
@@ -100,62 +100,75 @@ export const FeaturesScreen: React.FC = () => {
 
         </div>
 
-        {/* Benefits Section */}
-        <div className="mb-24">
-            <div className="text-center max-w-3xl mx-auto mb-16">
-                <h2 className="text-3xl font-bold text-slate-900 mb-4">Why Choose IITGEEPrep?</h2>
-                <p className="text-slate-600">
-                    We bridge the gap between hard work and smart work. Our platform is designed to serve the specific needs of both students and their support system.
-                </p>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-                {/* For Students */}
-                <div className="bg-blue-50 rounded-3xl p-10 border border-blue-100">
-                    <div className="flex items-center gap-4 mb-6">
-                        <div className="bg-blue-600 text-white p-3 rounded-xl">
-                            <Zap className="w-6 h-6" />
-                        </div>
-                        <h3 className="text-2xl font-bold text-blue-900">For Students</h3>
-                    </div>
-                    <ul className="space-y-4">
-                        {[
-                            "Stay organized with automated timetables.",
-                            "Practice exam temperament with timed tests.",
-                            "Eliminate 'what to study next' paralysis.",
-                            "Consolidate learning with Flashcards & Notes.",
-                            "Manage mental health with the Wellness Zone."
-                        ].map((item, i) => (
-                            <li key={i} className="flex items-start text-blue-800">
-                                <CheckCircle2 className="w-5 h-5 mr-3 text-blue-600 shrink-0 mt-0.5" />
-                                <span className="font-medium">{item}</span>
-                            </li>
-                        ))}
-                    </ul>
+        {/* Detailed Parent Roles Section (Added as per request) */}
+        <div className="mb-24 bg-white rounded-3xl border border-slate-200 shadow-xl overflow-hidden">
+            <div className="bg-slate-900 p-10 text-white text-center relative overflow-hidden">
+                <div className="relative z-10">
+                    <h2 className="text-3xl font-bold mb-4">Parent Role & Responsibilities</h2>
+                    <p className="text-slate-400 max-w-2xl mx-auto text-lg">
+                        Parents have access to a dedicated dashboard to monitor, support, and track their child’s preparation.
+                    </p>
                 </div>
-
-                {/* For Parents */}
-                <div className="bg-slate-50 rounded-3xl p-10 border border-slate-200">
-                    <div className="flex items-center gap-4 mb-6">
-                        <div className="bg-slate-800 text-white p-3 rounded-xl">
-                            <ShieldCheck className="w-6 h-6" />
-                        </div>
-                        <h3 className="text-2xl font-bold text-slate-800">For Parents</h3>
-                    </div>
-                    <ul className="space-y-4">
-                        {[
-                            "Gain transparency into your child's effort.",
-                            "Identify struggle areas early to provide help.",
-                            "Celebrate small wins and progress milestones.",
-                            "Access psychometric reports to understand stress levels.",
-                            "Reduce household friction over study updates."
-                        ].map((item, i) => (
-                            <li key={i} className="flex items-start text-slate-700">
-                                <CheckCircle2 className="w-5 h-5 mr-3 text-green-600 shrink-0 mt-0.5" />
-                                <span className="font-medium">{item}</span>
-                            </li>
-                        ))}
-                    </ul>
+                <Users className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 text-slate-800 opacity-20 pointer-events-none" />
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-0 divide-y md:divide-y-0 md:divide-x divide-slate-100">
+                <div className="p-8 space-y-10">
+                    <FeatureBlock 
+                        title="Student Performance Monitoring" 
+                        points={[
+                            "View overall academic progress",
+                            "Track subject-wise and topic-wise performance",
+                            "Monitor test scores, rankings, and improvement trends"
+                        ]}
+                        icon={<TrendingUp className="w-6 h-6 text-blue-600" />}
+                    />
+                    <FeatureBlock 
+                        title="Test & Assessment Visibility" 
+                        points={[
+                            "Access results of diagnostic, practice, mock, and psychometric tests",
+                            "Review detailed reports and analytics",
+                            "See strengths, weaknesses, and recommended focus areas"
+                        ]}
+                        icon={<FileText className="w-6 h-6 text-purple-600" />}
+                    />
+                    <FeatureBlock 
+                        title="Psychometric & Career Insights" 
+                        points={[
+                            "View psychometric test results",
+                            "Understand the student’s learning style, aptitude, and interests",
+                            "Get guidance insights aligned with IIT/JEE preparation"
+                        ]}
+                        icon={<Brain className="w-6 h-6 text-pink-600" />}
+                    />
+                </div>
+                <div className="p-8 space-y-10">
+                    <FeatureBlock 
+                        title="Activity & Engagement Tracking" 
+                        points={[
+                            "Monitor test participation and completion status",
+                            "Check consistency, practice frequency, and engagement level"
+                        ]}
+                        icon={<Activity className="w-6 h-6 text-orange-600" />}
+                    />
+                    <FeatureBlock 
+                        title="Communication & Support" 
+                        points={[
+                            "Receive important updates, announcements, and alerts",
+                            "Help students plan study schedules based on insights",
+                            "Encourage corrective actions based on performance data"
+                        ]}
+                        icon={<Bell className="w-6 h-6 text-green-600" />}
+                    />
+                    <FeatureBlock 
+                        title="Account & Profile Management" 
+                        points={[
+                            "View student profile details",
+                            "Ensure data accuracy and completeness",
+                            "Manage linked family accounts"
+                        ]}
+                        icon={<ShieldCheck className="w-6 h-6 text-slate-600" />}
+                    />
                 </div>
             </div>
         </div>
@@ -183,9 +196,9 @@ export const FeaturesScreen: React.FC = () => {
                     <p className="text-xs text-slate-500 mt-1">Error analysis</p>
                 </div>
                 <div className="p-6 bg-white border border-slate-200 rounded-xl text-center hover:shadow-lg transition-shadow">
-                    <Activity className="w-10 h-10 text-blue-500 mx-auto mb-3" />
-                    <h4 className="font-bold text-slate-800">Psychometrics</h4>
-                    <p className="text-xs text-slate-500 mt-1">Mindset tracking</p>
+                    <Heart className="w-10 h-10 text-blue-500 mx-auto mb-3" />
+                    <h4 className="font-bold text-slate-800">Wellness</h4>
+                    <p className="text-xs text-slate-500 mt-1">Stress reduction</p>
                 </div>
             </div>
         </div>
@@ -207,3 +220,22 @@ export const FeaturesScreen: React.FC = () => {
     </div>
   );
 };
+
+const FeatureBlock = ({ title, points, icon }: { title: string, points: string[], icon: React.ReactNode }) => (
+    <div className="flex gap-4">
+        <div className="shrink-0 mt-1 bg-slate-50 p-2 rounded-lg border border-slate-100 h-fit">
+            {icon}
+        </div>
+        <div>
+            <h4 className="font-bold text-slate-900 text-lg mb-3">{title}</h4>
+            <ul className="space-y-2">
+                {points.map((p, i) => (
+                    <li key={i} className="flex items-start text-sm text-slate-600 leading-relaxed">
+                        <span className="w-1.5 h-1.5 bg-slate-300 rounded-full mt-2 mr-2 shrink-0"></span>
+                        {p}
+                    </li>
+                ))}
+            </ul>
+        </div>
+    </div>
+);
