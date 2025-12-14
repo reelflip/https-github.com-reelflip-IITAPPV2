@@ -17,6 +17,7 @@ export const PsychometricScreen: React.FC<Props> = ({ user, reportData: initialR
     const [responses, setResponses] = useState<Record<number, number>>({});
     const [analyzing, setAnalyzing] = useState(false);
     const [report, setReport] = useState<PsychometricReport | null>(initialReport || null);
+    const [fetchError, setFetchError] = useState(false);
     
     const isParent = user.role === 'PARENT';
 
@@ -26,18 +27,26 @@ export const PsychometricScreen: React.FC<Props> = ({ user, reportData: initialR
             const checkReport = async () => {
                 try {
                     const targetId = isParent && user.linkedStudentId ? user.linkedStudentId : user.id;
+                    if (!targetId) return;
+                    
                     const res = await fetch(`/api/get_psychometric.php?user_id=${targetId}`);
                     if(res.ok) {
                         const data = await res.json();
                         if(data && data.report) {
                             setReport(data.report);
+                        } else {
+                            // Only fallback to local if API explicitly returns nothing AND we are same user
+                            // Parents should NEVER fallback to local storage of their own machine
+                            if (!isParent) {
+                                const saved = localStorage.getItem(`psych_report_${user.id}`);
+                                if(saved) setReport(JSON.parse(saved));
+                            }
                         }
+                    } else {
+                        setFetchError(true);
                     }
                 } catch(e) { 
-                    // Fallback to local
-                    const targetId = isParent && user.linkedStudentId ? user.linkedStudentId : user.id;
-                    const saved = localStorage.getItem(`psych_report_${targetId}`);
-                    if(saved) setReport(JSON.parse(saved));
+                    setFetchError(true);
                 }
             };
             checkReport();
@@ -72,19 +81,24 @@ export const PsychometricScreen: React.FC<Props> = ({ user, reportData: initialR
         // Simulate "Thinking" time
         setTimeout(async () => {
             const generatedReport = generatePsychometricReport(responses);
-            setReport(generatedReport);
-            setAnalyzing(false);
             
-            // Persist
+            // Persist FIRST, then update UI
             try {
                 await fetch('/api/save_psychometric.php', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ user_id: user.id, report: generatedReport })
                 });
-            } catch(e) { console.error("Save failed", e); }
-            
-            localStorage.setItem(`psych_report_${user.id}`, JSON.stringify(generatedReport));
+                
+                // Update Local & State only after success attempt
+                localStorage.setItem(`psych_report_${user.id}`, JSON.stringify(generatedReport));
+                setReport(generatedReport);
+            } catch(e) { 
+                console.error("Save failed", e); 
+                alert("Failed to save report to server. Please check connection.");
+            } finally {
+                setAnalyzing(false);
+            }
         }, 2000);
     };
 

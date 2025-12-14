@@ -44,7 +44,7 @@ import { DEFAULT_CHAPTER_NOTES } from './lib/chapterContent';
 import { MOCK_TESTS_DATA, generateInitialQuestionBank } from './lib/mockTestsData';
 import { TrendingUp, Bell, LogOut } from 'lucide-react';
 
-const APP_VERSION = '12.10';
+const APP_VERSION = '12.11';
 
 const ComingSoonScreen = ({ title, icon }: { title: string, icon: string }) => (
   <div className="flex flex-col items-center justify-center h-[70vh] text-center">
@@ -53,22 +53,6 @@ const ComingSoonScreen = ({ title, icon }: { title: string, icon: string }) => (
     <p className="text-slate-500 max-w-md">This feature is available in the Pro version or is currently under development.</p>
   </div>
 );
-
-// --- DB Helpers ---
-const getUserDB = (): User[] => {
-    const db = localStorage.getItem('iitjee_users_db');
-    return db ? JSON.parse(db) : [];
-};
-
-const saveUserToDB = (user: User) => {
-    const db = getUserDB();
-    const index = db.findIndex(u => u.id === user.id);
-    if (index >= 0) db[index] = user;
-    else db.push(user);
-    localStorage.setItem('iitjee_users_db', JSON.stringify(db));
-};
-
-const findUserById = (id: string) => getUserDB().find(u => u.id === id);
 
 // --- Screen Validation Helper ---
 const validateScreen = (role: string, screen: Screen): Screen => {
@@ -276,14 +260,8 @@ export default function App() {
 
   useEffect(() => {
     if (user) {
+        // Save minimal local backup
         localStorage.setItem('iitjee_user', JSON.stringify(user));
-        saveUserToDB(user);
-        localStorage.setItem(`iitjee_progress_${user.id}`, JSON.stringify(progress));
-        localStorage.setItem(`iitjee_tests_${user.id}`, JSON.stringify(testAttempts));
-        localStorage.setItem(`iitjee_goals_${user.id}`, JSON.stringify(goals));
-        localStorage.setItem(`iitjee_mistakes_${user.id}`, JSON.stringify(mistakes));
-        localStorage.setItem(`iitjee_backlogs_${user.id}`, JSON.stringify(backlogs));
-        if (timetableData) localStorage.setItem(`iitjee_timetable_${user.id}`, JSON.stringify(timetableData));
     }
     localStorage.setItem('iitjee_videos', JSON.stringify(videoMap));
     localStorage.setItem('iitjee_questions', JSON.stringify(questionBank));
@@ -291,9 +269,10 @@ export default function App() {
     localStorage.setItem('iitjee_syllabus', JSON.stringify(syllabus));
     localStorage.setItem('iitjee_chapter_notes', JSON.stringify(chapterNotes));
 
-  }, [user, progress, testAttempts, goals, mistakes, backlogs, timetableData, videoMap, questionBank, adminTests, syllabus, chapterNotes]);
+  }, [user, videoMap, questionBank, adminTests, syllabus, chapterNotes]);
 
   const loadLocalData = (userId: string) => {
+    // Fallback if API fails
     const savedProgress = localStorage.getItem(`iitjee_progress_${userId}`);
     const savedTests = localStorage.getItem(`iitjee_tests_${userId}`);
     const savedGoals = localStorage.getItem(`iitjee_goals_${userId}`);
@@ -323,45 +302,63 @@ export default function App() {
                       lastRevised: p.last_revised,
                       revisionLevel: p.revision_level,
                       nextRevisionDate: p.next_revision_date,
-                      solvedQuestions: p.solvedQuestions || [] 
+                      solvedQuestions: p.solved_questions_json ? JSON.parse(p.solved_questions_json) : [] 
                   };
               });
               setProgress(progMap);
           }
           if (data.attempts) setTestAttempts(data.attempts);
           if (data.goals) setGoals(data.goals);
+          if (data.mistakes) setMistakes(data.mistakes);
+          if (data.backlogs) setBacklogs(data.backlogs);
+          if (data.notifications && user) {
+              setUser(prev => prev ? ({...prev, notifications: data.notifications}) : prev);
+          }
+          if (data.userProfileSync && user) {
+              setUser(prev => prev ? ({ ...prev, ...data.userProfileSync }) : prev);
+          }
           if (data.timetable) {
               setTimetableData({ config: data.timetable.config, slots: data.timetable.slots });
           }
       } catch (e) { loadLocalData(userId); }
   };
 
-  const loadLinkedStudent = (studentId: string) => {
-      const sProgress = localStorage.getItem(`iitjee_progress_${studentId}`);
-      const sTests = localStorage.getItem(`iitjee_tests_${studentId}`);
-      const studentUser = findUserById(studentId);
-      if (studentUser) {
-          setLinkedStudentData({
-              progress: sProgress ? JSON.parse(sProgress) : {},
-              tests: sTests ? JSON.parse(sTests) : [],
-              studentName: studentUser.name
-          });
-      }
+  const loadLinkedStudent = async (studentId: string) => {
+      try {
+          const res = await fetch(`/api/get_dashboard.php?user_id=${studentId}`);
+          if(res.ok) {
+              const data = await res.json();
+              
+              const progMap: Record<string, UserProgress> = {};
+              if(Array.isArray(data.progress)) {
+                  data.progress.forEach((p: any) => {
+                      progMap[p.topic_id] = {
+                          topicId: p.topic_id,
+                          status: p.status,
+                          lastRevised: p.last_revised,
+                          revisionLevel: p.revision_level,
+                          nextRevisionDate: p.next_revision_date,
+                          solvedQuestions: p.solved_questions_json ? JSON.parse(p.solved_questions_json) : []
+                      };
+                  });
+              }
+
+              setLinkedStudentData({
+                  progress: progMap,
+                  tests: data.attempts || [],
+                  studentName: data.userProfileSync ? data.userProfileSync.name : 'Student'
+              });
+          }
+      } catch(e) { console.error("Failed to load linked student data", e); }
   };
 
   const handleLogin = (userData: User) => {
-    const existingDb = getUserDB();
-    const existingUser = existingDb.find(u => u.email === userData.email);
-    let newUser: User;
-    if (existingUser) { newUser = { ...existingUser, ...userData, id: existingUser.id }; } 
-    else { newUser = { ...userData, id: userData.id || Math.floor(100000 + Math.random() * 900000).toString(), notifications: [] }; }
-    
-    const safeScreen = validateScreen(newUser.role, currentScreen);
+    const safeScreen = validateScreen(userData.role, currentScreen);
     setCurrentScreen(safeScreen);
-    setUser(newUser);
+    setUser(userData);
     
-    fetchRemoteData(newUser.id);
-    if (newUser.role === 'PARENT' && newUser.linkedStudentId) loadLinkedStudent(newUser.linkedStudentId);
+    fetchRemoteData(userData.id);
+    if (userData.role === 'PARENT' && userData.linkedStudentId) loadLinkedStudent(userData.linkedStudentId);
   };
 
   const handleLogout = () => { 
@@ -371,34 +368,84 @@ export default function App() {
       setLinkedStudentData(undefined); 
   };
   const handleNavigation = (page: string) => { setCurrentScreen(page as Screen); };
+  
   const sendConnectionRequest = async (studentId: string): Promise<{success: boolean, message: string}> => {
       if(!user) return { success: false, message: 'Not logged in' };
-      const student = findUserById(studentId);
-      if(!student) return { success: false, message: 'Student ID not found' };
-      if(student.role !== 'STUDENT') return { success: false, message: 'ID belongs to non-student' };
-      const updatedStudent = { ...student, notifications: [ ...(student.notifications || []), { id: Date.now().toString(), fromId: user.id, fromName: user.name, type: 'connection_request' as const, date: new Date().toISOString() } ] };
-      saveUserToDB(updatedStudent);
-      return { success: true, message: 'Invitation sent successfully!' };
+      
+      try {
+          const res = await fetch('/api/send_request.php', {
+              method: 'POST',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({
+                  student_identifier: studentId,
+                  parent_id: user.id,
+                  parent_name: user.name,
+                  action: 'send'
+              })
+          });
+          const data = await res.json();
+          if(res.ok && data.message === 'Request Sent') {
+              return { success: true, message: 'Invitation sent successfully!' };
+          } else {
+              return { success: false, message: 'Failed to send request. Check ID.' };
+          }
+      } catch(e) {
+          return { success: false, message: 'Connection Error' };
+      }
   };
 
-  const acceptConnectionRequest = (notificationId: string) => {
-      if(!user) return;
-      const notification = user.notifications?.find(n => n.id === notificationId);
+  const acceptConnectionRequest = async (notificationId: string) => {
+      if(!user || !user.notifications) return;
+      const notification = user.notifications.find(n => n.id === notificationId);
       if(!notification) return;
-      const parentId = notification.fromId;
-      const parent = findUserById(parentId);
-      const updatedStudent: User = { ...user, notifications: user.notifications?.filter(n => n.id !== notificationId), parentId: parentId };
-      setUser(updatedStudent); 
-      if(parent) { const updatedParent = { ...parent, linkedStudentId: user.id }; saveUserToDB(updatedParent); }
+      
+      try {
+          const res = await fetch('/api/respond_request.php', {
+              method: 'POST',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({
+                  accept: true,
+                  student_id: user.id,
+                  parent_id: notification.fromId,
+                  notification_id: notificationId
+              })
+          });
+          
+          if(res.ok) {
+              const updatedNotifs = user.notifications.filter(n => n.id !== notificationId);
+              const updatedUser = { ...user, notifications: updatedNotifs, parentId: notification.fromId };
+              setUser(updatedUser);
+              localStorage.setItem('iitjee_user', JSON.stringify(updatedUser)); // Update local backup
+          }
+      } catch(e) { console.error("Failed to accept request", e); }
   };
+
   const updateTopicProgress = (topicId: string, updates: Partial<UserProgress>) => {
     setProgress(prev => {
       const current = prev[topicId] || { topicId, status: 'NOT_STARTED', lastRevised: null, revisionLevel: 0, nextRevisionDate: null, solvedQuestions: [] };
+      
+      // Auto-logic for revision reset
       if (updates.status === 'COMPLETED' && current.status !== 'COMPLETED') {
         const now = new Date().toISOString();
         updates.lastRevised = now; updates.nextRevisionDate = calculateNextRevision(0, now); updates.revisionLevel = 0;
       }
-      return { ...prev, [topicId]: { ...current, ...updates } };
+      
+      const updated = { ...current, ...updates };
+      
+      // Sync to API
+      if (user) {
+          fetch('/api/sync_progress.php', {
+              method: 'POST',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({
+                  user_id: user.id,
+                  topic_id: topicId,
+                  ...updated
+              })
+          }).catch(console.error);
+      }
+
+      return { ...prev, [topicId]: updated };
     });
   };
   
@@ -413,7 +460,22 @@ export default function App() {
           let status = current.status;
           if (newSolved.length > 0 && status === 'NOT_STARTED') status = 'IN_PROGRESS';
           
-          return { ...prev, [topicId]: { ...current, solvedQuestions: newSolved, status } };
+          const updated = { ...current, solvedQuestions: newSolved, status };
+          
+          // Sync to API
+          if (user) {
+              fetch('/api/sync_progress.php', {
+                  method: 'POST',
+                  headers: {'Content-Type': 'application/json'},
+                  body: JSON.stringify({
+                      user_id: user.id,
+                      topic_id: topicId,
+                      ...updated
+                  })
+              }).catch(console.error);
+          }
+
+          return { ...prev, [topicId]: updated };
       });
   };
 
@@ -423,10 +485,27 @@ export default function App() {
       if (!current) return prev;
       const now = new Date().toISOString();
       const newLevel = Math.min(current.revisionLevel + 1, 4);
-      return { ...prev, [topicId]: { ...current, lastRevised: now, revisionLevel: newLevel, nextRevisionDate: calculateNextRevision(newLevel, now) } };
+      const updated = { ...current, lastRevised: now, revisionLevel: newLevel, nextRevisionDate: calculateNextRevision(newLevel, now) };
+      
+      if (user) {
+          fetch('/api/sync_progress.php', {
+              method: 'POST',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({ user_id: user.id, topic_id: topicId, ...updated })
+          }).catch(console.error);
+      }
+      return { ...prev, [topicId]: updated };
     });
   };
-  const updateVideo = (topicId: string, url: string, description: string) => { setVideoMap(prev => ({ ...prev, [topicId]: { topicId, videoUrl: url, description } })); };
+
+  const updateVideo = (topicId: string, url: string, description: string) => { 
+      setVideoMap(prev => ({ ...prev, [topicId]: { topicId, videoUrl: url, description } })); 
+      fetch('/api/manage_videos.php', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ topicId, url, desc: description })
+      }).catch(console.error);
+  };
   
   const updateChapterNotes = (topicId: string, pages: string[]) => {
       setChapterNotes(prev => ({ ...prev, [topicId]: { id: Date.now(), topicId, pages, lastUpdated: new Date().toISOString() } }));
@@ -437,7 +516,17 @@ export default function App() {
       }).catch(console.error);
   };
 
-  const saveTimetable = (config: TimetableConfig, slots: any[]) => { setTimetableData({ config, slots }); };
+  const saveTimetable = (config: TimetableConfig, slots: any[]) => { 
+      setTimetableData({ config, slots }); 
+      if (user) {
+          fetch('/api/save_timetable.php', {
+              method: 'POST',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({ user_id: user.id, config, slots })
+          }).catch(console.error);
+      }
+  };
+
   const addQuestion = (q: Question) => setQuestionBank(prev => [...prev, q]);
   const deleteQuestion = (id: string) => setQuestionBank(prev => prev.filter(q => q.id !== id));
   const createTest = (t: Test) => setAdminTests(prev => [...prev, t]);
@@ -454,9 +543,47 @@ export default function App() {
       }
   };
 
-  const addGoal = (text: string) => setGoals(prev => [...prev, { id: Date.now().toString(), text, completed: false }]);
-  const toggleGoal = (id: string) => setGoals(prev => prev.map(g => g.id === id ? { ...g, completed: !g.completed } : g));
-  const addMistake = (m: Omit<MistakeLog, 'id' | 'date'>) => setMistakes(prev => [{ ...m, id: Date.now().toString(), date: new Date().toISOString() }, ...prev]);
+  const addGoal = (text: string) => {
+      if(!user) return;
+      const id = Date.now().toString();
+      const newGoal = { id, text, completed: false };
+      setGoals(prev => [...prev, newGoal]);
+      fetch('/api/manage_goals.php', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ id, user_id: user.id, text })
+      }).catch(console.error);
+  };
+
+  const toggleGoal = (id: string) => {
+      if(!user) return;
+      setGoals(prev => {
+          const updated = prev.map(g => g.id === id ? { ...g, completed: !g.completed } : g);
+          const goal = updated.find(g => g.id === id);
+          if(goal) {
+              fetch('/api/manage_goals.php', {
+                  method: 'PUT',
+                  headers: {'Content-Type': 'application/json'},
+                  body: JSON.stringify({ id, completed: goal.completed })
+              }).catch(console.error);
+          }
+          return updated;
+      });
+  };
+
+  const addMistake = (m: Omit<MistakeLog, 'id' | 'date'>) => {
+      if(!user) return;
+      const id = Date.now().toString();
+      const date = new Date().toISOString();
+      const newMistake = { ...m, id, date };
+      setMistakes(prev => [newMistake, ...prev]);
+      
+      fetch('/api/manage_mistakes.php', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ id, user_id: user.id, ...newMistake })
+      }).catch(console.error);
+  };
   
   const addFlashcard = (card: Omit<Flashcard, 'id'>) => { 
       const newCard = { ...card, id: Date.now() };
@@ -519,9 +646,34 @@ export default function App() {
     }).catch(console.error);
   };
 
-  const handleAddTopic = (topic: Omit<Topic, 'id'>) => { const newTopic: Topic = { ...topic, id: `${topic.subject[0].toLowerCase()}_${Date.now()}` }; setSyllabus(prev => [...prev, newTopic]); };
-  const handleDeleteTopic = (id: string) => { setSyllabus(prev => prev.filter(t => t.id !== id)); };
-  const addBacklog = (item: Omit<BacklogItem, 'id' | 'status'>) => { setBacklogs(prev => [...prev, { ...item, id: `bl_${Date.now()}`, status: 'PENDING' }]); };
+  const handleAddTopic = (topic: Omit<Topic, 'id'>) => { 
+      const newTopic: Topic = { ...topic, id: `${topic.subject[0].toLowerCase()}_${Date.now()}` }; 
+      setSyllabus(prev => [...prev, newTopic]); 
+      fetch('/api/manage_syllabus.php', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(newTopic)
+      }).catch(console.error);
+  };
+
+  const handleDeleteTopic = (id: string) => { 
+      setSyllabus(prev => prev.filter(t => t.id !== id)); 
+      fetch(`/api/manage_syllabus.php?id=${id}`, { method: 'DELETE' }).catch(console.error);
+  };
+
+  const addBacklog = (item: Omit<BacklogItem, 'id' | 'status'>) => {
+      if(!user) return;
+      const id = `bl_${Date.now()}`;
+      const newItem = { ...item, id, status: 'PENDING' as const };
+      setBacklogs(prev => [...prev, newItem]);
+      
+      fetch('/api/manage_backlogs.php', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ id, user_id: user.id, ...item, status: 'PENDING' })
+      }).catch(console.error);
+  };
+
   const toggleBacklog = (id: string) => { setBacklogs(prev => prev.map(b => b.id === id ? { ...b, status: b.status === 'PENDING' ? 'COMPLETED' : 'PENDING' } : b)); };
   const deleteBacklog = (id: string) => { setBacklogs(prev => prev.filter(b => b.id !== id)); };
 
@@ -556,7 +708,7 @@ export default function App() {
                 {currentScreen === 'analytics' && <AnalyticsScreen user={user} progress={linkedStudentData?.progress || {}} testAttempts={linkedStudentData?.tests || []} />}
                 {currentScreen === 'tests' && <TestScreen user={user} history={linkedStudentData?.tests || []} addTestAttempt={()=>{}} availableTests={adminTests} />}
                 {currentScreen === 'syllabus' && <SyllabusScreen user={user} subjects={syllabus} progress={linkedStudentData?.progress || {}} onUpdateProgress={()=>{}} readOnly={true} videoMap={videoMap} chapterNotes={chapterNotes} questionBank={questionBank} addTestAttempt={()=>{}} testAttempts={linkedStudentData?.tests || []} />}
-                {currentScreen === 'profile' && <ProfileScreen user={user} onAcceptRequest={()=>{}} onUpdateUser={(u) => { const updated = { ...user, ...u }; setUser(updated); saveUserToDB(updated); }} linkedStudentName={linkedStudentData?.studentName} />} 
+                {currentScreen === 'profile' && <ProfileScreen user={user} onAcceptRequest={()=>{}} onUpdateUser={(u) => { const updated = { ...user, ...u }; setUser(updated); }} linkedStudentName={linkedStudentData?.studentName} />} 
              </>
           )}
           {user.role === 'STUDENT' && (
@@ -579,7 +731,7 @@ export default function App() {
                 {currentScreen === 'hacks' && <HacksScreen hacks={hacks} />}
                 {currentScreen === 'analytics' && <AnalyticsScreen user={user} progress={progress} testAttempts={testAttempts} />}
                 {currentScreen === 'wellness' && <WellnessScreen />}
-                {currentScreen === 'profile' && <ProfileScreen user={user} onAcceptRequest={acceptConnectionRequest} onUpdateUser={(u) => { const updated = { ...user, ...u }; setUser(updated); saveUserToDB(updated); }} />}
+                {currentScreen === 'profile' && <ProfileScreen user={user} onAcceptRequest={acceptConnectionRequest} onUpdateUser={(u) => { const updated = { ...user, ...u }; setUser(updated); }} />}
               </>
           )}
           {user.role === 'ADMIN' && (

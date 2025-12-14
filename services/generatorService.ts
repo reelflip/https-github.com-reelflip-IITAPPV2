@@ -42,7 +42,7 @@ try {
         folder: 'deployment/api',
         desc: 'API Root Health Check',
         content: `${phpHeader}
-echo json_encode(["status" => "active", "message" => "IITGEEPrep API v12.10 Operational", "timestamp" => date('c')]);
+echo json_encode(["status" => "active", "message" => "IITGEEPrep API v12.11 Operational", "timestamp" => date('c')]);
 ?>`
     },
     {
@@ -221,43 +221,18 @@ if(!empty($data->name) && !empty($data->email) && !empty($data->password)) {
 ?>`
     },
     {
-        name: 'update_profile.php',
-        folder: 'deployment/api',
-        content: `${phpHeader}
-$data = json_decode(file_get_contents("php://input"));
-if($data->id) {
-    $allowed_fields = ['name', 'target_exam', 'target_year', 'school', 'phone', 'avatar_url', 'notifications_json'];
-    $updates = [];
-    $params = [];
-    foreach($data as $key => $val) {
-        if(in_array($key, $allowed_fields)) {
-            $updates[] = "$key = ?";
-            $params[] = $val;
-        }
-    }
-    if(!empty($updates)) {
-        $params[] = $data->id;
-        $sql = "UPDATE users SET " . implode(', ', $updates) . " WHERE id = ?";
-        $stmt = $conn->prepare($sql);
-        $stmt->execute($params);
-        echo json_encode(["message" => "Profile Updated"]);
-    } else {
-        echo json_encode(["message" => "No valid fields to update"]);
-    }
-}
-?>`
-    },
-    {
         name: 'get_dashboard.php',
         folder: 'deployment/api',
         content: `${phpHeader}
 $user_id = $_GET['user_id'] ?? null;
 if(!$user_id) { echo json_encode([]); exit(); }
 
+// 1. Topic Progress
 $stmt = $conn->prepare("SELECT * FROM topic_progress WHERE user_id = ?");
 $stmt->execute([$user_id]);
 $progress = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+// 2. Test Attempts
 $stmt = $conn->prepare("SELECT * FROM test_attempts WHERE user_id = ? ORDER BY date DESC LIMIT 50");
 $stmt->execute([$user_id]);
 $attempts = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -284,10 +259,12 @@ foreach($attempts as &$attempt) {
     $attempt['detailedResults'] = $detailedResults;
 }
 
+// 3. Goals
 $stmt = $conn->prepare("SELECT * FROM goals WHERE user_id = ? AND date(created_at) = CURDATE()");
 $stmt->execute([$user_id]);
 $goals = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+// 4. Timetable
 $stmt = $conn->prepare("SELECT * FROM timetable_configs WHERE user_id = ?");
 $stmt->execute([$user_id]);
 $timetable = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -298,16 +275,35 @@ if($timetable) {
     unset($timetable['slots_json']);
 }
 
+// 5. Mistakes (New for persistence)
+$stmt = $conn->prepare("SELECT * FROM mistakes WHERE user_id = ? ORDER BY date DESC");
+$stmt->execute([$user_id]);
+$mistakes = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// 6. Backlogs (New for persistence)
+$stmt = $conn->prepare("SELECT * FROM backlogs WHERE user_id = ?");
+$stmt->execute([$user_id]);
+$backlogs = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// 7. Notifications (New for persistence)
+$stmt = $conn->prepare("SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC");
+$stmt->execute([$user_id]);
+$notifications = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// 8. User Profile Sync (Parent linking, etc)
 $stmt = $conn->prepare("SELECT * FROM users WHERE id = ?");
 $stmt->execute([$user_id]);
 $user = $stmt->fetch(PDO::FETCH_ASSOC);
-unset($user['password_hash']);
+if ($user) unset($user['password_hash']);
 
 echo json_encode([
     "progress" => $progress,
     "attempts" => $attempts,
     "goals" => $goals,
     "timetable" => $timetable,
+    "mistakes" => $mistakes,
+    "backlogs" => $backlogs,
+    "notifications" => $notifications,
     "userProfileSync" => $user
 ]);
 ?>`
@@ -321,10 +317,13 @@ if(!empty($data->user_id) && !empty($data->topic_id)) {
     $check = $conn->prepare("SELECT id FROM topic_progress WHERE user_id = ? AND topic_id = ?");
     $check->execute([$data->user_id, $data->topic_id]);
     
+    // Convert solvedQuestions array to JSON for storage if present
+    $solvedJson = isset($data->solvedQuestions) ? json_encode($data->solvedQuestions) : '[]';
+
     if($check->rowCount() > 0) {
-        $query = "UPDATE topic_progress SET status = :status, last_revised = :lr, revision_level = :rl, next_revision_date = :nrd, ex1_solved = :e1s, ex1_total = :e1t, ex2_solved = :e2s, ex2_total = :e2t WHERE user_id = :uid AND topic_id = :tid";
+        $query = "UPDATE topic_progress SET status = :status, last_revised = :lr, revision_level = :rl, next_revision_date = :nrd, solved_questions_json = :sqj WHERE user_id = :uid AND topic_id = :tid";
     } else {
-        $query = "INSERT INTO topic_progress (user_id, topic_id, status, last_revised, revision_level, next_revision_date, ex1_solved, ex1_total, ex2_solved, ex2_total) VALUES (:uid, :tid, :status, :lr, :rl, :nrd, :e1s, :e1t, :e2s, :e2t)";
+        $query = "INSERT INTO topic_progress (user_id, topic_id, status, last_revised, revision_level, next_revision_date, solved_questions_json) VALUES (:uid, :tid, :status, :lr, :rl, :nrd, :sqj)";
     }
     $stmt = $conn->prepare($query);
     $stmt->execute([
@@ -334,10 +333,7 @@ if(!empty($data->user_id) && !empty($data->topic_id)) {
         ':lr' => $data->lastRevised ?? date('Y-m-d H:i:s'),
         ':rl' => $data->revisionLevel ?? 0,
         ':nrd' => $data->nextRevisionDate ?? null,
-        ':e1s' => $data->ex1Solved ?? 0,
-        ':e1t' => $data->ex1Total ?? 30,
-        ':e2s' => $data->ex2Solved ?? 0,
-        ':e2t' => $data->ex2Total ?? 20
+        ':sqj' => $solvedJson
     ]);
     echo json_encode(["message" => "Saved"]);
 }
@@ -542,6 +538,13 @@ if($data->accept) {
     $stmt->execute([$data->parent_id, $data->student_id]);
     $stmt2 = $conn->prepare("UPDATE users SET linked_student_id = ? WHERE id = ?");
     $stmt2->execute([$data->student_id, $data->parent_id]);
+    
+    // Cleanup notification
+    if(isset($data->notification_id)) {
+        $stmt3 = $conn->prepare("DELETE FROM notifications WHERE id = ?");
+        $stmt3->execute([$data->notification_id]);
+    }
+    
     echo json_encode(["message" => "Connected"]);
 }
 ?>`
@@ -757,7 +760,6 @@ if($user_id) {
 }
 ?>`
     },
-    // --- RESTORED FILES ---
     {
         name: 'manage_broadcasts.php',
         folder: 'deployment/api',
