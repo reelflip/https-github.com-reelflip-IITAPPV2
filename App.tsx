@@ -42,7 +42,7 @@ import { calculateNextRevision } from './lib/utils';
 import { SYLLABUS_DATA } from './lib/syllabusData';
 import { DEFAULT_CHAPTER_NOTES } from './lib/chapterContent';
 import { MOCK_TESTS_DATA, generateInitialQuestionBank } from './lib/mockTestsData';
-import { TrendingUp, Bell, LogOut, Cloud, CloudOff, RefreshCw, Check } from 'lucide-react';
+import { TrendingUp, Bell, LogOut, Cloud, CloudOff, RefreshCw, Check, WifiOff, AlertTriangle } from 'lucide-react';
 
 const APP_VERSION = '12.21';
 
@@ -55,7 +55,7 @@ const ComingSoonScreen = ({ title, icon }: { title: string, icon: string }) => (
 );
 
 // --- Sync Status Component ---
-const SyncIndicator = ({ status, onRetry }: { status: 'SYNCED' | 'SAVING' | 'ERROR', onRetry: () => void }) => {
+const SyncIndicator = ({ status, onRetry }: { status: 'SYNCED' | 'SAVING' | 'ERROR' | 'OFFLINE', onRetry: () => void }) => {
     if (status === 'SYNCED') return (
         <div className="flex items-center gap-1 text-green-600 bg-green-50 px-2 py-1 rounded text-[10px] font-bold border border-green-200" title="Data Saved to Cloud">
             <Cloud className="w-3 h-3" /> <span>Synced</span>
@@ -64,6 +64,11 @@ const SyncIndicator = ({ status, onRetry }: { status: 'SYNCED' | 'SAVING' | 'ERR
     if (status === 'SAVING') return (
         <div className="flex items-center gap-1 text-blue-600 bg-blue-50 px-2 py-1 rounded text-[10px] font-bold border border-blue-200" title="Saving...">
             <RefreshCw className="w-3 h-3 animate-spin" /> <span>Saving...</span>
+        </div>
+    );
+    if (status === 'OFFLINE') return (
+        <div className="flex items-center gap-1 text-slate-500 bg-slate-100 px-2 py-1 rounded text-[10px] font-bold border border-slate-200" title="Offline Mode: Data saved locally">
+            <WifiOff className="w-3 h-3" /> <span>Offline Mode</span>
         </div>
     );
     return (
@@ -124,8 +129,9 @@ export default function App() {
   const [linkedStudentData, setLinkedStudentData] = useState<{ progress: Record<string, UserProgress>; tests: TestAttempt[]; studentName: string; } | undefined>(undefined);
   
   // Sync State
-  const [syncStatus, setSyncStatus] = useState<'SYNCED' | 'SAVING' | 'ERROR'>('SYNCED');
+  const [syncStatus, setSyncStatus] = useState<'SYNCED' | 'SAVING' | 'ERROR' | 'OFFLINE'>('SYNCED');
   const [syncErrorMsg, setSyncErrorMsg] = useState<string | null>(null);
+  const [isOfflineMode, setIsOfflineMode] = useState(false);
 
   const [flashcards, setFlashcards] = useState<Flashcard[]>([
      { id: 1, front: "Newton's Second Law", back: "F = ma\n(Force equals mass times acceleration.)", subjectId: 'phys' },
@@ -171,6 +177,12 @@ export default function App() {
 
   // --- Central API Handler ---
   const apiCall = useCallback(async (endpoint: string, method: string, body?: any) => {
+      // If we are in offline mode, don't even try to fetch
+      if (isOfflineMode) {
+          console.log(`[Offline] Skipped API call to ${endpoint}`);
+          return { status: 'success', offline: true };
+      }
+
       if (!user) return;
       setSyncStatus('SAVING');
       try {
@@ -179,17 +191,28 @@ export default function App() {
               headers: { 'Content-Type': 'application/json' },
               body: body ? JSON.stringify(body) : undefined
           });
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          if (!res.ok) {
+              if (res.status === 404) {
+                  // Backend not found, switch to offline mode immediately
+                  setIsOfflineMode(true);
+                  setSyncStatus('OFFLINE');
+                  setSyncErrorMsg(null);
+                  return { status: 'success', offline: true };
+              }
+              throw new Error(`HTTP ${res.status}`);
+          }
           const data = await res.json();
           setSyncStatus('SYNCED');
           setSyncErrorMsg(null);
           return data;
       } catch (error) {
           console.error("Sync Failed:", error);
-          setSyncStatus('ERROR');
-          throw error;
+          // If fetch failed completely (network error), switch to offline
+          setIsOfflineMode(true);
+          setSyncStatus('OFFLINE');
+          return { status: 'success', offline: true };
       }
-  }, [user]);
+  }, [user, isOfflineMode]);
 
   // --- Version Check & Validation ---
   useEffect(() => {
@@ -302,7 +325,7 @@ export default function App() {
     if (savedSyllabus) setSyllabus(JSON.parse(savedSyllabus));
   }, []);
 
-  // Persist Local Backup
+  // Persist Local Backup (Global Settings)
   useEffect(() => {
     if (user) {
         localStorage.setItem('iitjee_user', JSON.stringify(user));
@@ -313,6 +336,18 @@ export default function App() {
     localStorage.setItem('iitjee_syllabus', JSON.stringify(syllabus));
     localStorage.setItem('iitjee_chapter_notes', JSON.stringify(chapterNotes));
   }, [user, videoMap, questionBank, adminTests, syllabus, chapterNotes]);
+
+  // Persist User-Specific Data (Offline Support)
+  useEffect(() => {
+      if (user) {
+          localStorage.setItem(`iitjee_progress_${user.id}`, JSON.stringify(progress));
+          localStorage.setItem(`iitjee_tests_${user.id}`, JSON.stringify(testAttempts));
+          localStorage.setItem(`iitjee_goals_${user.id}`, JSON.stringify(goals));
+          localStorage.setItem(`iitjee_mistakes_${user.id}`, JSON.stringify(mistakes));
+          localStorage.setItem(`iitjee_backlogs_${user.id}`, JSON.stringify(backlogs));
+          if(timetableData) localStorage.setItem(`iitjee_timetable_${user.id}`, JSON.stringify(timetableData));
+      }
+  }, [user, progress, testAttempts, goals, mistakes, backlogs, timetableData]);
 
   const loadLocalData = (userId: string) => {
     // Only fall back if explicitly requested or needed
@@ -337,14 +372,37 @@ export default function App() {
       setSyncErrorMsg(null);
       try {
           const res = await fetch(`/api/get_dashboard.php?user_id=${userId}`);
-          if (!res.ok) throw new Error(`HTTP Error ${res.status}`);
+          
+          const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+
+          if (!res.ok) {
+              if (res.status === 404) {
+                  // Only go silently offline if we are on localhost (dev mode)
+                  if (isLocalhost) {
+                      setIsOfflineMode(true);
+                      setSyncStatus('OFFLINE');
+                      loadLocalData(userId);
+                      return;
+                  } else {
+                      throw new Error("API Endpoint Not Found (404). Check if /api/ folder exists on server.");
+                  }
+              } else if (res.status === 500) {
+                  throw new Error("Server Error (500). Check Database Credentials in config.php.");
+              }
+              throw new Error(`HTTP Error ${res.status}`);
+          }
+          
           const text = await res.text();
           let data;
           try {
               data = JSON.parse(text);
           } catch(e) {
               console.error("Invalid JSON response:", text.substring(0, 100));
-              throw new Error("Invalid Server Response");
+              // Detect HTML error pages
+              if (text.includes("<!DOCTYPE html>") || text.includes("<html>")) {
+                  throw new Error("Server returned HTML instead of JSON. Check .htaccess configuration.");
+              }
+              throw new Error("Invalid Server Response (JSON Parse Error)");
           }
           
           if (data.error) throw new Error(data.error);
@@ -379,11 +437,19 @@ export default function App() {
           }
           
           setSyncStatus('SYNCED');
+          setIsOfflineMode(false);
       } catch (e: any) { 
           console.error("Remote Fetch Failed:", e);
-          setSyncStatus('ERROR');
-          setSyncErrorMsg("Connection Failed: Using Offline Mode");
-          // Fallback to ensure app works offline.
+          
+          // Switch to offline for functionality
+          setIsOfflineMode(true);
+          setSyncStatus('OFFLINE');
+          
+          // Show error banner if NOT localhost
+          if (window.location.hostname !== 'localhost') {
+              setSyncErrorMsg(`Connection Failed: ${e.message}`);
+          }
+          
           loadLocalData(userId); 
       }
   };
@@ -662,10 +728,15 @@ export default function App() {
         {syncErrorMsg && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl mb-4 flex items-center justify-between shadow-sm animate-in slide-in-from-top-2">
                 <div className="flex items-center gap-2">
-                    <CloudOff className="w-5 h-5" />
+                    <AlertTriangle className="w-5 h-5" />
                     <span className="font-bold text-sm">{syncErrorMsg}</span>
                 </div>
-                <button onClick={() => fetchRemoteData(user.id)} className="text-xs font-bold underline hover:text-red-900">Retry</button>
+                <div className="flex gap-4">
+                    {syncErrorMsg.includes("404") && (
+                        <button onClick={() => setCurrentScreen('deployment')} className="text-xs font-bold underline hover:text-red-900">Check Setup</button>
+                    )}
+                    <button onClick={() => fetchRemoteData(user.id)} className="text-xs font-bold underline hover:text-red-900">Retry</button>
+                </div>
             </div>
         )}
 

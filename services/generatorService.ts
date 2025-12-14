@@ -938,7 +938,8 @@ CREATE TABLE IF NOT EXISTS settings (
     setting_key VARCHAR(255) PRIMARY KEY,
     value TEXT
 );
-CREATE TABLE IF NOT EXISTS topics (
+DROP TABLE IF EXISTS topics;
+CREATE TABLE topics (
     id VARCHAR(255) PRIMARY KEY,
     name VARCHAR(255),
     chapter VARCHAR(255),
@@ -996,7 +997,8 @@ CREATE TABLE IF NOT EXISTS user_progress (
     ex1_total INT,
     UNIQUE KEY (user_id, topic_id)
 );
-CREATE TABLE IF NOT EXISTS questions (
+DROP TABLE IF EXISTS questions;
+CREATE TABLE questions (
     id VARCHAR(255) PRIMARY KEY,
     subject_id VARCHAR(50),
     topic_id VARCHAR(255),
@@ -1007,7 +1009,8 @@ CREATE TABLE IF NOT EXISTS questions (
     source VARCHAR(100),
     year INT
 );
-CREATE TABLE IF NOT EXISTS tests (
+DROP TABLE IF EXISTS tests;
+CREATE TABLE tests (
     id VARCHAR(255) PRIMARY KEY,
     title VARCHAR(255),
     duration INT,
@@ -1051,7 +1054,8 @@ CREATE TABLE IF NOT EXISTS content (
     content_json LONGTEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-CREATE TABLE IF NOT EXISTS chapter_notes (
+DROP TABLE IF EXISTS chapter_notes;
+CREATE TABLE chapter_notes (
     id INT AUTO_INCREMENT PRIMARY KEY,
     topic_id VARCHAR(255),
     content_json LONGTEXT,
