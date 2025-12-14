@@ -20,6 +20,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 include_once 'config.php';
 `;
 
+// Helper to categorize files for the ZIP structure
 export const getBackendFiles = (dbConfig: any) => [
     {
         name: 'config.php',
@@ -44,7 +45,7 @@ try {
     {
         name: 'index.php',
         folder: 'deployment/api',
-        content: `${phpHeader} echo json_encode(["status" => "active", "version" => "12.20"]); ?>`
+        content: `${phpHeader} echo json_encode(["status" => "active", "version" => "12.21"]); ?>`
     },
     {
         name: 'test_db.php',
@@ -252,6 +253,21 @@ if(isset($data->id)) {
 ?>`
     },
     {
+        name: 'update_password.php',
+        folder: 'deployment/api',
+        content: `${phpHeader}
+$data = json_decode(file_get_contents("php://input"));
+if($data->user_id && $data->new_password) {
+    $stmt = $conn->prepare("UPDATE users SET password_hash = ? WHERE id = ?");
+    $stmt->execute([$data->new_password, $data->user_id]);
+    echo json_encode(["status" => "success"]);
+} else {
+    http_response_code(400);
+    echo json_encode(["error" => "Invalid data"]);
+}
+?>`
+    },
+    {
         name: 'manage_settings.php',
         folder: 'deployment/api',
         content: `${phpHeader}
@@ -272,6 +288,25 @@ try {
 } catch(Exception $e) {
     http_response_code(500);
     echo json_encode(["error" => $e->getMessage()]);
+}
+?>`
+    },
+    {
+        name: 'manage_syllabus.php',
+        folder: 'deployment/api',
+        content: `${phpHeader}
+$method = $_SERVER['REQUEST_METHOD'];
+if ($method === 'GET') {
+    $stmt = $conn->query("SELECT * FROM topics");
+    echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
+} elseif ($method === 'POST') {
+    $data = json_decode(file_get_contents("php://input"));
+    $stmt = $conn->prepare("INSERT INTO topics (id, name, chapter, subject) VALUES (?, ?, ?, ?)");
+    $stmt->execute([$data->id, $data->name, $data->chapter, $data->subject]);
+    echo json_encode(["message" => "Created"]);
+} elseif ($method === 'DELETE') {
+    $conn->prepare("DELETE FROM topics WHERE id = ?")->execute([$_GET['id']]);
+    echo json_encode(["message" => "Deleted"]);
 }
 ?>`
     },
@@ -314,6 +349,76 @@ if($data && isset($data->user_id) && isset($data->topic_id)) {
 } else {
     http_response_code(400);
     echo json_encode(["error" => "Invalid Data Payload"]);
+}
+?>`
+    },
+    {
+        name: 'manage_backlogs.php',
+        folder: 'deployment/api',
+        content: `${phpHeader}
+$data = json_decode(file_get_contents("php://input"));
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if(isset($data->id)) {
+        try {
+            $stmt = $conn->prepare("INSERT INTO backlogs (id, user_id, title, subject, priority, status, deadline) VALUES (?, ?, ?, ?, ?, ?, ?)");
+            $stmt->execute([$data->id, $data->user_id, $data->title, $data->subject, $data->priority, $data->status, $data->deadline]);
+            echo json_encode(["message" => "Saved"]);
+        } catch(Exception $e) { http_response_code(500); echo json_encode(["error" => $e->getMessage()]); }
+    } else {
+        http_response_code(400);
+        echo json_encode(["error" => "Missing ID"]);
+    }
+} elseif ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
+    try {
+        $conn->prepare("DELETE FROM backlogs WHERE id = ?")->execute([$_GET['id']]);
+        echo json_encode(["message" => "Deleted"]);
+    } catch(Exception $e) { http_response_code(500); echo json_encode(["error" => $e->getMessage()]); }
+}
+?>`
+    },
+    {
+        name: 'manage_goals.php',
+        folder: 'deployment/api',
+        content: `${phpHeader}
+$data = json_decode(file_get_contents("php://input"));
+try {
+    if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['user_id'])) {
+        $stmt = $conn->prepare("SELECT * FROM goals WHERE user_id = ?");
+        $stmt->execute([$_GET['user_id']]);
+        echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
+    } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        $stmt = $conn->prepare("INSERT INTO goals (id, user_id, text, completed) VALUES (?, ?, ?, 0)");
+        $stmt->execute([$data->id, $data->user_id, $data->text]);
+        echo json_encode(["message" => "Goal Added"]);
+    } elseif ($_SERVER['REQUEST_METHOD'] === 'PUT') {
+        $conn->prepare("UPDATE goals SET completed = ? WHERE id = ?")->execute([$data->completed ? 1 : 0, $data->id]);
+        echo json_encode(["message" => "Updated"]);
+    } elseif ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
+        $conn->prepare("DELETE FROM goals WHERE id = ?")->execute([$_GET['id']]);
+        echo json_encode(["message" => "Deleted"]);
+    }
+} catch(Exception $e) {
+    http_response_code(500); echo json_encode(["error" => $e->getMessage()]);
+}
+?>`
+    },
+    {
+        name: 'manage_mistakes.php',
+        folder: 'deployment/api',
+        content: `${phpHeader}
+$data = json_decode(file_get_contents("php://input"));
+try {
+    if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['user_id'])) {
+        $stmt = $conn->prepare("SELECT * FROM mistake_logs WHERE user_id = ? ORDER BY date DESC");
+        $stmt->execute([$_GET['user_id']]);
+        echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
+    } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        $stmt = $conn->prepare("INSERT INTO mistake_logs (id, user_id, question, subject, note, date) VALUES (?, ?, ?, ?, ?, ?)");
+        $stmt->execute([$data->id, $data->user_id, $data->question, $data->subject, $data->note, $data->date]);
+        echo json_encode(["message" => "Saved"]);
+    }
+} catch(Exception $e) {
+    http_response_code(500); echo json_encode(["error" => $e->getMessage()]);
 }
 ?>`
     },
@@ -447,6 +552,137 @@ try {
 ?>`
     },
     {
+        name: 'send_request.php',
+        folder: 'deployment/api',
+        content: `${phpHeader}
+$data = json_decode(file_get_contents("php://input"));
+if($data && isset($data->action) && $data->action === 'send') {
+    try {
+        $stmt = $conn->prepare("SELECT id FROM users WHERE id = ? AND role = 'STUDENT'");
+        $stmt->execute([$data->student_identifier]);
+        if($stmt->rowCount() > 0) {
+            $notif_id = uniqid('notif_');
+            $sql = "INSERT INTO notifications (id, from_id, from_name, to_id, type, message) VALUES (?, ?, ?, ?, 'connection_request', 'Parent Connection Request')";
+            $conn->prepare($sql)->execute([$notif_id, $data->parent_id, $data->parent_name, $data->student_identifier]);
+            echo json_encode(["message" => "Request Sent"]);
+        } else {
+            http_response_code(404);
+            echo json_encode(["message" => "Student Not Found"]);
+        }
+    } catch(Exception $e) {
+        http_response_code(500);
+        echo json_encode(["error" => $e->getMessage()]);
+    }
+} else {
+    http_response_code(400);
+    echo json_encode(["error" => "Invalid Request"]);
+}
+?>`
+    },
+    {
+        name: 'respond_request.php',
+        folder: 'deployment/api',
+        content: `${phpHeader}
+$data = json_decode(file_get_contents("php://input"));
+if($data && isset($data->accept) && $data->accept) {
+    try {
+        $conn->prepare("UPDATE users SET parent_id = ? WHERE id = ?")->execute([$data->parent_id, $data->student_id]);
+        $conn->prepare("UPDATE users SET linked_student_id = ? WHERE id = ?")->execute([$data->student_id, $data->parent_id]);
+        $conn->prepare("DELETE FROM notifications WHERE id = ?")->execute([$data->notification_id]);
+        echo json_encode(["status" => "success"]);
+    } catch(Exception $e) {
+        http_response_code(500);
+        echo json_encode(["error" => $e->getMessage()]);
+    }
+} else {
+    http_response_code(400);
+    echo json_encode(["error" => "Invalid Request"]);
+}
+?>`
+    },
+    {
+        name: 'manage_users.php',
+        folder: 'deployment/api',
+        content: `${phpHeader}
+$method = $_SERVER['REQUEST_METHOD'];
+if ($method === 'GET') {
+    $stmt = $conn->query("SELECT id, name, email, role, is_verified, created_at FROM users ORDER BY created_at DESC");
+    echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
+} elseif ($method === 'PUT') {
+    $data = json_decode(file_get_contents("php://input"));
+    $val = $data->isVerified ? 1 : 0;
+    $conn->prepare("UPDATE users SET is_verified = ? WHERE id = ?")->execute([$val, $data->id]);
+    echo json_encode(["message" => "Updated"]);
+} elseif ($method === 'DELETE') {
+    $conn->prepare("DELETE FROM users WHERE id = ?")->execute([$_GET['id']]);
+    echo json_encode(["message" => "Deleted"]);
+}
+?>`
+    },
+    {
+        name: 'manage_content.php',
+        folder: 'deployment/api',
+        content: `${phpHeader}
+$method = $_SERVER['REQUEST_METHOD'];
+$type = $_GET['type'] ?? 'flashcard';
+
+if ($method === 'GET') {
+    $stmt = $conn->prepare("SELECT * FROM content WHERE type = ?");
+    $stmt->execute([$type]);
+    echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
+} elseif ($method === 'POST') {
+    $data = json_decode(file_get_contents("php://input"));
+    // Ensure content_json handles UTF-8 characters well
+    $stmt = $conn->prepare("INSERT INTO content (type, title, content_json) VALUES (?, ?, ?)");
+    $stmt->execute([$type, $data->title ?? '', json_encode($data)]);
+    echo json_encode(["status" => "success", "id" => $conn->lastInsertId()]);
+} elseif ($method === 'DELETE') {
+    $conn->prepare("DELETE FROM content WHERE id = ?")->execute([$_GET['id']]);
+}
+?>`
+    },
+    {
+        name: 'manage_questions.php',
+        folder: 'deployment/api',
+        content: `${phpHeader}
+$method = $_SERVER['REQUEST_METHOD'];
+if ($method === 'GET') {
+    $stmt = $conn->query("SELECT * FROM questions");
+    $qs = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    foreach($qs as &$q) { $q['options'] = json_decode($q['options_json']); }
+    echo json_encode($qs);
+} elseif ($method === 'POST') {
+    $data = json_decode(file_get_contents("php://input"));
+    $stmt = $conn->prepare("INSERT INTO questions (id, subject_id, topic_id, text, options_json, correct_idx, difficulty, source, year) VALUES (?,?,?,?,?,?,?,?,?)");
+    $stmt->execute([$data->id, $data->subjectId, $data->topicId, $data->text, json_encode($data->options), $data->correctOptionIndex, $data->difficulty, $data->source, $data->year]);
+    echo json_encode(["status" => "success"]);
+} elseif ($method === 'DELETE') {
+    $conn->prepare("DELETE FROM questions WHERE id = ?")->execute([$_GET['id']]);
+}
+?>`
+    },
+    {
+        name: 'manage_tests.php',
+        folder: 'deployment/api',
+        content: `${phpHeader}
+$method = $_SERVER['REQUEST_METHOD'];
+if ($method === 'GET') {
+    $stmt = $conn->query("SELECT * FROM tests");
+    $tests = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    foreach($tests as &$t) { $t['questions'] = json_decode($t['questions_json']); }
+    echo json_encode($tests);
+} elseif ($method === 'POST') {
+    $data = json_decode(file_get_contents("php://input"));
+    // Uses LONGTEXT in schema
+    $stmt = $conn->prepare("INSERT INTO tests (id, title, duration, category, difficulty, exam_type, questions_json) VALUES (?,?,?,?,?,?,?)");
+    $stmt->execute([$data->id, $data->title, $data->durationMinutes, $data->category, $data->difficulty, $data->examType, json_encode($data->questions)]);
+    echo json_encode(["status" => "success"]);
+} elseif ($method === 'DELETE') {
+    $conn->prepare("DELETE FROM tests WHERE id = ?")->execute([$_GET['id']]);
+}
+?>`
+    },
+    {
         name: 'save_psychometric.php',
         folder: 'deployment/api',
         content: `${phpHeader}
@@ -499,80 +735,106 @@ if($user_id) {
 ?>`
     },
     {
-        name: 'manage_backlogs.php',
+        name: 'contact.php',
         folder: 'deployment/api',
         content: `${phpHeader}
 $data = json_decode(file_get_contents("php://input"));
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if(isset($data->id)) {
-        try {
-            $stmt = $conn->prepare("INSERT INTO backlogs (id, user_id, title, subject, priority, status, deadline) VALUES (?, ?, ?, ?, ?, ?, ?)");
-            $stmt->execute([$data->id, $data->user_id, $data->title, $data->subject, $data->priority, $data->status, $data->deadline]);
-            echo json_encode(["message" => "Saved"]);
-        } catch(Exception $e) { http_response_code(500); echo json_encode(["error" => $e->getMessage()]); }
+$stmt = $conn->prepare("INSERT INTO contact_messages (name, email, subject, message) VALUES (?, ?, ?, ?)");
+$stmt->execute([$data->name, $data->email, $data->subject, $data->message]);
+echo json_encode(["status" => "success"]);
+?>`
+    },
+    {
+        name: 'manage_contact.php',
+        folder: 'deployment/api',
+        content: `${phpHeader}
+$method = $_SERVER['REQUEST_METHOD'];
+if ($method === 'GET') {
+    $stmt = $conn->query("SELECT * FROM contact_messages ORDER BY created_at DESC");
+    echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
+} elseif ($method === 'POST') {
+    // Admin Reply (Placeholder)
+    include 'contact.php'; 
+} elseif ($method === 'DELETE') {
+    $conn->prepare("DELETE FROM contact_messages WHERE id = ?")->execute([$_GET['id']]);
+}
+?>`
+    },
+    {
+        name: 'manage_notes.php',
+        folder: 'deployment/api',
+        content: `${phpHeader}
+$method = $_SERVER['REQUEST_METHOD'];
+if ($method === 'POST') {
+    $data = json_decode(file_get_contents("php://input"));
+    $content = json_encode($data->pages);
+    $check = $conn->prepare("SELECT id FROM chapter_notes WHERE topic_id = ?");
+    $check->execute([$data->topicId]);
+    if($check->rowCount() > 0) {
+        // Updated to set content_json
+        $conn->prepare("UPDATE chapter_notes SET content_json = ?, updated_at = NOW() WHERE topic_id = ?")->execute([$content, $data->topicId]);
     } else {
-        http_response_code(400);
-        echo json_encode(["error" => "Missing ID"]);
+        $conn->prepare("INSERT INTO chapter_notes (topic_id, content_json, updated_at) VALUES (?, ?, NOW())")->execute([$data->topicId, $content]);
     }
-} elseif ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
-    try {
-        $conn->prepare("DELETE FROM backlogs WHERE id = ?")->execute([$_GET['id']]);
-        echo json_encode(["message" => "Deleted"]);
-    } catch(Exception $e) { http_response_code(500); echo json_encode(["error" => $e->getMessage()]); }
+    echo json_encode(["status" => "success"]);
+} elseif ($method === 'GET') {
+    $stmt = $conn->query("SELECT topic_id, content_json FROM chapter_notes");
+    $results = [];
+    while($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        $results[$row['topic_id']] = ['pages' => json_decode($row['content_json'])];
+    }
+    echo json_encode($results);
 }
 ?>`
     },
     {
-        name: 'manage_goals.php',
+        name: 'manage_videos.php',
         folder: 'deployment/api',
         content: `${phpHeader}
 $data = json_decode(file_get_contents("php://input"));
-try {
-    if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['user_id'])) {
-        $stmt = $conn->prepare("SELECT * FROM goals WHERE user_id = ?");
-        $stmt->execute([$_GET['user_id']]);
-        echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
-    } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        $stmt = $conn->prepare("INSERT INTO goals (id, user_id, text, completed) VALUES (?, ?, ?, 0)");
-        $stmt->execute([$data->id, $data->user_id, $data->text]);
-        echo json_encode(["message" => "Goal Added"]);
-    } elseif ($_SERVER['REQUEST_METHOD'] === 'PUT') {
-        $conn->prepare("UPDATE goals SET completed = ? WHERE id = ?")->execute([$data->completed ? 1 : 0, $data->id]);
-        echo json_encode(["message" => "Updated"]);
-    } elseif ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
-        $conn->prepare("DELETE FROM goals WHERE id = ?")->execute([$_GET['id']]);
-        echo json_encode(["message" => "Deleted"]);
+if($data->topicId) {
+    $check = $conn->prepare("SELECT id FROM video_lessons WHERE topic_id = ?");
+    $check->execute([$data->topicId]);
+    if($check->rowCount() > 0) {
+        $conn->prepare("UPDATE video_lessons SET url = ?, description = ? WHERE topic_id = ?")->execute([$data->url, $data->desc, $data->topicId]);
+    } else {
+        $conn->prepare("INSERT INTO video_lessons (topic_id, url, description) VALUES (?, ?, ?)")->execute([$data->topicId, $data->url, $data->desc]);
     }
-} catch(Exception $e) {
-    http_response_code(500); echo json_encode(["error" => $e->getMessage()]);
+    echo json_encode(["status" => "success"]);
 }
 ?>`
     },
     {
-        name: 'manage_mistakes.php',
+        name: 'upload_avatar.php',
         folder: 'deployment/api',
         content: `${phpHeader}
-$data = json_decode(file_get_contents("php://input"));
-try {
-    if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['user_id'])) {
-        $stmt = $conn->prepare("SELECT * FROM mistake_logs WHERE user_id = ? ORDER BY date DESC");
-        $stmt->execute([$_GET['user_id']]);
-        echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
-    } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        $stmt = $conn->prepare("INSERT INTO mistake_logs (id, user_id, question, subject, note, date) VALUES (?, ?, ?, ?, ?, ?)");
-        $stmt->execute([$data->id, $data->user_id, $data->question, $data->subject, $data->note, $data->date]);
-        echo json_encode(["message" => "Saved"]);
-    }
-} catch(Exception $e) {
-    http_response_code(500); echo json_encode(["error" => $e->getMessage()]);
-}
+// Placeholder for file upload logic
+echo json_encode(["status" => "error", "message" => "Upload not configured"]);
 ?>`
     },
-    { name: 'send_request.php', folder: 'deployment/api', content: `${phpHeader} $data = json_decode(file_get_contents("php://input")); if($data && isset($data->action) && $data->action === 'send') { try { $stmt = $conn->prepare("SELECT id FROM users WHERE id = ? AND role = 'STUDENT'"); $stmt->execute([$data->student_identifier]); if($stmt->rowCount() > 0) { $notif_id = uniqid('notif_'); $sql = "INSERT INTO notifications (id, from_id, from_name, to_id, type, message) VALUES (?, ?, ?, ?, 'connection_request', 'Parent Connection Request')"; $conn->prepare($sql)->execute([$notif_id, $data->parent_id, $data->parent_name, $data->student_identifier]); echo json_encode(["message" => "Request Sent"]); } else { http_response_code(404); echo json_encode(["message" => "Student Not Found"]); } } catch(Exception $e) { http_response_code(500); echo json_encode(["error" => $e->getMessage()]); } } else { http_response_code(400); echo json_encode(["error" => "Invalid Request"]); } ?>` },
-    { name: 'respond_request.php', folder: 'deployment/api', content: `${phpHeader} $data = json_decode(file_get_contents("php://input")); if($data && isset($data->accept) && $data->accept) { try { $conn->prepare("UPDATE users SET parent_id = ? WHERE id = ?")->execute([$data->parent_id, $data->student_id]); $conn->prepare("UPDATE users SET linked_student_id = ? WHERE id = ?")->execute([$data->student_id, $data->parent_id]); $conn->prepare("DELETE FROM notifications WHERE id = ?")->execute([$data->notification_id]); echo json_encode(["status" => "success"]); } catch(Exception $e) { http_response_code(500); echo json_encode(["error" => $e->getMessage()]); } } else { http_response_code(400); echo json_encode(["error" => "Invalid Request"]); } ?>` },
-    { name: 'manage_content.php', folder: 'deployment/api', content: `${phpHeader} $method = $_SERVER['REQUEST_METHOD']; $type = $_GET['type'] ?? 'flashcard'; if ($method === 'GET') { $stmt = $conn->prepare("SELECT * FROM content WHERE type = ?"); $stmt->execute([$type]); echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC)); } elseif ($method === 'POST') { $data = json_decode(file_get_contents("php://input")); $stmt = $conn->prepare("INSERT INTO content (type, title, content_json) VALUES (?, ?, ?)"); $stmt->execute([$type, $data->title ?? '', json_encode($data)]); echo json_encode(["status" => "success", "id" => $conn->lastInsertId()]); } elseif ($method === 'DELETE') { $conn->prepare("DELETE FROM content WHERE id = ?")->execute([$_GET['id']]); } ?>` },
-    { name: 'track_visit.php', folder: 'deployment/api', content: `${phpHeader} $today = date('Y-m-d'); $conn->query("INSERT INTO analytics_visits (date, count) VALUES ('$today', 1) ON DUPLICATE KEY UPDATE count = count + 1"); echo json_encode(["status" => "tracked"]); ?>` },
-    { name: 'get_admin_stats.php', folder: 'deployment/api', content: `${phpHeader} $visits = $conn->query("SELECT SUM(count) FROM analytics_visits")->fetchColumn(); $users = $conn->query("SELECT COUNT(*) FROM users")->fetchColumn(); $traffic = $conn->query("SELECT date, count as visits FROM analytics_visits ORDER BY date DESC LIMIT 7")->fetchAll(PDO::FETCH_ASSOC); echo json_encode(["totalVisits" => (int)$visits, "totalUsers" => (int)$users, "dailyTraffic" => array_reverse($traffic)]); ?>` }
+    {
+        name: 'track_visit.php',
+        folder: 'deployment/api',
+        content: `${phpHeader}
+$today = date('Y-m-d');
+$conn->query("INSERT INTO analytics_visits (date, count) VALUES ('$today', 1) ON DUPLICATE KEY UPDATE count = count + 1");
+echo json_encode(["status" => "tracked"]);
+?>`
+    },
+    {
+        name: 'get_admin_stats.php',
+        folder: 'deployment/api',
+        content: `${phpHeader}
+$visits = $conn->query("SELECT SUM(count) FROM analytics_visits")->fetchColumn();
+$users = $conn->query("SELECT COUNT(*) FROM users")->fetchColumn();
+$traffic = $conn->query("SELECT date, count as visits FROM analytics_visits ORDER BY date DESC LIMIT 7")->fetchAll(PDO::FETCH_ASSOC);
+echo json_encode([
+    "totalVisits" => (int)$visits,
+    "totalUsers" => (int)$users,
+    "dailyTraffic" => array_reverse($traffic)
+]);
+?>`
+    }
 ];
 
 export const generateSQLSchema = () => `
