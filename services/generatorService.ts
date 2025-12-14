@@ -727,6 +727,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $stmt = $conn->prepare("INSERT INTO backlogs (id, user_id, title, subject, priority, status, deadline) VALUES (?, ?, ?, ?, ?, ?, ?)");
     $stmt->execute([$data->id, $data->user_id, $data->title, $data->subject, $data->priority, $data->status, $data->deadline]);
     echo json_encode(["message" => "Saved"]);
+} elseif ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
+    $id = $_GET['id'];
+    $conn->prepare("DELETE FROM backlogs WHERE id = ?")->execute([$id]);
+    echo json_encode(["message" => "Deleted"]);
 }
 ?>`
     },
@@ -740,6 +744,9 @@ if($data->user_id && $data->report) {
     $stmt = $conn->prepare("INSERT INTO psychometric_results (user_id, report_json) VALUES (?, ?)");
     $stmt->execute([$data->user_id, $json]);
     echo json_encode(["message" => "Saved"]);
+} else {
+    http_response_code(400);
+    echo json_encode(["error" => "Invalid Input"]);
 }
 ?>`
     },
@@ -757,6 +764,8 @@ if($user_id) {
     } else {
         echo json_encode(["report" => null]);
     }
+} else {
+    echo json_encode(["report" => null]);
 }
 ?>`
     },
@@ -802,6 +811,10 @@ if ($method === 'GET' && $user_id) {
     $stmt = $conn->prepare("UPDATE goals SET completed = ? WHERE id = ?");
     $stmt->execute([$data->completed ? 1 : 0, $data->id]);
     echo json_encode(["message" => "Updated"]);
+} elseif ($method === 'DELETE') {
+    $id = $_GET['id'];
+    $conn->prepare("DELETE FROM goals WHERE id = ?")->execute([$id]);
+    echo json_encode(["message" => "Deleted"]);
 }
 ?>`
     },

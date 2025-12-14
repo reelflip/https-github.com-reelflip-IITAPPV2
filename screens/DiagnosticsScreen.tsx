@@ -1,9 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
-import { Database, RefreshCw, Server, Table, CheckCircle2, AlertTriangle, XCircle, Activity, Globe, Play, Loader2, Clock, Terminal, AlertCircle, FileText } from 'lucide-react';
-import { SYLLABUS_DATA } from '../lib/syllabusData';
+import { Database, RefreshCw, Server, Table, CheckCircle2, AlertTriangle, XCircle, Activity, Globe, Play, Loader2, Terminal, AlertCircle, FileText, ChevronRight, ChevronDown } from 'lucide-react';
 
-// Full List of Required Tables based on schema v12.9
+// Tables required for v12.11
 const REQUIRED_SCHEMA = [
     'users', 'topic_progress', 'tests', 'questions', 'test_attempts',
     'attempt_details', 'flashcards', 'memory_hacks', 'blog_posts',
@@ -12,109 +11,51 @@ const REQUIRED_SCHEMA = [
     'psychometric_results'
 ];
 
-// Embedded JSON Data from the test run
-const DIAGNOSTICS_DATA = {
-  "metadata": {
-    "timestamp": new Date().toISOString(),
-    "url": "https://iitgeeprep.com/",
-    "appVersion": "v12.11"
-  },
-  "results": {
-    "1. [System] Core Health": [
-      { "description": "should ping the API root", "passed": true, "duration": 57 },
-      { "description": "should connect to the database", "passed": true, "duration": 60 }
-    ],
-    "2. [Student] Auth & Profile": [
-      { "description": "should register a new Student", "passed": true, "duration": 120 },
-      { "description": "should verify 6-digit ID format", "passed": true, "duration": 1 },
-      { "description": "should update profile details", "passed": true, "duration": 104 }
-    ],
-    "3. [Student] Syllabus Sync": [
-      { "description": "should setup Student session", "passed": true, "duration": 117 },
-      { "description": "should save topic progress", "passed": true, "duration": 77 },
-      { "description": "should retrieve progress correctly", "passed": true, "duration": 59 }
-    ],
-    "4. [Student] Task Management": [
-      { "description": "should setup Student session", "passed": true, "duration": 135 },
-      { "description": "should create Backlog Item", "passed": true, "duration": 101 },
-      { "description": "should create Daily Goal", "passed": true, "duration": 69 }
-    ],
-    "5. [Student] Timetable Config": [
-      { "description": "should setup Student session", "passed": true, "duration": 120 },
-      { "description": "should save and retrieve schedule", "passed": true, "duration": 164 }
-    ],
-    "6. [Student] Exam Engine": [
-      { "description": "should setup Student session", "passed": true, "duration": 131 },
-      { "description": "should verify Mock Tests exist", "passed": true, "duration": 108 },
-      { "description": "should submit test attempt", "passed": true, "duration": 56 }
-    ],
-    "7. [Student] Analytics Data": [
-      { "description": "should setup Student session", "passed": true, "duration": 233 },
-      { "description": "should retrieve attempt with Topic Metadata", "passed": true, "duration": 58 }
-    ],
-    "8. [Parent] Connection Flow": [
-      { "description": "should register pair", "passed": true, "duration": 270 },
-      { "description": "should search student", "passed": true, "duration": 85 },
-      { "description": "should link accounts", "passed": true, "duration": 173 }
-    ],
-    "9. [Parent] Monitoring": [
-      { "description": "should setup Student data", "passed": true, "duration": 359 },
-      { "description": "should verify Parent sees data", "passed": true, "duration": 57 }
-    ],
-    "10. [Admin] User Management": [
-      { "description": "should setup Target", "passed": true, "duration": 136 },
-      { "description": "should block user", "passed": true, "duration": 142 },
-      { "description": "should delete user", "passed": true, "duration": 115 }
-    ],
-    "11. [Admin] Content Operations": [
-      { "description": "should create Notification", "passed": true, "duration": 121 },
-      { "description": "should create Test", "passed": true, "duration": 60 }
-    ],
-    "12. [Admin] Inbox Flow": [
-      { "description": "should receive public message", "passed": true, "duration": 167 }
-    ],
-    "13. [System] Study Tools": [
-      { "description": "should have seeded Flashcards", "passed": true, "duration": 64 },
-      { "description": "should have seeded Memory Hacks", "passed": true, "duration": 10 }
-    ],
-    "14. [System] Revision Logic": [
-      { "description": "should setup user", "passed": true, "duration": 123 },
-      { "description": "should save revision date", "passed": true, "duration": 156 }
-    ],
-    "15. [Security] Access Control": [
-      { "description": "should setup & block user", "passed": true, "duration": 223 },
-      { "description": "should prevent login for blocked user", "passed": true, "duration": 120 }
-    ],
-    "16. [System] Database Schema I/O": [
-      { "description": "should verify all tables exist", "passed": true, "duration": 59 }
-    ],
-    "17. [System] Analytics Engine": [
-      { "description": "should increment visitor count", "passed": true, "duration": 60 }
-    ],
-    "18. [System] Content Integrity": [
-      { "description": "should have video mappings", "passed": true, "duration": 65 }
-    ],
-    "19. [Content] Syllabus Audit": [
-        { "description": "should have Physics Chapters >= 20", "passed": true, "duration": 5 },
-        { "description": "should have Chemistry Chapters >= 20", "passed": true, "duration": 5 },
-        { "description": "should have Maths Chapters >= 14", "passed": true, "duration": 5 }
-    ]
-  }
-};
+interface TestResult {
+    name: string;
+    passed: boolean;
+    duration: number;
+    error?: string;
+    details?: any;
+}
+
+interface TestSuite {
+    name: string;
+    description: string;
+    tests: TestResult[];
+    status: 'PENDING' | 'RUNNING' | 'COMPLETED';
+}
 
 export const DiagnosticsScreen: React.FC = () => {
-  const { metadata, results } = DIAGNOSTICS_DATA;
-  
-  // Combine Static results with Dynamic Admin Test AND Student Action Test
-  const [dynamicResults, setDynamicResults] = useState<{ [key: string]: any[] }>({});
-  
-  // Scan State
-  const [scanStatus, setScanStatus] = useState<'IDLE' | 'RUNNING' | 'COMPLETE'>('IDLE');
-  const [scanIndex, setScanIndex] = useState(0);
-
   // Live DB State
   const [dbStatus, setDbStatus] = useState<any>(null);
   const [loadingDb, setLoadingDb] = useState(false);
+  
+  // Test Execution State
+  const [isRunning, setIsRunning] = useState(false);
+  const [suites, setSuites] = useState<TestSuite[]>([]);
+  const [expandedError, setExpandedError] = useState<string | null>(null);
+
+  // Generate Unique Test IDs to avoid collision with real data
+  const SESSION_ID = `diag_${Date.now()}`;
+  const TEST_USER = {
+      name: `Test User ${SESSION_ID}`,
+      email: `test_${SESSION_ID}@diag.local`,
+      password: 'TestPassword123'
+  };
+
+  useEffect(() => {
+      // Initialize Suites Structure
+      setSuites([
+          { name: "0. Infrastructure", description: "API & DB Connectivity", tests: [], status: 'PENDING' },
+          { name: "1. Authentication", description: "Register, Login, Profile", tests: [], status: 'PENDING' },
+          { name: "2. Content Engine", description: "Flashcards, Hacks, Blogs", tests: [], status: 'PENDING' },
+          { name: "3. Academic Core", description: "Syllabus, Tests, Progress", tests: [], status: 'PENDING' },
+          { name: "4. Productivity Tools", description: "Goals, Backlogs, Mistakes", tests: [], status: 'PENDING' },
+          { name: "5. System & AI", description: "Settings, Analytics, AI", tests: [], status: 'PENDING' },
+          { name: "6. Cleanup", description: "Garbage Collection", tests: [], status: 'PENDING' }
+      ]);
+  }, []);
 
   const runLiveDbCheck = async () => {
       setLoadingDb(true);
@@ -134,230 +75,257 @@ export const DiagnosticsScreen: React.FC = () => {
       }
   };
 
-  const performTest = async (name: string, fn: () => Promise<any[]>) => {
-      const tests = await fn();
-      setDynamicResults(prev => ({ ...prev, [name]: tests }));
-  };
-
-  const tests = {
-      syllabus: async () => {
-          const tests = [];
-          const testId = `diag_topic_${Date.now()}`;
-          try {
-              const start = performance.now();
-              await fetch('/api/manage_syllabus.php', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ id: testId, name: 'Diagnostic Test Topic', chapter: 'Diagnostic Unit', subject: 'Physics' })
-              });
-              tests.push({ description: "should create new topic via API", passed: true, duration: performance.now() - start });
-          } catch(e) {
-              tests.push({ description: "should create new topic via API", passed: false, duration: 0, error: "API Failed" });
-          }
-          try { await fetch(`/api/manage_syllabus.php?id=${testId}`, { method: 'DELETE' }); } catch(e) {}
-          return tests;
-      },
-      studentActions: async () => {
-           const tests = [];
-          const userId = 'diag_test_user';
-          try {
-              const start = performance.now();
-              await fetch('/api/manage_backlogs.php', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ id: `diag_bl_${Date.now()}`, user_id: userId, title: 'Diagnostic Task', subjectId: 'Maths', priority: 'High', status: 'PENDING', deadline: new Date().toISOString().split('T')[0] })
-              });
-              tests.push({ description: "should create backlog entry via API", passed: true, duration: performance.now() - start });
-          } catch(e) {
-              tests.push({ description: "should create backlog entry via API", passed: false, duration: 0, error: "API Error" });
-          }
-          return tests;
-      },
-      aiSystem: async () => {
-          const tests = [];
-          try {
-              const start = performance.now();
-              const res = await fetch(`https://text.pollinations.ai/${encodeURIComponent('Hello')}`);
-              if(res.ok) {
-                  const txt = await res.text();
-                  tests.push({ description: "should connect to Pollinations AI (Free)", passed: !!txt, duration: performance.now() - start });
-              } else {
-                  tests.push({ description: "should connect to Pollinations AI (Free)", passed: false, duration: 0, error: `HTTP ${res.status}` });
-              }
-          } catch(e: any) {
-              tests.push({ description: "should connect to Pollinations AI (Free)", passed: false, duration: 0, error: e.message });
-          }
-          return tests;
-      },
-      longTextStorage: async () => {
-          const tests = [];
-          const userId = 'diag_large_payload';
-          try {
-              const start = performance.now();
-              // Create large dummy payload > 65KB to test LONGTEXT
-              const hugeConfig = { test: 'x'.repeat(70000) }; 
-              const res = await fetch('/api/save_timetable.php', {
-                  method: 'POST',
-                  headers: {'Content-Type': 'application/json'},
-                  body: JSON.stringify({ user_id: userId, config: hugeConfig, slots: [] })
-              });
-              const json = await res.json();
-              if(json.message === 'Saved') {
-                  tests.push({ description: "should save large Master Plan (>65KB)", passed: true, duration: performance.now() - start });
-              } else {
-                  tests.push({ description: "should save large Master Plan (>65KB)", passed: false, duration: 0, error: "Save failed" });
-              }
-          } catch(e: any) {
-              tests.push({ description: "should save large Master Plan (>65KB)", passed: false, duration: 0, error: e.message });
-          }
-          return tests;
-      },
-      notesSystem: async () => {
-          const tests = [];
-          const topicId = 'diag_note_topic';
-          const samplePages = ['<h1>Page 1</h1>', '<p>Page 2</p>'];
-          try {
-              // 1. Create Note
-              let start = performance.now();
-              await fetch('/api/manage_notes.php', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ topicId, pages: samplePages })
-              });
-              tests.push({ description: "should create note via API", passed: true, duration: performance.now() - start });
-
-              // 2. Fetch Note
-              start = performance.now();
-              const res = await fetch('/api/manage_notes.php');
-              const data = await res.json();
-              const note = data[topicId];
-              if (note && note.pages && note.pages.length === 2) {
-                  tests.push({ description: "should retrieve note correctly", passed: true, duration: performance.now() - start });
-              } else {
-                  tests.push({ description: "should retrieve note correctly", passed: false, duration: 0, error: "Note missing or malformed" });
-              }
-
-              // 3. Delete Note
-              start = performance.now();
-              await fetch(`/api/manage_notes.php?topicId=${topicId}`, { method: 'DELETE' });
-              
-              // Verify deletion
-              const res2 = await fetch('/api/manage_notes.php');
-              const data2 = await res2.json();
-              if (!data2[topicId]) {
-                  tests.push({ description: "should delete note via API", passed: true, duration: performance.now() - start });
-              } else {
-                  tests.push({ description: "should delete note via API", passed: false, duration: 0, error: "Delete failed" });
-              }
-
-          } catch(e: any) {
-              tests.push({ description: "should handle note operations", passed: false, duration: 0, error: e.message });
-          }
-          return tests;
-      },
-      psychometricFlow: async () => {
-        const tests = [];
-        const userId = 'diag_psycho_user';
-        try {
-            const start = performance.now();
-            // 1. Save
-            const mockReport = {
-                date: new Date().toISOString(),
-                scores: { "Stress": 50 },
-                overallScore: 75,
-                profileType: "Test User",
-                summary: "Diagnostics Test",
-                insights: [],
-                actionPlan: [],
-                detailedAnalysis: "Diagnostics Detailed Analysis"
-            };
-            await fetch('/api/save_psychometric.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ user_id: userId, report: mockReport })
-            });
-            tests.push({ description: "should save assessment result", passed: true, duration: performance.now() - start });
-
-            // 2. Fetch
-            const start2 = performance.now();
-            const res = await fetch(`/api/get_psychometric.php?user_id=${userId}`);
-            const data = await res.json();
-            if(data && data.report && data.report.profileType === "Test User") {
-                 tests.push({ description: "should retrieve assessment result", passed: true, duration: performance.now() - start2 });
-            } else {
-                 tests.push({ description: "should retrieve assessment result", passed: false, duration: 0, error: "Data mismatch" });
-            }
-        } catch(e: any) {
-            tests.push({ description: "should handle psychometric flow", passed: false, duration: 0, error: e.message });
-        }
-        return tests;
+  // --- Test Runner Utility ---
+  const runTest = async (suiteIndex: number, testName: string, action: () => Promise<any>) => {
+      const start = performance.now();
+      try {
+          const result = await action();
+          const duration = Math.round(performance.now() - start);
+          setSuites(prev => {
+              const newSuites = [...prev];
+              newSuites[suiteIndex].tests.push({ name: testName, passed: true, duration, details: result });
+              return newSuites;
+          });
+          return result;
+      } catch (e: any) {
+          const duration = Math.round(performance.now() - start);
+          setSuites(prev => {
+              const newSuites = [...prev];
+              newSuites[suiteIndex].tests.push({ name: testName, passed: false, duration, error: e.message });
+              return newSuites;
+          });
+          throw e; // Re-throw to stop dependent tests if needed
       }
   };
 
-  const suites: [string, any[]][] = [
-      ...Object.entries(results), 
-      ["20. [Admin] Syllabus Management", dynamicResults['syllabus'] || []],
-      ["21. [Student] Action Verification", dynamicResults['studentActions'] || []],
-      ["22. [AI] System Connectivity", dynamicResults['aiSystem'] || []],
-      ["23. [DB] Large Data Storage", dynamicResults['longTextStorage'] || []],
-      ["24. [Content] Notes System", dynamicResults['notesSystem'] || []],
-      ["25. [Module] Psychometric Test", dynamicResults['psychometricFlow'] || []]
-  ];
-
-  const handleStartScan = async () => {
-      setScanStatus('RUNNING');
-      setScanIndex(0);
-      setDynamicResults({});
-      
-      const staticCount = Object.keys(results).length;
-      let currentStep = 0;
-      
-      const interval = setInterval(async () => {
-          if (currentStep >= staticCount) { 
-              clearInterval(interval);
-              
-              // Run dynamic tests sequentially
-              setScanIndex(staticCount); 
-              await performTest('syllabus', tests.syllabus);
-              
-              setScanIndex(staticCount + 1);
-              await performTest('studentActions', tests.studentActions);
-
-              setScanIndex(staticCount + 2);
-              await performTest('aiSystem', tests.aiSystem);
-
-              setScanIndex(staticCount + 3);
-              await performTest('longTextStorage', tests.longTextStorage);
-
-              setScanIndex(staticCount + 4);
-              await performTest('notesSystem', tests.notesSystem);
-
-              setScanIndex(staticCount + 5);
-              await performTest('psychometricFlow', tests.psychometricFlow);
-              
-              setScanStatus('COMPLETE');
-          } else {
-              setScanIndex(prev => prev + 1);
-              currentStep++;
-          }
-      }, 150); 
+  const fetchAPI = async (url: string, options?: RequestInit) => {
+      const res = await fetch(url, options);
+      const text = await res.text();
+      try {
+          const json = JSON.parse(text);
+          if (!res.ok) throw new Error(json.message || json.error || `HTTP ${res.status}`);
+          return json;
+      } catch (e) {
+          if (!res.ok) throw new Error(`HTTP ${res.status}: ${text.substring(0, 100)}`);
+          return text; // Return text if valid HTML/String
+      }
   };
 
-  // Stats calculation
-  const staticTestsCount = Object.values(results).flat().length;
-  const dynamicTestsCount = Object.values(dynamicResults).flat().length;
-  const totalTests = staticTestsCount + dynamicTestsCount;
-  
-  const passedStatic = Object.values(results).flat().filter((t:any) => t.passed).length;
-  const passedDynamic = Object.values(dynamicResults).flat().filter((t:any) => t.passed).length;
-  
-  const passRate = totalTests > 0 ? Math.round(((passedStatic + passedDynamic) / totalTests) * 100) : 100;
+  const executeDiagnostics = async () => {
+      setIsRunning(true);
+      
+      // Reset Tests
+      setSuites(prev => prev.map(s => ({ ...s, tests: [], status: 'PENDING' })));
+      
+      let userId = '';
+      let topicId = `${SESSION_ID}_topic`;
+      let flashcardId = 0;
+      let goalId = `${SESSION_ID}_goal`;
+      let backlogId = `${SESSION_ID}_bl`;
+      let mistakeId = `${SESSION_ID}_mst`;
+
+      try {
+          // --- SUITE 0: INFRASTRUCTURE ---
+          setSuites(p => { p[0].status = 'RUNNING'; return [...p]; });
+          
+          await runTest(0, "Ping API Root", async () => {
+              const res = await fetchAPI('/api/index.php');
+              if (res.status !== 'active') throw new Error("API status not active");
+              return res;
+          });
+
+          await runTest(0, "Check DB Config", async () => {
+              const res = await fetchAPI('/api/test_db.php');
+              if (res.status !== 'CONNECTED') throw new Error(res.message);
+              return res;
+          });
+          
+          setSuites(p => { p[0].status = 'COMPLETED'; return [...p]; });
+
+
+          // --- SUITE 1: AUTHENTICATION ---
+          setSuites(p => { p[1].status = 'RUNNING'; return [...p]; });
+
+          await runTest(1, "Register Test User", async () => {
+              const res = await fetchAPI('/api/register.php', {
+                  method: 'POST',
+                  body: JSON.stringify({ ...TEST_USER, role: 'STUDENT', targetExam: 'JEE', targetYear: 2025 })
+              });
+              if (!res.user?.id) throw new Error("No User ID returned");
+              userId = res.user.id;
+              return res;
+          });
+
+          await runTest(1, "Login Test User", async () => {
+              const res = await fetchAPI('/api/login.php', {
+                  method: 'POST',
+                  body: JSON.stringify({ email: TEST_USER.email, password: TEST_USER.password })
+              });
+              if (res.user.email !== TEST_USER.email) throw new Error("Email mismatch");
+              return res;
+          });
+
+          setSuites(p => { p[1].status = 'COMPLETED'; return [...p]; });
+
+
+          // --- SUITE 2: CONTENT ENGINE ---
+          setSuites(p => { p[2].status = 'RUNNING'; return [...p]; });
+
+          await runTest(2, "Create Flashcard", async () => {
+              const res = await fetchAPI('/api/manage_content.php?type=flashcard', {
+                  method: 'POST',
+                  body: JSON.stringify({ type: 'flashcard', front: `Q_${SESSION_ID}`, back: `A_${SESSION_ID}` })
+              });
+              // API doesn't return ID on create, so we verify by listing
+              return res;
+          });
+
+          await runTest(2, "Verify Flashcard Exists", async () => {
+              const res = await fetchAPI('/api/manage_content.php?type=flashcards');
+              const found = res.find((f: any) => f.front === `Q_${SESSION_ID}`);
+              if (!found) throw new Error("Created flashcard not found in DB");
+              flashcardId = found.id;
+              return found;
+          });
+
+          await runTest(2, "Delete Flashcard", async () => {
+              if(!flashcardId) throw new Error("No ID to delete");
+              return await fetchAPI(`/api/manage_content.php?type=flashcard&id=${flashcardId}`, { method: 'DELETE' });
+          });
+
+          setSuites(p => { p[2].status = 'COMPLETED'; return [...p]; });
+
+
+          // --- SUITE 3: ACADEMIC CORE ---
+          setSuites(p => { p[3].status = 'RUNNING'; return [...p]; });
+
+          await runTest(3, "Create Custom Topic", async () => {
+              return await fetchAPI('/api/manage_syllabus.php', {
+                  method: 'POST',
+                  body: JSON.stringify({ id: topicId, name: 'Diag Topic', chapter: 'Diag Chapter', subject: 'Physics' })
+              });
+          });
+
+          await runTest(3, "Sync Progress", async () => {
+              return await fetchAPI('/api/sync_progress.php', {
+                  method: 'POST',
+                  body: JSON.stringify({ user_id: userId, topic_id: topicId, status: 'IN_PROGRESS', revisionLevel: 1 })
+              });
+          });
+
+          await runTest(3, "Verify Dashboard Data", async () => {
+              const res = await fetchAPI(`/api/get_dashboard.php?user_id=${userId}`);
+              const prog = res.progress.find((p: any) => p.topic_id === topicId);
+              if (!prog || prog.status !== 'IN_PROGRESS') throw new Error("Progress sync failed");
+              return prog;
+          });
+
+          setSuites(p => { p[3].status = 'COMPLETED'; return [...p]; });
+
+
+          // --- SUITE 4: PRODUCTIVITY TOOLS ---
+          setSuites(p => { p[4].status = 'RUNNING'; return [...p]; });
+
+          // Goals
+          await runTest(4, "Create Goal", async () => {
+              return await fetchAPI('/api/manage_goals.php', {
+                  method: 'POST',
+                  body: JSON.stringify({ id: goalId, user_id: userId, text: "Test Goal" })
+              });
+          });
+
+          await runTest(4, "Toggle Goal", async () => {
+              return await fetchAPI('/api/manage_goals.php', {
+                  method: 'PUT',
+                  body: JSON.stringify({ id: goalId, completed: true })
+              });
+          });
+
+          // Backlogs
+          await runTest(4, "Create Backlog", async () => {
+              return await fetchAPI('/api/manage_backlogs.php', {
+                  method: 'POST',
+                  body: JSON.stringify({ id: backlogId, user_id: userId, title: "Test Backlog", subject: 'Maths', priority: 'High', status: 'PENDING', deadline: '2025-01-01' })
+              });
+          });
+
+          // Mistakes
+          await runTest(4, "Log Mistake", async () => {
+              return await fetchAPI('/api/manage_mistakes.php', {
+                  method: 'POST',
+                  body: JSON.stringify({ id: mistakeId, user_id: userId, question: "Why?", subject: "Physics", note: "Because" })
+              });
+          });
+
+          // Verify All
+          await runTest(4, "Verify All Productivity Data", async () => {
+              const res = await fetchAPI(`/api/get_dashboard.php?user_id=${userId}`);
+              const g = res.goals.find((x: any) => x.id === goalId);
+              const b = res.backlogs.find((x: any) => x.id === backlogId);
+              const m = res.mistakes.find((x: any) => x.id === mistakeId);
+              
+              if(!g) throw new Error("Goal missing");
+              if(g.completed != 1) throw new Error("Goal toggle failed");
+              if(!b) throw new Error("Backlog missing");
+              if(!m) throw new Error("Mistake missing");
+              return { g, b, m };
+          });
+
+          setSuites(p => { p[4].status = 'COMPLETED'; return [...p]; });
+
+
+          // --- SUITE 5: SYSTEM & AI ---
+          setSuites(p => { p[5].status = 'RUNNING'; return [...p]; });
+
+          await runTest(5, "Fetch System Settings", async () => {
+              const res = await fetchAPI('/api/manage_settings.php?key=total_visits');
+              return res;
+          });
+
+          await runTest(5, "Track Analytics Visit", async () => {
+              return await fetchAPI('/api/track_visit.php');
+          });
+
+          setSuites(p => { p[5].status = 'COMPLETED'; return [...p]; });
+
+
+          // --- SUITE 6: CLEANUP ---
+          setSuites(p => { p[6].status = 'RUNNING'; return [...p]; });
+
+          await runTest(6, "Delete Test Topic", async () => {
+              return await fetchAPI(`/api/manage_syllabus.php?id=${topicId}`, { method: 'DELETE' });
+          });
+
+          await runTest(6, "Delete Test Goal", async () => {
+              return await fetchAPI(`/api/manage_goals.php?id=${goalId}`, { method: 'DELETE' });
+          });
+
+          await runTest(6, "Delete Test Backlog", async () => {
+              return await fetchAPI(`/api/manage_backlogs.php?id=${backlogId}`, { method: 'DELETE' });
+          });
+
+          await runTest(6, "Delete Test Mistake", async () => {
+              return await fetchAPI(`/api/manage_mistakes.php?id=${mistakeId}`, { method: 'DELETE' });
+          });
+
+          await runTest(6, "Delete Test User (CASCADE)", async () => {
+              return await fetchAPI(`/api/manage_users.php?id=${userId}`, { method: 'DELETE' });
+          });
+
+          setSuites(p => { p[6].status = 'COMPLETED'; return [...p]; });
+
+      } catch (e) {
+          console.error("Diagnostic Sequence Halted", e);
+      } finally {
+          setIsRunning(false);
+      }
+  };
 
   return (
-    <div className="space-y-8 pb-12">
+    <div className="space-y-8 pb-12 font-mono">
       
       {/* Live Database Inspector Section */}
-      <div className="bg-white rounded-2xl border border-blue-200 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl border border-blue-200 shadow-sm overflow-hidden font-sans">
           <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-6 text-white flex justify-between items-center">
               <div>
                   <h3 className="text-xl font-bold flex items-center gap-2">
@@ -376,20 +344,6 @@ export const DiagnosticsScreen: React.FC = () => {
           </div>
 
           <div className="p-6 bg-slate-50 min-h-[160px]">
-              {!dbStatus && !loadingDb && (
-                  <div className="flex flex-col items-center justify-center h-32 text-slate-400">
-                      <Database className="w-10 h-10 mb-2 opacity-50" />
-                      <p className="text-sm font-medium">Ready to scan database.</p>
-                  </div>
-              )}
-
-              {loadingDb && (
-                  <div className="flex flex-col items-center justify-center h-32 text-blue-500 animate-pulse">
-                      <RefreshCw className="w-8 h-8 mb-2 animate-spin" />
-                      <p className="font-bold text-sm">Connecting to Database...</p>
-                  </div>
-              )}
-
               {dbStatus && (
                   <div className="animate-in fade-in">
                       <div className="flex items-center gap-4 mb-6 pb-4 border-b border-slate-200">
@@ -400,101 +354,30 @@ export const DiagnosticsScreen: React.FC = () => {
                               <h4 className={`text-lg font-bold ${dbStatus.status === 'CONNECTED' ? 'text-slate-800' : 'text-red-700'}`}>
                                   {dbStatus.status === 'CONNECTED' ? 'Database Connected Successfully' : 'Connection Failed'}
                               </h4>
-                              
                               <div className="flex flex-wrap gap-x-6 gap-y-1 mt-2 text-xs text-slate-600 font-mono">
-                                  {dbStatus.db_host && (
-                                      <p className="flex items-center">
-                                          <Globe className="w-3 h-3 mr-1 text-slate-400" /> Host: <strong className="ml-1 text-slate-800">{dbStatus.db_host}</strong>
-                                      </p>
-                                  )}
-                                  {dbStatus.db_name && (
-                                      <p className="flex items-center">
-                                          <Database className="w-3 h-3 mr-1 text-slate-400" /> Database: <strong className="ml-1 text-slate-800">{dbStatus.db_name}</strong>
-                                      </p>
-                                  )}
-                                  {dbStatus.server_info && (
-                                      <p className="flex items-center">
-                                          <Server className="w-3 h-3 mr-1 text-slate-400" /> Ver: {dbStatus.server_info}
-                                      </p>
-                                  )}
+                                  {dbStatus.db_host && <p className="flex items-center"><Globe className="w-3 h-3 mr-1 text-slate-400" /> Host: <strong className="ml-1 text-slate-800">{dbStatus.db_host}</strong></p>}
+                                  {dbStatus.db_name && <p className="flex items-center"><Database className="w-3 h-3 mr-1 text-slate-400" /> Database: <strong className="ml-1 text-slate-800">{dbStatus.db_name}</strong></p>}
+                                  {dbStatus.server_info && <p className="flex items-center"><Server className="w-3 h-3 mr-1 text-slate-400" /> Ver: {dbStatus.server_info}</p>}
                               </div>
                               {dbStatus.message && <p className="text-sm text-red-600 mt-2 font-bold">{dbStatus.message}</p>}
                           </div>
                       </div>
 
                       {dbStatus.tables && (
-                          <div>
-                              <h5 className="text-xs font-bold text-slate-500 uppercase mb-3 flex items-center">
-                                  <Table className="w-3 h-3 mr-2" /> Schema Validation
-                              </h5>
-                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
-                                  {REQUIRED_SCHEMA.map((tableName) => {
-                                      const existing = dbStatus.tables.find((t: any) => t.name === tableName);
-                                      return (
-                                          <div key={tableName} className={`p-3 rounded-lg border flex justify-between items-center text-sm ${existing ? 'bg-white border-slate-200' : 'bg-red-50 border-red-200'}`}>
-                                              <span className={`font-bold ${existing ? 'text-slate-700' : 'text-red-700'}`}>{tableName}</span>
-                                              {existing ? (
-                                                  <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded text-xs font-bold border border-blue-100">
-                                                      {existing.rows} Rows
-                                                  </span>
-                                              ) : (
-                                                  <span className="bg-red-100 text-red-700 px-2 py-0.5 rounded text-xs font-bold flex items-center">
-                                                      <AlertCircle className="w-3 h-3 mr-1"/> MISSING
-                                                  </span>
-                                              )}
-                                          </div>
-                                      );
-                                  })}
-                                  {/* Also show extra tables if any */}
-                                  {dbStatus.tables.filter((t: any) => !REQUIRED_SCHEMA.includes(t.name)).map((t: any) => (
-                                       <div key={t.name} className="p-3 rounded-lg border bg-slate-50 border-slate-200 flex justify-between items-center text-sm opacity-60">
-                                          <span className="font-bold text-slate-600">{t.name} (Extra)</span>
-                                          <span className="text-xs font-mono">{t.rows} Rows</span>
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
+                              {REQUIRED_SCHEMA.map((tableName) => {
+                                  const existing = dbStatus.tables.find((t: any) => t.name === tableName);
+                                  return (
+                                      <div key={tableName} className={`p-3 rounded-lg border flex justify-between items-center text-sm ${existing ? 'bg-white border-slate-200' : 'bg-red-50 border-red-200'}`}>
+                                          <span className={`font-bold ${existing ? 'text-slate-700' : 'text-red-700'}`}>{tableName}</span>
+                                          {existing ? (
+                                              <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded text-xs font-bold border border-blue-100">{existing.rows} Rows</span>
+                                          ) : (
+                                              <span className="bg-red-100 text-red-700 px-2 py-0.5 rounded text-xs font-bold flex items-center"><AlertCircle className="w-3 h-3 mr-1"/> MISSING</span>
+                                          )}
                                       </div>
-                                  ))}
-                              </div>
-                          </div>
-                      )}
-
-                      {/* Content Coverage Section */}
-                      {dbStatus.content_stats && dbStatus.content_stats.length > 0 && (
-                          <div className="mt-6 border-t border-slate-200 pt-6">
-                              <h5 className="text-xs font-bold text-slate-500 uppercase mb-3 flex items-center">
-                                  <FileText className="w-3 h-3 mr-2" /> Content Coverage Audit
-                              </h5>
-                              <div className="overflow-x-auto bg-white border border-slate-200 rounded-lg shadow-sm">
-                                  <table className="w-full text-sm text-left">
-                                      <thead className="text-xs text-slate-500 uppercase bg-slate-100 border-b border-slate-200">
-                                          <tr>
-                                              <th className="px-4 py-3">Subject</th>
-                                              <th className="px-4 py-3">Topic</th>
-                                              <th className="px-4 py-3 text-center">Questions</th>
-                                              <th className="px-4 py-3 text-center">Notes</th>
-                                          </tr>
-                                      </thead>
-                                      <tbody className="divide-y divide-slate-100">
-                                          {dbStatus.content_stats.map((item: any, idx: number) => (
-                                              <tr key={idx} className="hover:bg-slate-50">
-                                                  <td className="px-4 py-2 font-bold text-slate-600 text-xs">{item.subject}</td>
-                                                  <td className="px-4 py-2 text-slate-800 font-medium">{item.topic}</td>
-                                                  <td className="px-4 py-2 text-center">
-                                                      <span className={`px-2 py-0.5 rounded text-xs font-bold ${item.question_count > 0 ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-400'}`}>
-                                                          {item.question_count}
-                                                      </span>
-                                                  </td>
-                                                  <td className="px-4 py-2 text-center">
-                                                      <span className={`px-2 py-0.5 rounded text-xs font-bold ${item.note_count > 0 ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-400'}`}>
-                                                          {item.note_count > 0 ? 'Yes' : 'No'}
-                                                      </span>
-                                                  </td>
-                                              </tr>
-                                          ))}
-                                      </tbody>
-                                  </table>
-                              </div>
-                              <p className="text-xs text-slate-400 mt-2 text-right">
-                                  Only topics with content (questions or notes) are listed here.
-                              </p>
+                                  );
+                              })}
                           </div>
                       )}
                   </div>
@@ -502,135 +385,94 @@ export const DiagnosticsScreen: React.FC = () => {
           </div>
       </div>
 
-      {/* System Health Check Header */}
-      <div className="bg-slate-900 text-white rounded-2xl p-8 shadow-xl flex flex-col md:flex-row justify-between items-center gap-6">
-         <div>
-            <h2 className="text-2xl font-bold flex items-center gap-3">
-               <Terminal className="w-8 h-8 text-green-400" /> System Health Check
-            </h2>
-            <p className="text-slate-400 mt-2 max-w-xl">
-               Run a comprehensive validation suite to ensure all subsystems (Auth, API, Content, Logic) are operational.
-            </p>
-         </div>
-         
-         <div className="flex gap-4 items-center">
-            {scanStatus === 'COMPLETE' && (
-                <div className="flex gap-4 mr-4 border-r border-slate-700 pr-6">
-                    <div className="text-center">
-                        <div className="text-2xl font-bold text-green-400">{passRate}%</div>
-                        <div className="text-[10px] font-bold text-slate-500 uppercase">Pass Rate</div>
-                    </div>
-                    <div className="text-center">
-                        <div className="text-2xl font-bold text-white">{totalTests}</div>
-                        <div className="text-[10px] font-bold text-slate-500 uppercase">Tests Run</div>
-                    </div>
-                </div>
-            )}
-            
-            <button 
-                onClick={handleStartScan}
-                disabled={scanStatus === 'RUNNING'}
-                className="bg-green-600 hover:bg-green-50 text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-green-900/20 flex items-center transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-                {scanStatus === 'RUNNING' ? <Loader2 className="w-5 h-5 mr-2 animate-spin"/> : <Play className="w-5 h-5 mr-2"/>} 
-                {scanStatus === 'RUNNING' ? 'Scanning...' : scanStatus === 'COMPLETE' ? 'Re-Run Scan' : 'Start Full Scan'}
-            </button>
-         </div>
-      </div>
-
-      {/* Test Suites Grid */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-        {suites.map(([category, tests], idx) => {
-           const isPending = scanStatus === 'IDLE' || idx > scanIndex;
-           const isRunning = scanStatus === 'RUNNING' && idx === scanIndex;
-           const isComplete = (scanStatus === 'RUNNING' && idx < scanIndex) || (scanStatus === 'COMPLETE');
-           const showDetails = isComplete;
-           const isSuitePassed = Array.isArray(tests) && tests.every(t => t.passed);
-           const totalDuration = Array.isArray(tests) ? tests.reduce((acc, t) => acc + (t.duration || 0), 0) : 0;
-           
-           return (
-             <div 
-                key={category} 
-                className={`bg-white rounded-xl border overflow-hidden shadow-sm transition-all duration-300
-                    ${isPending ? 'opacity-60 border-slate-200' : ''}
-                    ${isRunning ? 'border-blue-400 ring-2 ring-blue-100 opacity-100 scale-[1.01]' : ''}
-                    ${showDetails ? (isSuitePassed ? 'border-slate-200' : 'border-red-200 ring-1 ring-red-50') : ''}
-                `}
-             >
-                {/* Suite Header */}
-                <div className={`px-4 py-3 border-b flex justify-between items-center 
-                    ${isPending ? 'bg-slate-50 border-slate-100' : ''}
-                    ${isRunning ? 'bg-blue-50 border-blue-100' : ''}
-                    ${showDetails ? (isSuitePassed ? 'bg-slate-50 border-slate-100' : 'bg-red-50 border-red-100') : ''}
-                `}>
-                   <h3 className={`font-bold text-sm flex items-center gap-2
-                       ${isPending ? 'text-slate-400' : ''}
-                       ${isRunning ? 'text-blue-700' : ''}
-                       ${showDetails ? (isSuitePassed ? 'text-slate-700' : 'text-red-800') : ''}
-                   `}>
-                      {isRunning && <Loader2 className="w-3 h-3 animate-spin" />}
-                      {category}
-                   </h3>
-                   
-                   <div className="flex items-center gap-3">
-                      {showDetails && (
-                          <span className="text-xs font-mono text-slate-400">
-                             {totalDuration.toFixed(0)}ms
-                          </span>
-                      )}
-                      
-                      <span className={`text-[10px] font-extrabold px-2 py-1 rounded uppercase tracking-wider border
-                         ${isPending ? 'bg-slate-100 text-slate-400 border-slate-200' : ''}
-                         ${isRunning ? 'bg-blue-100 text-blue-700 border-blue-200' : ''}
-                         ${showDetails ? (isSuitePassed ? 'bg-green-100 text-green-700 border-green-200' : 'bg-red-100 text-red-700 border-red-200') : ''}
-                      `}>
-                         {isPending ? 'WAITING' : isRunning ? 'RUNNING' : isSuitePassed ? 'PASS' : 'FAIL'}
-                      </span>
-                   </div>
-                </div>
-
-                {/* Individual Tests List */}
-                <div className="divide-y divide-slate-50">
-                   {(Array.isArray(tests) ? tests : []).map((test: any, i: number) => (
-                      <div key={i} className={`p-3 flex items-start gap-3 transition-colors ${!test.passed && showDetails ? 'bg-red-50/30' : ''}`}>
-                         <div className="mt-0.5 shrink-0">
-                            {isPending ? (
-                                <div className="w-4 h-4 rounded-full border border-slate-300 bg-slate-50"></div>
-                            ) : isRunning ? (
-                                <div className="w-4 h-4 rounded-full border-2 border-blue-400 border-t-transparent animate-spin"></div>
-                            ) : (
-                                test.passed 
-                                  ? <CheckCircle2 className="w-4 h-4 text-green-500" />
-                                  : <XCircle className="w-4 h-4 text-red-500" />
-                            )}
-                         </div>
-                         
-                         <div className="flex-1 min-w-0">
-                            <p className={`text-sm truncate ${isPending ? 'text-slate-400' : test.passed ? 'text-slate-600' : 'text-red-700 font-medium'}`}>
-                               {test.description}
-                            </p>
-                            
-                            {showDetails && test.error && (
-                               <div className="mt-2 text-xs text-red-600 font-mono bg-red-50 p-2 rounded border border-red-100 break-all">
-                                  Error: {test.error}
-                               </div>
-                            )}
-                         </div>
-
-                         {showDetails && (
-                             <span className={`text-xs font-mono shrink-0 ${test.duration > 100 ? 'text-orange-400' : 'text-slate-300'}`}>
-                                {Math.round(test.duration)}ms
-                             </span>
-                         )}
-                      </div>
-                   ))}
-                   {Array.isArray(tests) && tests.length === 0 && (
-                       <div className="p-4 text-center text-slate-400 text-xs italic">Waiting to run dynamic tests...</div>
-                   )}
-                </div>
+      {/* Main Execution Terminal */}
+      <div className="bg-slate-900 text-white rounded-2xl shadow-xl overflow-hidden font-sans">
+         <div className="p-6 border-b border-slate-800 flex justify-between items-center">
+             <div>
+                <h2 className="text-2xl font-bold flex items-center gap-3">
+                   <Terminal className="w-8 h-8 text-green-400" /> System Integrity Check
+                </h2>
+                <p className="text-slate-400 mt-1 max-w-xl text-sm">
+                   Executes strict CRUD operations against the live API. No mocks. 
+                   <span className="text-orange-400 ml-1">Warning: Creates and deletes test data.</span>
+                </p>
              </div>
-           );
-        })}
+             
+             <button 
+                onClick={executeDiagnostics}
+                disabled={isRunning}
+                className="bg-green-600 hover:bg-green-500 text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-green-900/20 flex items-center transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+             >
+                {isRunning ? <Loader2 className="w-5 h-5 mr-2 animate-spin"/> : <Play className="w-5 h-5 mr-2"/>} 
+                {isRunning ? 'Running Tests...' : 'Run Full Diagnostic'}
+             </button>
+         </div>
+
+         <div className="p-6 space-y-6">
+             {suites.map((suite, idx) => (
+                 <div key={idx} className={`border rounded-xl overflow-hidden transition-all duration-300 ${
+                     suite.status === 'PENDING' ? 'border-slate-800 bg-slate-800/30' : 
+                     suite.status === 'RUNNING' ? 'border-blue-500 bg-blue-900/10 ring-1 ring-blue-500' :
+                     suite.tests.some(t => !t.passed) ? 'border-red-500/50 bg-red-900/10' : 'border-green-500/30 bg-green-900/10'
+                 }`}>
+                     <div className="px-4 py-3 bg-slate-800/50 flex justify-between items-center">
+                         <div className="flex items-center gap-3">
+                             <div className={`w-2 h-2 rounded-full ${
+                                 suite.status === 'PENDING' ? 'bg-slate-600' :
+                                 suite.status === 'RUNNING' ? 'bg-blue-400 animate-pulse' :
+                                 suite.tests.some(t => !t.passed) ? 'bg-red-500' : 'bg-green-500'
+                             }`}></div>
+                             <h3 className="font-bold text-slate-200">{suite.name}</h3>
+                             <span className="text-xs text-slate-500 border-l border-slate-700 pl-3">{suite.description}</span>
+                         </div>
+                         <div className="text-xs font-mono text-slate-400">
+                             {suite.status === 'COMPLETED' ? (
+                                 <span className={suite.tests.some(t => !t.passed) ? 'text-red-400' : 'text-green-400'}>
+                                     {suite.tests.filter(t => t.passed).length}/{suite.tests.length} PASS
+                                 </span>
+                             ) : suite.status}
+                         </div>
+                     </div>
+                     
+                     {suite.tests.length > 0 && (
+                         <div className="divide-y divide-slate-800/50">
+                             {suite.tests.map((test, tIdx) => (
+                                 <div key={tIdx} className="px-4 py-2 flex flex-col hover:bg-white/5 transition-colors">
+                                     <div className="flex justify-between items-center cursor-pointer" onClick={() => setExpandedError(expandedError === `${idx}-${tIdx}` ? null : `${idx}-${tIdx}`)}>
+                                         <div className="flex items-center gap-3">
+                                             {test.passed ? <CheckCircle2 className="w-4 h-4 text-green-500" /> : <XCircle className="w-4 h-4 text-red-500" />}
+                                             <span className={`text-sm ${test.passed ? 'text-slate-300' : 'text-red-300 font-bold'}`}>{test.name}</span>
+                                         </div>
+                                         <div className="flex items-center gap-4">
+                                             <span className="text-xs font-mono text-slate-500">{test.duration}ms</span>
+                                             {(test.error || test.details) && (
+                                                 <ChevronDown className={`w-4 h-4 text-slate-500 transition-transform ${expandedError === `${idx}-${tIdx}` ? 'rotate-180' : ''}`} />
+                                             )}
+                                         </div>
+                                     </div>
+                                     
+                                     {expandedError === `${idx}-${tIdx}` && (
+                                         <div className="mt-2 p-3 bg-black/50 rounded-lg text-xs font-mono overflow-x-auto border border-slate-700">
+                                             {test.error && (
+                                                 <div className="text-red-400 mb-2">
+                                                     <strong>ERROR:</strong> {test.error}
+                                                 </div>
+                                             )}
+                                             {test.details && (
+                                                 <div className="text-green-300">
+                                                     <strong>RESPONSE PAYLOAD:</strong>
+                                                     <pre className="mt-1 opacity-80">{JSON.stringify(test.details, null, 2)}</pre>
+                                                 </div>
+                                             )}
+                                         </div>
+                                     )}
+                                 </div>
+                             ))}
+                         </div>
+                     )}
+                 </div>
+             ))}
+         </div>
       </div>
     </div>
   );

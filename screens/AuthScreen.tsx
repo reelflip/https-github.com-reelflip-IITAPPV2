@@ -875,7 +875,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate, ena
                                     <input 
                                         id="confirmPassword"
                                         type="password" 
-                                        placeholder="Re-enter password"
+                                        placeholder="Repeat password"
                                         className="w-full pl-12 pr-4 py-3 border border-slate-200 rounded-xl text-sm text-slate-700 focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all placeholder:text-slate-400"
                                         value={formData.confirmPassword}
                                         onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})}
@@ -885,161 +885,103 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate, ena
                             </div>
                         )}
 
-                        {/* Account Recovery Setup (Register Only) */}
+                        {/* Security Question (Register Only) */}
                         {view === 'REGISTER' && (
-                            <div className="bg-blue-50 rounded-xl p-4 border border-blue-100 mt-2">
-                                <div className="flex items-center space-x-2 mb-3">
-                                    <Shield className="w-4 h-4 text-blue-600" />
-                                    <h4 className="text-xs font-bold text-blue-800 uppercase">Account Recovery Setup</h4>
+                            <div className="grid grid-cols-1 gap-3">
+                                <div className="space-y-1">
+                                    <label htmlFor="secQuestion" className="text-[10px] font-bold text-slate-400 uppercase tracking-wide ml-1">Security Question</label>
+                                    <div className="relative">
+                                        <Shield className="absolute left-4 top-3.5 text-slate-400 w-4 h-4 z-10" />
+                                        <select 
+                                            id="secQuestion"
+                                            className="w-full pl-10 pr-8 py-3 border border-slate-200 rounded-xl text-sm text-slate-700 focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none appearance-none bg-white transition-all"
+                                            value={formData.securityQuestion}
+                                            onChange={(e) => setFormData({...formData, securityQuestion: e.target.value})}
+                                        >
+                                            <option>What is the name of your first pet?</option>
+                                            <option>What is your mother's maiden name?</option>
+                                            <option>What was the name of your first school?</option>
+                                            <option>What is your favorite food?</option>
+                                        </select>
+                                        <ChevronDown className="absolute right-4 top-3.5 text-slate-400 w-4 h-4 pointer-events-none" />
+                                    </div>
                                 </div>
-                                
-                                <div className="space-y-3">
-                                    <div className="space-y-1">
-                                        <label htmlFor="securityQuestion" className="text-[10px] font-bold text-slate-400 uppercase ml-1">Security Question</label>
-                                        <div className="relative">
-                                            <HelpCircle className="absolute left-3 top-2.5 text-slate-400 w-4 h-4" />
-                                            <select 
-                                                id="securityQuestion"
-                                                className="w-full pl-9 pr-2 py-2 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:border-blue-400 bg-white"
-                                                value={formData.securityQuestion}
-                                                onChange={(e) => setFormData({...formData, securityQuestion: e.target.value})}
-                                            >
-                                                <option>What is the name of your first pet?</option>
-                                                <option>What is your mother's maiden name?</option>
-                                                <option>What was your childhood nickname?</option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                    
-                                    <div className="space-y-1">
-                                        <label htmlFor="securityAnswer" className="text-[10px] font-bold text-slate-400 uppercase ml-1">Answer</label>
-                                        <input 
-                                            id="securityAnswer"
-                                            type="text" 
-                                            placeholder="e.g. Fluffy"
-                                            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:border-blue-400 bg-white"
-                                            value={formData.securityAnswer}
-                                            onChange={(e) => setFormData({...formData, securityAnswer: e.target.value})}
-                                        />
-                                    </div>
+                                <div className="space-y-1">
+                                    <label htmlFor="secAnswer" className="text-[10px] font-bold text-slate-400 uppercase tracking-wide ml-1">Answer</label>
+                                    <input 
+                                        id="secAnswer"
+                                        type="text" 
+                                        placeholder="Your answer"
+                                        className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm text-slate-700 focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all"
+                                        value={formData.securityAnswer}
+                                        onChange={(e) => setFormData({...formData, securityAnswer: e.target.value})}
+                                        required
+                                    />
                                 </div>
                             </div>
                         )}
 
-                        {/* Submit Button */}
+                        {error && (
+                            <div className="p-3 bg-red-50 border border-red-100 rounded-lg flex items-start gap-2">
+                                <AlertCircle className="w-4 h-4 text-red-500 mt-0.5 shrink-0" />
+                                <p className="text-xs text-red-600">{error}</p>
+                            </div>
+                        )}
+
+                        {successMessage && (
+                            <div className="p-3 bg-green-50 border border-green-100 rounded-lg flex items-start gap-2">
+                                <CheckCircle2 className="w-4 h-4 text-green-500 mt-0.5 shrink-0" />
+                                <p className="text-xs text-green-600">{successMessage}</p>
+                            </div>
+                        )}
+
                         <button 
                             type="submit" 
                             disabled={isLoading}
-                            className="w-full bg-blue-600 text-white font-bold py-3.5 rounded-xl hover:bg-blue-700 active:bg-blue-800 transition-all shadow-lg shadow-blue-200/50 flex items-center justify-center space-x-2 group mt-4 disabled:opacity-70 disabled:cursor-not-allowed"
+                            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-blue-200 transition-all active:scale-95 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
                         >
-                            {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
-                                <>
-                                    <span>{view === 'REGISTER' ? 'Create Account' : 'Sign In'}</span>
-                                    <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" strokeWidth={3} />
-                                </>
-                            )}
+                            {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : (view === 'REGISTER' ? 'Create Account' : 'Sign In')}
+                            {!isLoading && <ArrowRight className="w-4 h-4" />}
                         </button>
                     </form>
                 )}
 
-                {/* Status Messages */}
-                {successMessage && (
-                    <div className="flex items-center text-green-700 text-xs bg-green-50 p-3 rounded-lg border border-green-200 animate-in fade-in slide-in-from-top-1">
-                        <CheckCircle2 className="w-4 h-4 mr-2 shrink-0" />
-                        {successMessage}
+                {/* DEMO LOGIN SECTION */}
+                {window.IITJEE_CONFIG?.enableDevTools && (
+                    <div className="mt-8 pt-6 border-t border-slate-200">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center mb-4">
+                            Developer Quick Access
+                        </p>
+                        <div className="grid grid-cols-3 gap-3">
+                            <button 
+                                onClick={() => handleQuickLogin('STUDENT')} 
+                                className="flex flex-col items-center justify-center p-3 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-colors border border-blue-100"
+                            >
+                                <UserIcon className="w-5 h-5 mb-1" />
+                                <span className="text-[10px] font-bold uppercase">Student</span>
+                            </button>
+                            <button 
+                                onClick={() => handleQuickLogin('PARENT')} 
+                                className="flex flex-col items-center justify-center p-3 bg-orange-50 text-orange-600 rounded-xl hover:bg-orange-100 transition-colors border border-orange-100"
+                            >
+                                <Users className="w-5 h-5 mb-1" />
+                                <span className="text-[10px] font-bold uppercase">Parent</span>
+                            </button>
+                            <button 
+                                onClick={() => handleQuickLogin('ADMIN')} 
+                                className="flex flex-col items-center justify-center p-3 bg-purple-50 text-purple-600 rounded-xl hover:bg-purple-100 transition-colors border border-purple-100"
+                            >
+                                <Shield className="w-5 h-5 mb-1" />
+                                <span className="text-[10px] font-bold uppercase">Admin</span>
+                            </button>
+                        </div>
                     </div>
                 )}
 
-                {error && (
-                    <div className="flex items-center text-red-600 text-xs bg-red-50 p-3 rounded-lg border border-red-100 animate-in fade-in slide-in-from-top-1 break-words">
-                        <AlertCircle className="w-4 h-4 mr-2 shrink-0" />
-                        {error}
-                    </div>
-                )}
-            </div>
-            
-            {/* Developer Shortcuts */}
-            {(window.IITJEE_CONFIG?.enableDevTools || window.location.hostname === 'localhost') && view === 'LOGIN' && (
-                <div className="mt-6 pt-6 border-t border-slate-100">
-                    <p className="text-[10px] text-center text-slate-400 font-bold uppercase tracking-wider mb-3 flex items-center justify-center">
-                        <Zap className="w-3 h-3 mr-1" /> Developer Shortcuts (Offline)
-                    </p>
-                    <div className="grid grid-cols-3 gap-2">
-                        <button 
-                            onClick={() => handleQuickLogin('ADMIN')}
-                            className="bg-slate-100 text-slate-600 hover:bg-slate-200 text-[10px] py-2 rounded-lg font-bold flex flex-col items-center border border-slate-200 transition-colors"
-                        >
-                            <Shield className="w-4 h-4 mb-1 text-red-500" />
-                            Admin
-                        </button>
-                        <button 
-                            onClick={() => handleQuickLogin('STUDENT')}
-                            className="bg-slate-100 text-slate-600 hover:bg-slate-200 text-[10px] py-2 rounded-lg font-bold flex flex-col items-center border border-slate-200 transition-colors"
-                        >
-                            <UserIcon className="w-4 h-4 mb-1 text-blue-500" />
-                            Student
-                        </button>
-                        <button 
-                            onClick={() => handleQuickLogin('PARENT')}
-                            className="bg-slate-100 text-slate-600 hover:bg-slate-200 text-[10px] py-2 rounded-lg font-bold flex flex-col items-center border border-slate-200 transition-colors"
-                        >
-                            <Users className="w-4 h-4 mb-1 text-green-500" />
-                            Parent
-                        </button>
-                    </div>
+                {/* Footer Credits */}
+                <div className="mt-6 text-center">
+                    <p className="text-xs text-slate-400">v12.11 • Secured by IITGEEPrep</p>
                 </div>
-            )}
-
-            {/* Social Media Footer inside Login Card (If Enabled) */}
-            {socialConfig?.enabled && (
-                <div className="mt-6 pt-6 border-t border-slate-100 flex flex-col items-center">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Connect With Us</p>
-                    <div className="flex gap-4">
-                        {socialConfig.instagram && (
-                            <a href={socialConfig.instagram} target="_blank" rel="noopener noreferrer" className="p-2 bg-pink-50 text-pink-600 rounded-full hover:bg-pink-100 transition-colors">
-                                <Instagram size={16} />
-                            </a>
-                        )}
-                        {socialConfig.facebook && (
-                            <a href={socialConfig.facebook} target="_blank" rel="noopener noreferrer" className="p-2 bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100 transition-colors">
-                                <Facebook size={16} />
-                            </a>
-                        )}
-                        {socialConfig.twitter && (
-                            <a href={socialConfig.twitter} target="_blank" rel="noopener noreferrer" className="p-2 bg-slate-50 text-slate-800 rounded-full hover:bg-slate-100 transition-colors">
-                                <Twitter size={16} />
-                            </a>
-                        )}
-                        {socialConfig.youtube && (
-                            <a href={socialConfig.youtube} target="_blank" rel="noopener noreferrer" className="p-2 bg-red-50 text-red-600 rounded-full hover:bg-red-100 transition-colors">
-                                <Youtube size={16} />
-                            </a>
-                        )}
-                        {socialConfig.linkedin && (
-                            <a href={socialConfig.linkedin} target="_blank" rel="noopener noreferrer" className="p-2 bg-blue-50 text-blue-700 rounded-full hover:bg-blue-100 transition-colors">
-                                <Linkedin size={16} />
-                            </a>
-                        )}
-                    </div>
-                </div>
-            )}
-
-            {/* Footer Links */}
-            <div className="mt-8 text-center space-x-4 text-xs text-slate-400 font-medium flex flex-wrap justify-center gap-y-2">
-                <button onClick={() => onNavigate('about')} className="hover:text-blue-600 transition-colors">About Us</button>
-                <span>•</span>
-                <button onClick={() => onNavigate('features')} className="hover:text-blue-600 transition-colors">Features</button>
-                <span>•</span>
-                <button onClick={() => onNavigate('blog')} className="hover:text-blue-600 transition-colors">Blog</button>
-                <span>•</span>
-                <button onClick={() => onNavigate('exams')} className="hover:text-blue-600 transition-colors">Exams Guide</button>
-                <span>•</span>
-                <button onClick={() => onNavigate('privacy')} className="hover:text-blue-600 transition-colors">Privacy Policy</button>
-                <span>•</span>
-                <button onClick={() => onNavigate('contact')} className="hover:text-blue-600 transition-colors">Contact</button>
-            </div>
-            <div className="text-center text-[10px] text-slate-300 mt-4">
-                v12.10
             </div>
         </div>
       </div>
