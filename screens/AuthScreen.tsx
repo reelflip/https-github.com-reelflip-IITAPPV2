@@ -34,7 +34,8 @@ import {
   FunctionSquare,
   Divide,
   ChevronDown,
-  Loader2
+  Loader2,
+  WifiOff
 } from 'lucide-react';
 
 interface AuthScreenProps {
@@ -148,7 +149,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate, ena
       finally { setIsLoading(false); setShowRoleModal(false); setPendingGoogleToken(null); }
   };
 
-  const handleAuth = async (e?: React.FormEvent, overrideCreds?: {email: string, pass: string}) => {
+  const handleAuth = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setError(''); setSuccessMessage(''); setIsLoading(true);
     
@@ -164,22 +165,36 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate, ena
             targetExam: formData.targetExam, dob: formData.dob, gender: formData.gender,
             securityQuestion: formData.securityQuestion, securityAnswer: formData.securityAnswer
         } : {
-            email: overrideCreds ? overrideCreds.email : formData.email,
-            password: overrideCreds ? overrideCreds.pass : formData.password
+            email: formData.email,
+            password: formData.password
         };
 
         const response = await fetch(endpoint, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json' }, 
+            body: JSON.stringify(payload)
         });
+
+        const contentType = response.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+            const text = await response.text();
+            console.error("Server Error Response:", text);
+            throw new Error(`Server connection failed. The backend API is missing or returning invalid data. (Check /api/${view === 'REGISTER' ? 'register.php' : 'login.php'})`);
+        }
+
         const data = await response.json();
 
-        if (!response.ok) throw new Error(data.error || data.message || 'Auth failed');
+        // STRICT CHECK: Do not allow fallback if server explicitly fails
+        if (!response.ok || data.status === 'error' || data.error) {
+            throw new Error(data.message || data.error || 'Authentication failed on server.');
+        }
 
         if (view === 'REGISTER') {
             setView('LOGIN');
             setSuccessMessage("Registration successful! Please log in.");
             setFormData(prev => ({ ...prev, password: '', confirmPassword: '' }));
         } else {
+            if(!data.user || !data.user.id) throw new Error("Invalid user data received from server.");
             const finalUser = data.user;
             onLogin({
                 ...finalUser,
@@ -190,21 +205,9 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate, ena
             });
         }
     } catch (err: any) {
+        console.error("Auth Error:", err);
         setError(err.message || "An unexpected error occurred.");
     } finally { setIsLoading(false); }
-  };
-
-  const handleQuickLogin = (role: Role) => {
-      const mockUser: User = {
-          id: role === 'ADMIN' ? '100000' : role === 'STUDENT' ? '492813' : '839102',
-          name: role === 'ADMIN' ? 'Dev Admin' : role === 'STUDENT' ? 'Dev Student' : 'Dev Parent',
-          email: `${role.toLowerCase()}@dev.local`,
-          role: role,
-          isVerified: true,
-          targetYear: 2025,
-          targetExam: 'JEE Main & Advanced'
-      };
-      onLogin(mockUser);
   };
 
   return (
@@ -412,7 +415,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate, ena
                             </div>
                         )}
 
-                        {error && <div className="p-3 bg-red-50 text-red-600 text-xs rounded-lg flex items-center gap-2"><AlertCircle className="w-4 h-4" /> {error}</div>}
+                        {error && <div className="p-3 bg-red-50 text-red-600 text-xs rounded-lg flex items-center gap-2"><WifiOff className="w-4 h-4" /> {error}</div>}
                         {successMessage && <div className="p-3 bg-green-50 text-green-600 text-xs rounded-lg flex items-center gap-2"><CheckCircle2 className="w-4 h-4" /> {successMessage}</div>}
                         
                         <button type="submit" disabled={isLoading} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2">
@@ -420,22 +423,6 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate, ena
                         </button>
                     </form>
                 )}
-
-                {/* Developer Quick Access - ALWAYS VISIBLE */}
-                <div className="mt-8 pt-6 border-t border-slate-200">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center mb-4">Developer Quick Access</p>
-                    <div className="grid grid-cols-3 gap-3">
-                        <button onClick={() => handleQuickLogin('STUDENT')} className="flex flex-col items-center justify-center p-3 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-colors border border-blue-100">
-                            <UserIcon className="w-5 h-5 mb-1" /><span className="text-[10px] font-bold uppercase">Student</span>
-                        </button>
-                        <button onClick={() => handleQuickLogin('PARENT')} className="flex flex-col items-center justify-center p-3 bg-orange-50 text-orange-600 rounded-xl hover:bg-orange-100 transition-colors border border-orange-100">
-                            <Users className="w-5 h-5 mb-1" /><span className="text-[10px] font-bold uppercase">Parent</span>
-                        </button>
-                        <button onClick={() => handleQuickLogin('ADMIN')} className="flex flex-col items-center justify-center p-3 bg-purple-50 text-purple-600 rounded-xl hover:bg-purple-100 transition-colors border border-purple-100">
-                            <Shield className="w-5 h-5 mb-1" /><span className="text-[10px] font-bold uppercase">Admin</span>
-                        </button>
-                    </div>
-                </div>
             </div>
         </div>
       </div>

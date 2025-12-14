@@ -125,6 +125,7 @@ export default function App() {
   
   // Sync State
   const [syncStatus, setSyncStatus] = useState<'SYNCED' | 'SAVING' | 'ERROR'>('SYNCED');
+  const [syncErrorMsg, setSyncErrorMsg] = useState<string | null>(null);
 
   const [flashcards, setFlashcards] = useState<Flashcard[]>([
      { id: 1, front: "Newton's Second Law", back: "F = ma\n(Force equals mass times acceleration.)", subjectId: 'phys' },
@@ -181,6 +182,7 @@ export default function App() {
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           const data = await res.json();
           setSyncStatus('SYNCED');
+          setSyncErrorMsg(null);
           return data;
       } catch (error) {
           console.error("Sync Failed:", error);
@@ -332,10 +334,18 @@ export default function App() {
 
   const fetchRemoteData = async (userId: string) => {
       setSyncStatus('SAVING'); // Show spinner while fetching
+      setSyncErrorMsg(null);
       try {
           const res = await fetch(`/api/get_dashboard.php?user_id=${userId}`);
           if (!res.ok) throw new Error(`HTTP Error ${res.status}`);
-          const data = await res.json();
+          const text = await res.text();
+          let data;
+          try {
+              data = JSON.parse(text);
+          } catch(e) {
+              console.error("Invalid JSON response:", text.substring(0, 100));
+              throw new Error("Invalid Server Response");
+          }
           
           if (data.error) throw new Error(data.error);
 
@@ -369,11 +379,11 @@ export default function App() {
           }
           
           setSyncStatus('SYNCED');
-      } catch (e) { 
+      } catch (e: any) { 
           console.error("Remote Fetch Failed:", e);
           setSyncStatus('ERROR');
-          // Optional: Only load local if we are sure it's a network error, 
-          // but for now we fall back to ensure app works offline.
+          setSyncErrorMsg("Connection Failed: Using Offline Mode");
+          // Fallback to ensure app works offline.
           loadLocalData(userId); 
       }
   };
@@ -647,6 +657,17 @@ export default function App() {
         <div className="hidden md:block absolute top-6 right-8 z-50">
             <SyncIndicator status={syncStatus} onRetry={() => fetchRemoteData(user.id)} />
         </div>
+
+        {/* Sync Error Banner */}
+        {syncErrorMsg && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl mb-4 flex items-center justify-between shadow-sm animate-in slide-in-from-top-2">
+                <div className="flex items-center gap-2">
+                    <CloudOff className="w-5 h-5" />
+                    <span className="font-bold text-sm">{syncErrorMsg}</span>
+                </div>
+                <button onClick={() => fetchRemoteData(user.id)} className="text-xs font-bold underline hover:text-red-900">Retry</button>
+            </div>
+        )}
 
         <div className="max-w-6xl mx-auto">
           {user.role === 'PARENT' && (

@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { getBackendFiles, generateSQLSchema, generateHtaccess } from '../services/generatorService';
-import { Download, Server, BookOpen, Package, FileText, Folder, ArrowRight, ShieldCheck, Database, Layout, Activity } from 'lucide-react';
+import { Download, Server, BookOpen, Package, FileText, Folder, ArrowRight, ShieldCheck, Database, Layout, Activity, PlugZap } from 'lucide-react';
 import JSZip from 'jszip';
 
 export const DeploymentScreen: React.FC = () => {
@@ -14,6 +14,28 @@ export const DeploymentScreen: React.FC = () => {
         pass: ""
     });
     const [isZipping, setIsZipping] = useState(false);
+    const [connectionStatus, setConnectionStatus] = useState<null | 'success' | 'error'>(null);
+
+    const checkConnection = async () => {
+        setConnectionStatus(null);
+        try {
+            const res = await fetch('/api/test_db.php');
+            if (res.ok) {
+                const data = await res.json();
+                if (data.status === 'CONNECTED') {
+                    setConnectionStatus('success');
+                    alert(`Success! Connected to DB. ${data.tables.length} tables found.`);
+                } else {
+                    throw new Error(data.message);
+                }
+            } else {
+                throw new Error(`HTTP ${res.status}`);
+            }
+        } catch (e: any) {
+            setConnectionStatus('error');
+            alert(`Connection Failed: ${e.message}. \n\nEnsure your /api folder is uploaded and config.php matches your hosting database.`);
+        }
+    };
 
     const downloadAllZip = async () => {
         setIsZipping(true);
@@ -230,6 +252,26 @@ export const DeploymentScreen: React.FC = () => {
                                     />
                                 </div>
                             </div>
+                        </div>
+
+                        {/* Connection Test Tool */}
+                        <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 shadow-sm">
+                            <h4 className="font-bold text-slate-800 mb-2 flex items-center">
+                                <PlugZap className="w-4 h-4 mr-2 text-slate-500" /> Test Connection
+                            </h4>
+                            <p className="text-xs text-slate-500 mb-4">
+                                Once deployed, click below to verify if the frontend can talk to your database.
+                            </p>
+                            <button 
+                                onClick={checkConnection}
+                                className={`w-full py-2 rounded-lg text-sm font-bold border transition-colors ${
+                                    connectionStatus === 'success' ? 'bg-green-100 text-green-700 border-green-200' : 
+                                    connectionStatus === 'error' ? 'bg-red-100 text-red-700 border-red-200' : 
+                                    'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'
+                                }`}
+                            >
+                                Verify API Connection
+                            </button>
                         </div>
 
                         <div className="bg-green-50 border border-green-100 p-4 rounded-xl flex items-start gap-3">
