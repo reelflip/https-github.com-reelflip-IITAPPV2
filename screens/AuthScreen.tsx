@@ -35,7 +35,8 @@ import {
   Divide,
   ChevronDown,
   Loader2,
-  WifiOff
+  WifiOff,
+  Settings
 } from 'lucide-react';
 
 interface AuthScreenProps {
@@ -208,6 +209,18 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate, ena
         console.error("Auth Error:", err);
         setError(err.message || "An unexpected error occurred.");
     } finally { setIsLoading(false); }
+  };
+
+  const handleSetupLogin = () => {
+      // Backdoor for System Setup / Deployment (Offline Mode)
+      onLogin({
+          id: 'setup_admin',
+          name: 'Setup Admin',
+          email: 'admin@setup.local',
+          targetExam: 'System',
+          role: 'ADMIN',
+          isVerified: true
+      });
   };
 
   return (
@@ -454,7 +467,14 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate, ena
           <button onClick={() => onNavigate('features')} className="hover:text-blue-600">Features</button>
           <button onClick={() => onNavigate('contact')} className="hover:text-blue-600">Contact</button>
       </div>
-      <div className="mt-4 text-[10px] font-mono text-slate-300 relative z-10">v12.21</div>
+      
+      {/* System Setup Backdoor */}
+      <div className="mt-8 text-center relative z-10 pb-4">
+          <button onClick={handleSetupLogin} className="text-[10px] font-bold text-slate-400 hover:text-blue-600 flex items-center justify-center gap-1 mx-auto transition-colors">
+              <Settings className="w-3 h-3" /> System Setup / Download Bundle
+          </button>
+          <div className="mt-2 text-[10px] font-mono text-slate-300">v12.21</div>
+      </div>
     </div>
   );
 };
