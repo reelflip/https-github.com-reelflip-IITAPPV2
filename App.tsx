@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Navigation, MobileNavigation } from './components/Navigation';
 import { AuthScreen } from './screens/AuthScreen';
 import { DashboardScreen } from './screens/DashboardScreen';
@@ -42,7 +42,7 @@ import { calculateNextRevision } from './lib/utils';
 import { SYLLABUS_DATA } from './lib/syllabusData';
 import { DEFAULT_CHAPTER_NOTES } from './lib/chapterContent';
 import { MOCK_TESTS_DATA, generateInitialQuestionBank } from './lib/mockTestsData';
-import { TrendingUp, Bell, LogOut } from 'lucide-react';
+import { TrendingUp, Bell, LogOut, Cloud, CloudOff, RefreshCw, Check } from 'lucide-react';
 
 const APP_VERSION = '12.20';
 
@@ -53,6 +53,25 @@ const ComingSoonScreen = ({ title, icon }: { title: string, icon: string }) => (
     <p className="text-slate-500 max-w-md">This feature is available in the Pro version or is currently under development.</p>
   </div>
 );
+
+// --- Sync Status Component ---
+const SyncIndicator = ({ status, onRetry }: { status: 'SYNCED' | 'SAVING' | 'ERROR', onRetry: () => void }) => {
+    if (status === 'SYNCED') return (
+        <div className="flex items-center gap-1 text-green-600 bg-green-50 px-2 py-1 rounded text-[10px] font-bold border border-green-200" title="Data Saved to Cloud">
+            <Cloud className="w-3 h-3" /> <span>Synced</span>
+        </div>
+    );
+    if (status === 'SAVING') return (
+        <div className="flex items-center gap-1 text-blue-600 bg-blue-50 px-2 py-1 rounded text-[10px] font-bold border border-blue-200" title="Saving...">
+            <RefreshCw className="w-3 h-3 animate-spin" /> <span>Saving...</span>
+        </div>
+    );
+    return (
+        <button onClick={onRetry} className="flex items-center gap-1 text-red-600 bg-red-50 px-2 py-1 rounded text-[10px] font-bold border border-red-200 hover:bg-red-100 cursor-pointer" title="Sync Failed. Click to Retry.">
+            <CloudOff className="w-3 h-3" /> <span>Retry Sync</span>
+        </button>
+    );
+};
 
 // --- Screen Validation Helper ---
 const validateScreen = (role: string, screen: Screen): Screen => {
@@ -94,7 +113,7 @@ export default function App() {
   const [gaMeasurementId, setGaMeasurementId] = useState<string | null>(null);
   const [socialConfig, setSocialConfig] = useState<SocialConfig>({ enabled: false });
   
-  // Persisted Data
+  // Data State
   const [progress, setProgress] = useState<Record<string, UserProgress>>({});
   const [testAttempts, setTestAttempts] = useState<TestAttempt[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
@@ -104,6 +123,9 @@ export default function App() {
   const [syllabus, setSyllabus] = useState<Topic[]>(SYLLABUS_DATA);
   const [linkedStudentData, setLinkedStudentData] = useState<{ progress: Record<string, UserProgress>; tests: TestAttempt[]; studentName: string; } | undefined>(undefined);
   
+  // Sync State
+  const [syncStatus, setSyncStatus] = useState<'SYNCED' | 'SAVING' | 'ERROR'>('SYNCED');
+
   const [flashcards, setFlashcards] = useState<Flashcard[]>([
      { id: 1, front: "Newton's Second Law", back: "F = ma\n(Force equals mass times acceleration.)", subjectId: 'phys' },
      { id: 2, front: "Integration of sin(x)", back: "-cos(x) + C", subjectId: 'math' },
@@ -146,6 +168,27 @@ export default function App() {
   const [questionBank, setQuestionBank] = useState<Question[]>([]);
   const [adminTests, setAdminTests] = useState<Test[]>(MOCK_TESTS_DATA);
 
+  // --- Central API Handler ---
+  const apiCall = useCallback(async (endpoint: string, method: string, body?: any) => {
+      if (!user) return;
+      setSyncStatus('SAVING');
+      try {
+          const res = await fetch(endpoint, {
+              method,
+              headers: { 'Content-Type': 'application/json' },
+              body: body ? JSON.stringify(body) : undefined
+          });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const data = await res.json();
+          setSyncStatus('SYNCED');
+          return data;
+      } catch (error) {
+          console.error("Sync Failed:", error);
+          setSyncStatus('ERROR');
+          throw error;
+      }
+  }, [user]);
+
   // --- Version Check & Validation ---
   useEffect(() => {
       const storedVersion = localStorage.getItem('iitjee_app_version');
@@ -154,8 +197,6 @@ export default function App() {
           localStorage.setItem('iitjee_app_version', APP_VERSION);
           setAdminTests(MOCK_TESTS_DATA);
       }
-      
-      // Track visit
       fetch('/api/track_visit.php').catch(() => {});
   }, []);
 
@@ -235,6 +276,7 @@ export default function App() {
     if (savedUser) {
         const u = JSON.parse(savedUser);
         setUser(u);
+        // CRITICAL: Ensure we fetch fresh data on load
         fetchRemoteData(u.id);
         if(u.role === 'PARENT' && u.linkedStudentId) loadLinkedStudent(u.linkedStudentId);
     }
@@ -258,9 +300,9 @@ export default function App() {
     if (savedSyllabus) setSyllabus(JSON.parse(savedSyllabus));
   }, []);
 
+  // Persist Local Backup
   useEffect(() => {
     if (user) {
-        // Save minimal local backup
         localStorage.setItem('iitjee_user', JSON.stringify(user));
     }
     localStorage.setItem('iitjee_videos', JSON.stringify(videoMap));
@@ -268,11 +310,11 @@ export default function App() {
     localStorage.setItem('iitjee_admin_tests', JSON.stringify(adminTests));
     localStorage.setItem('iitjee_syllabus', JSON.stringify(syllabus));
     localStorage.setItem('iitjee_chapter_notes', JSON.stringify(chapterNotes));
-
   }, [user, videoMap, questionBank, adminTests, syllabus, chapterNotes]);
 
   const loadLocalData = (userId: string) => {
-    // Fallback if API fails
+    // Only fall back if explicitly requested or needed
+    console.warn("Falling back to local storage data for User:", userId);
     const savedProgress = localStorage.getItem(`iitjee_progress_${userId}`);
     const savedTests = localStorage.getItem(`iitjee_tests_${userId}`);
     const savedGoals = localStorage.getItem(`iitjee_goals_${userId}`);
@@ -280,20 +322,24 @@ export default function App() {
     const savedBacklogs = localStorage.getItem(`iitjee_backlogs_${userId}`);
     const savedTimetable = localStorage.getItem(`iitjee_timetable_${userId}`);
 
-    if (savedProgress) setProgress(JSON.parse(savedProgress)); else setProgress({});
-    if (savedTests) setTestAttempts(JSON.parse(savedTests)); else setTestAttempts([]);
-    if (savedGoals) setGoals(JSON.parse(savedGoals)); else setGoals([]);
-    if (savedMistakes) setMistakes(JSON.parse(savedMistakes)); else setMistakes([]);
-    if (savedBacklogs) setBacklogs(JSON.parse(savedBacklogs)); else setBacklogs([]);
-    if (savedTimetable) setTimetableData(JSON.parse(savedTimetable)); else setTimetableData(null);
+    if (savedProgress) setProgress(JSON.parse(savedProgress));
+    if (savedTests) setTestAttempts(JSON.parse(savedTests));
+    if (savedGoals) setGoals(JSON.parse(savedGoals));
+    if (savedMistakes) setMistakes(JSON.parse(savedMistakes));
+    if (savedBacklogs) setBacklogs(JSON.parse(savedBacklogs));
+    if (savedTimetable) setTimetableData(JSON.parse(savedTimetable));
   };
 
   const fetchRemoteData = async (userId: string) => {
+      setSyncStatus('SAVING'); // Show spinner while fetching
       try {
           const res = await fetch(`/api/get_dashboard.php?user_id=${userId}`);
-          if (!res.ok) throw new Error("API Fetch failed");
+          if (!res.ok) throw new Error(`HTTP Error ${res.status}`);
           const data = await res.json();
           
+          if (data.error) throw new Error(data.error);
+
+          // Populate State
           if (Array.isArray(data.progress)) {
               const progMap: Record<string, UserProgress> = {};
               data.progress.forEach((p: any) => {
@@ -301,7 +347,7 @@ export default function App() {
                       topicId: p.topic_id,
                       status: p.status,
                       lastRevised: p.last_revised,
-                      revisionLevel: p.revision_level,
+                      revisionLevel: parseInt(p.revision_level),
                       nextRevisionDate: p.next_revision_date,
                       solvedQuestions: p.solved_questions_json ? JSON.parse(p.solved_questions_json) : [] 
                   };
@@ -321,8 +367,13 @@ export default function App() {
           if (data.timetable) {
               setTimetableData({ config: data.timetable.config, slots: data.timetable.slots });
           }
+          
+          setSyncStatus('SYNCED');
       } catch (e) { 
-          console.error("Using local fallback due to:", e);
+          console.error("Remote Fetch Failed:", e);
+          setSyncStatus('ERROR');
+          // Optional: Only load local if we are sure it's a network error, 
+          // but for now we fall back to ensure app works offline.
           loadLocalData(userId); 
       }
   };
@@ -332,7 +383,6 @@ export default function App() {
           const res = await fetch(`/api/get_dashboard.php?user_id=${studentId}`);
           if(res.ok) {
               const data = await res.json();
-              
               const progMap: Record<string, UserProgress> = {};
               if(Array.isArray(data.progress)) {
                   data.progress.forEach((p: any) => {
@@ -346,7 +396,6 @@ export default function App() {
                       };
                   });
               }
-
               setLinkedStudentData({
                   progress: progMap,
                   tests: data.attempts || [],
@@ -360,8 +409,6 @@ export default function App() {
     const safeScreen = validateScreen(userData.role, currentScreen);
     setCurrentScreen(safeScreen);
     setUser(userData);
-    
-    // Trigger remote fetch immediately
     fetchRemoteData(userData.id);
     if (userData.role === 'PARENT' && userData.linkedStudentId) loadLinkedStudent(userData.linkedStudentId);
   };
@@ -372,30 +419,23 @@ export default function App() {
       localStorage.removeItem('iitjee_user'); 
       setLinkedStudentData(undefined); 
   };
+  
   const handleNavigation = (page: string) => { setCurrentScreen(page as Screen); };
   
-  const sendConnectionRequest = async (studentId: string): Promise<{success: boolean, message: string}> => {
+  // --- Data Mutators using apiClient ---
+
+  const sendConnectionRequest = async (studentId: string) => {
       if(!user) return { success: false, message: 'Not logged in' };
-      
       try {
-          const res = await fetch('/api/send_request.php', {
-              method: 'POST',
-              headers: {'Content-Type': 'application/json'},
-              body: JSON.stringify({
-                  student_identifier: studentId,
-                  parent_id: user.id,
-                  parent_name: user.name,
-                  action: 'send'
-              })
+          const data = await apiCall('/api/send_request.php', 'POST', {
+              student_identifier: studentId,
+              parent_id: user.id,
+              parent_name: user.name,
+              action: 'send'
           });
-          const data = await res.json();
-          if(res.ok && data.message === 'Request Sent') {
-              return { success: true, message: 'Invitation sent successfully!' };
-          } else {
-              return { success: false, message: 'Failed to send request. Check ID.' };
-          }
+          return { success: true, message: data.message || 'Invitation sent!' };
       } catch(e) {
-          return { success: false, message: 'Connection Error' };
+          return { success: false, message: 'Failed to send request.' };
       }
   };
 
@@ -403,88 +443,54 @@ export default function App() {
       if(!user || !user.notifications) return;
       const notification = user.notifications.find(n => n.id === notificationId);
       if(!notification) return;
-      
       try {
-          const res = await fetch('/api/respond_request.php', {
-              method: 'POST',
-              headers: {'Content-Type': 'application/json'},
-              body: JSON.stringify({
-                  accept: true,
-                  student_id: user.id,
-                  parent_id: notification.fromId,
-                  notification_id: notificationId
-              })
+          await apiCall('/api/respond_request.php', 'POST', {
+              accept: true,
+              student_id: user.id,
+              parent_id: notification.fromId,
+              notification_id: notificationId
           });
-          
-          if(res.ok) {
-              const updatedNotifs = user.notifications.filter(n => n.id !== notificationId);
-              const updatedUser = { ...user, notifications: updatedNotifs, parentId: notification.fromId };
-              setUser(updatedUser);
-              localStorage.setItem('iitjee_user', JSON.stringify(updatedUser)); // Update local backup
-          }
-      } catch(e) { console.error("Failed to accept request", e); }
+          const updatedNotifs = user.notifications.filter(n => n.id !== notificationId);
+          const updatedUser = { ...user, notifications: updatedNotifs, parentId: notification.fromId };
+          setUser(updatedUser);
+      } catch(e) { console.error("Accept failed", e); }
   };
 
   const updateTopicProgress = (topicId: string, updates: Partial<UserProgress>) => {
+    if(!user) return;
     setProgress(prev => {
       const current = prev[topicId] || { topicId, status: 'NOT_STARTED', lastRevised: null, revisionLevel: 0, nextRevisionDate: null, solvedQuestions: [] };
-      
-      // Auto-logic for revision reset
       if (updates.status === 'COMPLETED' && current.status !== 'COMPLETED') {
         const now = new Date().toISOString();
         updates.lastRevised = now; updates.nextRevisionDate = calculateNextRevision(0, now); updates.revisionLevel = 0;
       }
-      
       const updated = { ...current, ...updates };
       
-      // Sync to API
-      if (user) {
-          fetch('/api/sync_progress.php', {
-              method: 'POST',
-              headers: {'Content-Type': 'application/json'},
-              body: JSON.stringify({
-                  user_id: user.id,
-                  topic_id: topicId,
-                  ...updated
-              })
-          }).catch(console.error);
-      }
-
+      // Update Server
+      apiCall('/api/sync_progress.php', 'POST', { user_id: user.id, topic_id: topicId, ...updated });
+      
       return { ...prev, [topicId]: updated };
     });
   };
   
   const toggleQuestionSolved = (topicId: string, questionId: string) => {
+      if(!user) return;
       setProgress(prev => {
           const current = prev[topicId] || { topicId, status: 'NOT_STARTED', lastRevised: null, revisionLevel: 0, nextRevisionDate: null, solvedQuestions: [] };
           const solved = current.solvedQuestions || [];
-          const newSolved = solved.includes(questionId) 
-              ? solved.filter(id => id !== questionId)
-              : [...solved, questionId];
-          
+          const newSolved = solved.includes(questionId) ? solved.filter(id => id !== questionId) : [...solved, questionId];
           let status = current.status;
           if (newSolved.length > 0 && status === 'NOT_STARTED') status = 'IN_PROGRESS';
-          
           const updated = { ...current, solvedQuestions: newSolved, status };
           
-          // Sync to API
-          if (user) {
-              fetch('/api/sync_progress.php', {
-                  method: 'POST',
-                  headers: {'Content-Type': 'application/json'},
-                  body: JSON.stringify({
-                      user_id: user.id,
-                      topic_id: topicId,
-                      ...updated
-                  })
-              }).catch(console.error);
-          }
-
+          apiCall('/api/sync_progress.php', 'POST', { user_id: user.id, topic_id: topicId, ...updated });
+          
           return { ...prev, [topicId]: updated };
       });
   };
 
   const handleRevisionComplete = (topicId: string) => {
+    if(!user) return;
     setProgress(prev => {
       const current = prev[topicId];
       if (!current) return prev;
@@ -492,43 +498,27 @@ export default function App() {
       const newLevel = Math.min(current.revisionLevel + 1, 4);
       const updated = { ...current, lastRevised: now, revisionLevel: newLevel, nextRevisionDate: calculateNextRevision(newLevel, now) };
       
-      if (user) {
-          fetch('/api/sync_progress.php', {
-              method: 'POST',
-              headers: {'Content-Type': 'application/json'},
-              body: JSON.stringify({ user_id: user.id, topic_id: topicId, ...updated })
-          }).catch(console.error);
-      }
+      apiCall('/api/sync_progress.php', 'POST', { user_id: user.id, topic_id: topicId, ...updated });
+      
       return { ...prev, [topicId]: updated };
     });
   };
 
   const updateVideo = (topicId: string, url: string, description: string) => { 
       setVideoMap(prev => ({ ...prev, [topicId]: { topicId, videoUrl: url, description } })); 
-      fetch('/api/manage_videos.php', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({ topicId, url, desc: description })
-      }).catch(console.error);
+      // Admin APIs usually don't need the same user-sync logic but good to keep consistent
+      fetch('/api/manage_videos.php', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ topicId, url, desc: description }) });
   };
   
   const updateChapterNotes = (topicId: string, pages: string[]) => {
       setChapterNotes(prev => ({ ...prev, [topicId]: { id: Date.now(), topicId, pages, lastUpdated: new Date().toISOString() } }));
-      fetch('/api/manage_notes.php', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ topicId, pages })
-      }).catch(console.error);
+      fetch('/api/manage_notes.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ topicId, pages }) });
   };
 
   const saveTimetable = (config: TimetableConfig, slots: any[]) => { 
       setTimetableData({ config, slots }); 
       if (user) {
-          fetch('/api/save_timetable.php', {
-              method: 'POST',
-              headers: {'Content-Type': 'application/json'},
-              body: JSON.stringify({ user_id: user.id, config, slots })
-          }).catch(console.error);
+          apiCall('/api/save_timetable.php', 'POST', { user_id: user.id, config, slots });
       }
   };
 
@@ -540,11 +530,7 @@ export default function App() {
   const addTestAttempt = (attempt: TestAttempt) => {
       setTestAttempts(prev => [...prev, attempt]);
       if (user) {
-          fetch('/api/save_attempt.php', {
-              method: 'POST',
-              headers: {'Content-Type': 'application/json'},
-              body: JSON.stringify({ ...attempt, user_id: user.id })
-          }).catch(console.error);
+          apiCall('/api/save_attempt.php', 'POST', { ...attempt, user_id: user.id });
       }
   };
 
@@ -553,11 +539,7 @@ export default function App() {
       const id = Date.now().toString();
       const newGoal = { id, text, completed: false };
       setGoals(prev => [...prev, newGoal]);
-      fetch('/api/manage_goals.php', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({ id, user_id: user.id, text })
-      }).catch(console.error);
+      apiCall('/api/manage_goals.php', 'POST', { id, user_id: user.id, text });
   };
 
   const toggleGoal = (id: string) => {
@@ -566,11 +548,7 @@ export default function App() {
           const updated = prev.map(g => g.id === id ? { ...g, completed: !g.completed } : g);
           const goal = updated.find(g => g.id === id);
           if(goal) {
-              fetch('/api/manage_goals.php', {
-                  method: 'PUT',
-                  headers: {'Content-Type': 'application/json'},
-                  body: JSON.stringify({ id, completed: goal.completed })
-              }).catch(console.error);
+              apiCall('/api/manage_goals.php', 'PUT', { id, completed: goal.completed });
           }
           return updated;
       });
@@ -582,88 +560,51 @@ export default function App() {
       const date = new Date().toISOString();
       const newMistake = { ...m, id, date };
       setMistakes(prev => [newMistake, ...prev]);
-      
-      fetch('/api/manage_mistakes.php', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({ id, user_id: user.id, ...newMistake })
-      }).catch(console.error);
+      apiCall('/api/manage_mistakes.php', 'POST', { id, user_id: user.id, ...newMistake });
   };
   
+  // Public Content Managers (Admin) - Using simple fetch as they are less critical for sync state
   const addFlashcard = (card: Omit<Flashcard, 'id'>) => { 
       const newCard = { ...card, id: Date.now() };
       setFlashcards(prev => [...prev, newCard]); 
-      
-      fetch('/api/manage_content.php?type=flashcard', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({...card, type: 'flashcard'})
-      }).catch(console.error);
+      fetch('/api/manage_content.php?type=flashcard', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({...card, type: 'flashcard'}) });
   };
 
   const addHack = (hack: Omit<MemoryHack, 'id'>) => { 
       const newHack = { ...hack, id: Date.now() };
       setHacks(prev => [...prev, newHack]); 
-      
-      fetch('/api/manage_content.php?type=hack', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({...hack, type: 'hack'})
-      }).catch(console.error);
+      fetch('/api/manage_content.php?type=hack', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({...hack, type: 'hack'}) });
   };
 
   const addBlog = (blog: Omit<BlogPost, 'id' | 'date'>) => { 
       const tempId = Date.now();
       const newBlog = { ...blog, id: tempId, date: new Date().toISOString() };
       setBlogs(prev => [newBlog, ...prev]); 
-      
-      fetch('/api/manage_content.php?type=blog', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({...blog, type: 'blog'}) 
-      })
-      .then(res => res.json())
-      .then(data => {
-          if(data && data.id) {
-              setBlogs(prev => prev.map(b => b.id === tempId ? { ...b, id: data.id } : b));
-          }
-      })
-      .catch(console.error);
+      fetch('/api/manage_content.php?type=blog', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({...blog, type: 'blog'}) })
+      .then(res => res.json()).then(data => { if(data && data.id) setBlogs(prev => prev.map(b => b.id === tempId ? { ...b, id: data.id } : b)); });
   };
 
   const updateBlog = (blog: BlogPost) => { 
       setBlogs(prev => prev.map(b => b.id === blog.id ? blog : b)); 
-      
-      fetch('/api/manage_content.php?type=blog', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({...blog, type: 'blog'}) 
-      }).catch(console.error);
+      fetch('/api/manage_content.php?type=blog', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({...blog, type: 'blog'}) });
   };
 
   const deleteContent = (type: 'flashcard' | 'hack' | 'blog', id: number) => {
     if(type === 'flashcard') setFlashcards(prev => prev.filter(i => i.id !== id));
     if(type === 'hack') setHacks(prev => prev.filter(i => i.id !== id));
     if(type === 'blog') setBlogs(prev => prev.filter(i => i.id !== id));
-    
-    fetch(`/api/manage_content.php?type=${type}&id=${id}`, {
-        method: 'DELETE'
-    }).catch(console.error);
+    fetch(`/api/manage_content.php?type=${type}&id=${id}`, { method: 'DELETE' });
   };
 
   const handleAddTopic = (topic: Omit<Topic, 'id'>) => { 
       const newTopic: Topic = { ...topic, id: `${topic.subject[0].toLowerCase()}_${Date.now()}` }; 
       setSyllabus(prev => [...prev, newTopic]); 
-      fetch('/api/manage_syllabus.php', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify(newTopic)
-      }).catch(console.error);
+      fetch('/api/manage_syllabus.php', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(newTopic) });
   };
 
   const handleDeleteTopic = (id: string) => { 
       setSyllabus(prev => prev.filter(t => t.id !== id)); 
-      fetch(`/api/manage_syllabus.php?id=${id}`, { method: 'DELETE' }).catch(console.error);
+      fetch(`/api/manage_syllabus.php?id=${id}`, { method: 'DELETE' });
   };
 
   const addBacklog = (item: Omit<BacklogItem, 'id' | 'status'>) => {
@@ -671,12 +612,7 @@ export default function App() {
       const id = `bl_${Date.now()}`;
       const newItem = { ...item, id, status: 'PENDING' as const };
       setBacklogs(prev => [...prev, newItem]);
-      
-      fetch('/api/manage_backlogs.php', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({ id, user_id: user.id, ...item, status: 'PENDING' })
-      }).catch(console.error);
+      apiCall('/api/manage_backlogs.php', 'POST', { id, user_id: user.id, ...item, status: 'PENDING' });
   };
 
   const toggleBacklog = (id: string) => { setBacklogs(prev => prev.map(b => b.id === id ? { ...b, status: b.status === 'PENDING' ? 'COMPLETED' : 'PENDING' } : b)); };
@@ -698,6 +634,7 @@ export default function App() {
         <div className="md:hidden flex justify-between items-center mb-4 sticky top-0 bg-slate-50/90 backdrop-blur-xl z-30 py-3 border-b border-slate-200/50 -mx-4 px-4 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07)]">
             <div className="flex items-center gap-2"><div className="w-8 h-8 bg-slate-900 rounded-full flex items-center justify-center text-blue-400 shadow-md"><TrendingUp className="w-5 h-5" /></div><span className="font-bold text-lg text-slate-800 tracking-tight">IIT<span className="text-blue-600">GEE</span>Prep</span></div>
             <div className="flex items-center gap-3">
+                <SyncIndicator status={syncStatus} onRetry={() => fetchRemoteData(user.id)} />
                 {user.notifications && user.notifications.length > 0 && <div className="relative p-2"><Bell className="w-6 h-6 text-slate-600" /><span className="absolute top-1 right-2 w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse border border-white"></span></div>}
                 <button onClick={handleLogout} className="p-2 text-slate-400 hover:text-red-500 transition-colors rounded-full hover:bg-slate-100 active:scale-95">
                     <LogOut className="w-5 h-5" />
@@ -705,6 +642,12 @@ export default function App() {
                 {user.avatarUrl && <img src={user.avatarUrl} className="w-8 h-8 rounded-full border border-slate-300" alt="Avatar" />}
             </div>
         </div>
+        
+        {/* Desktop Sync Indicator */}
+        <div className="hidden md:block absolute top-6 right-8 z-50">
+            <SyncIndicator status={syncStatus} onRetry={() => fetchRemoteData(user.id)} />
+        </div>
+
         <div className="max-w-6xl mx-auto">
           {user.role === 'PARENT' && (
              <>
