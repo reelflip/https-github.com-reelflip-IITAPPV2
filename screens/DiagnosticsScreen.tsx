@@ -287,7 +287,7 @@ const useTestRunner = () => {
 
             // 25. Psychometric (Specifically Fixing the Previous Fail)
             await runTest(24, "Save Assessment Result", () => fetchAPI('/api/save_psychometric.php', {
-                method: 'POST', body: JSON.stringify({ user_id: userId, report: { date: new Date().toISOString(), scores: { "Stress": 20 }, overallScore: 80, profileType: "Balanced", insights: [], actionPlan: [] } })
+                method: 'POST', body: JSON.stringify({ user_id: userId, report: { date: new Date().toISOString(), scores: { "Stress": 50 }, overallScore: 80, profileType: "High Achiever", insights: [], actionPlan: [] } })
             }));
             await runTest(24, "Complete Flow", async () => {
                 const res = await fetchAPI(`/api/get_psychometric.php?user_id=${userId}`);
@@ -315,8 +315,7 @@ const useTestRunner = () => {
 const VisualSystemHealth = () => {
     const { suites, isRunning, executeTests } = useTestRunner();
     
-    // Auto-run on mount if empty
-    useEffect(() => { if(suites.length === 0) executeTests(); }, []);
+    // Removed auto-run useEffect to support manual trigger on demand
 
     const totalTests = suites.reduce((acc, s) => acc + s.tests.length, 0);
     const passedTests = suites.reduce((acc, s) => acc + s.tests.filter((t: any) => t.passed).length, 0);
@@ -349,7 +348,7 @@ const VisualSystemHealth = () => {
                         className="bg-green-600 hover:bg-green-500 text-white px-6 py-3 rounded-xl font-bold shadow-lg flex items-center transition-all disabled:opacity-50"
                     >
                         {isRunning ? <Loader2 className="w-5 h-5 animate-spin mr-2"/> : <Play className="w-5 h-5 mr-2"/>}
-                        {isRunning ? 'Scanning...' : 'Re-Run Scan'}
+                        {isRunning ? 'Scanning...' : (totalTests === 0 ? 'Start System Scan' : 'Re-Run Scan')}
                     </button>
                 </div>
             </div>
