@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Calendar, Clock, Moon, BookOpen, Briefcase, RefreshCw, Brain, PenTool, Layers, Coffee, Zap, Sun as SunIcon, RotateCw, Map, Flag, CheckSquare, CalendarDays } from 'lucide-react';
+import { Calendar, Clock, Moon, BookOpen, Briefcase, RefreshCw, Brain, PenTool, Layers, Coffee, Zap, Sun as SunIcon, RotateCw, Map, Flag, CheckSquare, CalendarDays, Save, CheckCircle2 } from 'lucide-react';
 import { User, UserProgress, TimetableConfig, MasterPlanWeek, Topic } from '../lib/types';
 import { SYLLABUS_DATA } from '../lib/syllabusData';
 
@@ -38,6 +38,8 @@ export const TimetableScreen: React.FC<Props> = ({ user, savedConfig, savedSlots
     return d.toISOString().split('T')[0];
   });
   const [generatedMasterPlan, setGeneratedMasterPlan] = useState<MasterPlanWeek[] | null>(null);
+  
+  const [saveStatus, setSaveStatus] = useState<'IDLE' | 'SAVING' | 'SAVED'>('IDLE');
 
   // --- Initialize from Saved Data ---
   useEffect(() => {
@@ -97,14 +99,11 @@ export const TimetableScreen: React.FC<Props> = ({ user, savedConfig, savedSlots
             return;
         }
 
-        // Reserve last 4 weeks for Revision/Mocks if plan is long enough (> 8 weeks)
-        // Otherwise proportional
-        let revisionWeeks = totalWeeks > 8 ? 4 : Math.floor(totalWeeks * 0.2); // 20% revision if short
+        let revisionWeeks = totalWeeks > 8 ? 4 : Math.floor(totalWeeks * 0.2); 
         if (revisionWeeks < 1) revisionWeeks = 1;
         
         const learningWeeks = Math.max(1, totalWeeks - revisionWeeks);
 
-        // Group syllabus by subject
         const physics = SYLLABUS_DATA.filter(t => t.subject === 'Physics');
         const chemistry = SYLLABUS_DATA.filter(t => t.subject === 'Chemistry');
         const maths = SYLLABUS_DATA.filter(t => t.subject === 'Maths');
@@ -115,35 +114,21 @@ export const TimetableScreen: React.FC<Props> = ({ user, savedConfig, savedSlots
             return;
         }
 
-        // Determine topics per week
         const topicsPerWeek = Math.ceil(allTopicsCount / learningWeeks);
 
         const plan: MasterPlanWeek[] = [];
         let pIdx = 0, cIdx = 0, mIdx = 0;
         let currentWeekStart = new Date(start);
 
-        // Phase 1: Learning Weeks
         for (let i = 1; i <= learningWeeks; i++) {
             const weekTopics: Topic[] = [];
-            
-            // Distribute topics roughly equally (Round Robin)
             let count = 0;
-            // Loop until we fill the week OR run out of ALL topics
             while (count < topicsPerWeek) {
-                // Check if all done
-                if (pIdx >= physics.length && cIdx >= chemistry.length && mIdx >= maths.length) {
-                    break;
-                }
-
-                // Add Physics
+                if (pIdx >= physics.length && cIdx >= chemistry.length && mIdx >= maths.length) break;
                 if (pIdx < physics.length) { weekTopics.push(physics[pIdx++]); count++; }
                 if (count >= topicsPerWeek) break;
-                
-                // Add Chemistry
                 if (cIdx < chemistry.length) { weekTopics.push(chemistry[cIdx++]); count++; }
                 if (count >= topicsPerWeek) break;
-                
-                // Add Maths
                 if (mIdx < maths.length) { weekTopics.push(maths[mIdx++]); count++; }
                 if (count >= topicsPerWeek) break;
             }
@@ -163,7 +148,6 @@ export const TimetableScreen: React.FC<Props> = ({ user, savedConfig, savedSlots
             currentWeekStart.setDate(currentWeekStart.getDate() + 7);
         }
 
-        // Phase 2: Revision & Mocks Weeks
         for (let i = 1; i <= revisionWeeks; i++) {
             const weekEnd = new Date(currentWeekStart);
             weekEnd.setDate(weekEnd.getDate() + 6);
@@ -173,7 +157,7 @@ export const TimetableScreen: React.FC<Props> = ({ user, savedConfig, savedSlots
                 startDate: currentWeekStart.toISOString().split('T')[0],
                 endDate: weekEnd.toISOString().split('T')[0],
                 focus: i % 2 === 0 ? 'MOCK' : 'REVISION',
-                topics: [], // General revision implies all previous
+                topics: [], 
                 completed: false
             });
             currentWeekStart.setDate(currentWeekStart.getDate() + 7);
@@ -196,6 +180,7 @@ export const TimetableScreen: React.FC<Props> = ({ user, savedConfig, savedSlots
 
   // --- Common Saver ---
   const saveAllData = (plan?: MasterPlanWeek[], dailySlots?: any[]) => {
+      setSaveStatus('SAVING');
       const configToSave: TimetableConfig = {
           coachingDays, coachingStart, coachingEnd,
           schoolEnabled, schoolStart, schoolEnd,
@@ -205,24 +190,17 @@ export const TimetableScreen: React.FC<Props> = ({ user, savedConfig, savedSlots
           planTargetDate
       };
 
+      // Calls the parent handler (App.tsx) which handles the API call
       if (onSave) {
           onSave(configToSave, dailySlots || generatedSchedule || []);
-      }
-
-      if (user) {
-          fetch('/api/save_timetable.php', {
-              method: 'POST',
-              headers: {'Content-Type': 'application/json'},
-              body: JSON.stringify({
-                  user_id: user.id,
-                  config: configToSave,
-                  slots: dailySlots || generatedSchedule || []
-              })
-          }).catch(err => console.error("Failed to save timetable", err));
+          setTimeout(() => setSaveStatus('SAVED'), 800);
+          setTimeout(() => setSaveStatus('IDLE'), 3000);
+      } else {
+          setSaveStatus('IDLE');
       }
   };
 
-  // --- Daily Generator Logic (Simplified for brevity, same as before) ---
+  // --- Daily Generator Logic ---
   const toMins = (t: string) => {
       if(!t) return 0;
       const [h, m] = t.split(':').map(Number);
@@ -426,8 +404,8 @@ export const TimetableScreen: React.FC<Props> = ({ user, savedConfig, savedSlots
             <div className="absolute bottom-0 right-20 w-32 h-32 rounded-full bg-white opacity-10"></div>
         </div>
 
-        {/* Top Toggle */}
-        <div className="flex justify-center mb-6">
+        {/* Top Toggle & Controls */}
+        <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-6">
             <div className="bg-white p-1 rounded-xl shadow-sm border border-slate-200 flex">
                 <button 
                     onClick={() => setViewMode('DAILY')}
@@ -442,6 +420,20 @@ export const TimetableScreen: React.FC<Props> = ({ user, savedConfig, savedSlots
                     <Map className="w-4 h-4" /> Full Course Plan
                 </button>
             </div>
+
+            <button 
+                onClick={() => saveAllData()} 
+                className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all shadow-sm ${
+                    saveStatus === 'SAVED' ? 'bg-green-100 text-green-700' : 
+                    saveStatus === 'SAVING' ? 'bg-blue-50 text-blue-600' :
+                    'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200'
+                }`}
+            >
+                {saveStatus === 'SAVING' ? <RefreshCw className="w-4 h-4 animate-spin" /> : 
+                 saveStatus === 'SAVED' ? <CheckCircle2 className="w-4 h-4" /> : 
+                 <Save className="w-4 h-4" />}
+                {saveStatus === 'SAVING' ? 'Saving...' : saveStatus === 'SAVED' ? 'Saved' : 'Save Changes'}
+            </button>
         </div>
 
         {/* ... Rest of content ... */}
