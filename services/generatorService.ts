@@ -57,22 +57,31 @@ try {
         name: 'migrate_db.php',
         folder: 'deployment/api',
         content: `${phpHeader}
-// Helper to safely add columns if they don't exist
-function checkAndAddColumn($conn, $table, $col, $def) {
+// Strict Schema Enforcement Script
+// This script ensures the DB matches the exact schema required by the React App (v12.21)
+
+function safeColumnAdd($conn, $table, $column, $definition) {
     try {
+        // Check if table exists first
+        $tableCheck = $conn->query("SHOW TABLES LIKE '$table'");
+        if($tableCheck->rowCount() == 0) {
+            return; // Table creation handled separately
+        }
+        
+        // Check if column exists
         $stmt = $conn->prepare("SHOW COLUMNS FROM $table LIKE ?");
-        $stmt->execute([$col]);
+        $stmt->execute([$column]);
         if ($stmt->rowCount() == 0) {
-            $conn->exec("ALTER TABLE $table ADD COLUMN $col $def");
+            $conn->exec("ALTER TABLE $table ADD COLUMN $column $definition");
         }
     } catch(Exception $e) {
-        // Table might not exist or other error
+        // Ignore errors if column already exists or table locked
     }
 }
 
 try {
-    // 1. Ensure Base Tables Exist (Simplified Re-run of Create)
-    $sql = "
+    // 1. Create Tables if missing (Idempotent)
+    $tables_sql = "
     CREATE TABLE IF NOT EXISTS users (id VARCHAR(255) PRIMARY KEY, name VARCHAR(255));
     CREATE TABLE IF NOT EXISTS test_attempts (id VARCHAR(255) PRIMARY KEY);
     CREATE TABLE IF NOT EXISTS user_progress (id INT AUTO_INCREMENT PRIMARY KEY);
@@ -83,83 +92,153 @@ try {
     CREATE TABLE IF NOT EXISTS content (id INT AUTO_INCREMENT PRIMARY KEY);
     CREATE TABLE IF NOT EXISTS notifications (id VARCHAR(255) PRIMARY KEY);
     CREATE TABLE IF NOT EXISTS psychometric_results (id INT AUTO_INCREMENT PRIMARY KEY);
+    CREATE TABLE IF NOT EXISTS questions (id VARCHAR(255) PRIMARY KEY);
+    CREATE TABLE IF NOT EXISTS tests (id VARCHAR(255) PRIMARY KEY);
+    CREATE TABLE IF NOT EXISTS settings (setting_key VARCHAR(255) PRIMARY KEY);
+    CREATE TABLE IF NOT EXISTS topics (id VARCHAR(255) PRIMARY KEY);
+    CREATE TABLE IF NOT EXISTS chapter_notes (id INT AUTO_INCREMENT PRIMARY KEY);
+    CREATE TABLE IF NOT EXISTS video_lessons (id INT AUTO_INCREMENT PRIMARY KEY);
+    CREATE TABLE IF NOT EXISTS analytics_visits (date DATE PRIMARY KEY);
+    CREATE TABLE IF NOT EXISTS contact_messages (id INT AUTO_INCREMENT PRIMARY KEY);
     ";
-    $conn->exec($sql);
+    $conn->exec($tables_sql);
+
+    // 2. Enforce Columns (Fixes 1054 Errors)
     
-    // 2. Add Missing Columns (Comprehensive Check for 1054 Errors)
-    
-    // Users Table
-    checkAndAddColumn($conn, 'users', 'school', 'VARCHAR(255)');
-    checkAndAddColumn($conn, 'users', 'phone', 'VARCHAR(50)');
-    checkAndAddColumn($conn, 'users', 'avatar_url', 'VARCHAR(500)');
-    checkAndAddColumn($conn, 'users', 'linked_student_id', 'VARCHAR(255)');
-    checkAndAddColumn($conn, 'users', 'parent_id', 'VARCHAR(255)');
-    checkAndAddColumn($conn, 'users', 'google_id', 'VARCHAR(255)');
-    checkAndAddColumn($conn, 'users', 'is_verified', 'TINYINT(1) DEFAULT 1');
-    checkAndAddColumn($conn, 'users', 'target_exam', 'VARCHAR(100)');
-    checkAndAddColumn($conn, 'users', 'target_year', 'INT');
-    checkAndAddColumn($conn, 'users', 'institute', 'VARCHAR(255)');
-    checkAndAddColumn($conn, 'users', 'gender', 'VARCHAR(50)');
-    checkAndAddColumn($conn, 'users', 'dob', 'VARCHAR(50)');
-    
-    // Test Attempts
-    checkAndAddColumn($conn, 'test_attempts', 'detailed_results', 'LONGTEXT');
-    checkAndAddColumn($conn, 'test_attempts', 'topic_id', 'VARCHAR(255)');
-    checkAndAddColumn($conn, 'test_attempts', 'difficulty', 'VARCHAR(50)');
-    checkAndAddColumn($conn, 'test_attempts', 'accuracy', 'FLOAT');
-    checkAndAddColumn($conn, 'test_attempts', 'total_marks', 'INT');
-    checkAndAddColumn($conn, 'test_attempts', 'user_id', 'VARCHAR(255)');
-    checkAndAddColumn($conn, 'test_attempts', 'test_id', 'VARCHAR(255)');
-    
-    // User Progress
-    checkAndAddColumn($conn, 'user_progress', 'solved_questions_json', 'LONGTEXT');
-    checkAndAddColumn($conn, 'user_progress', 'next_revision_date', 'DATETIME');
-    checkAndAddColumn($conn, 'user_progress', 'status', 'VARCHAR(50)');
-    checkAndAddColumn($conn, 'user_progress', 'last_revised', 'DATETIME');
-    checkAndAddColumn($conn, 'user_progress', 'revision_level', 'INT');
-    
+    // Users
+    safeColumnAdd($conn, 'users', 'email', 'VARCHAR(255) UNIQUE');
+    safeColumnAdd($conn, 'users', 'password_hash', 'VARCHAR(255)');
+    safeColumnAdd($conn, 'users', 'role', 'VARCHAR(50) DEFAULT "STUDENT"');
+    safeColumnAdd($conn, 'users', 'target_exam', 'VARCHAR(100)');
+    safeColumnAdd($conn, 'users', 'target_year', 'INT');
+    safeColumnAdd($conn, 'users', 'institute', 'VARCHAR(255)');
+    safeColumnAdd($conn, 'users', 'gender', 'VARCHAR(50)');
+    safeColumnAdd($conn, 'users', 'dob', 'DATE');
+    safeColumnAdd($conn, 'users', 'security_question', 'TEXT');
+    safeColumnAdd($conn, 'users', 'security_answer', 'TEXT');
+    safeColumnAdd($conn, 'users', 'is_verified', 'TINYINT(1) DEFAULT 1');
+    safeColumnAdd($conn, 'users', 'google_id', 'VARCHAR(255)');
+    safeColumnAdd($conn, 'users', 'parent_id', 'VARCHAR(255)');
+    safeColumnAdd($conn, 'users', 'linked_student_id', 'VARCHAR(255)');
+    safeColumnAdd($conn, 'users', 'school', 'VARCHAR(255)');
+    safeColumnAdd($conn, 'users', 'phone', 'VARCHAR(50)');
+    safeColumnAdd($conn, 'users', 'avatar_url', 'VARCHAR(500)');
+    safeColumnAdd($conn, 'users', 'created_at', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP');
+
+    // Test Attempts (Critical for persistence)
+    safeColumnAdd($conn, 'test_attempts', 'user_id', 'VARCHAR(255)');
+    safeColumnAdd($conn, 'test_attempts', 'test_id', 'VARCHAR(255)');
+    safeColumnAdd($conn, 'test_attempts', 'score', 'INT');
+    safeColumnAdd($conn, 'test_attempts', 'total_marks', 'INT');
+    safeColumnAdd($conn, 'test_attempts', 'accuracy', 'FLOAT');
+    safeColumnAdd($conn, 'test_attempts', 'detailed_results', 'LONGTEXT'); // JSON
+    safeColumnAdd($conn, 'test_attempts', 'topic_id', 'VARCHAR(255)');
+    safeColumnAdd($conn, 'test_attempts', 'difficulty', 'VARCHAR(50)');
+    safeColumnAdd($conn, 'test_attempts', 'date', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP');
+
+    // User Progress (Critical for syllabus sync)
+    safeColumnAdd($conn, 'user_progress', 'user_id', 'VARCHAR(255)');
+    safeColumnAdd($conn, 'user_progress', 'topic_id', 'VARCHAR(255)');
+    safeColumnAdd($conn, 'user_progress', 'status', 'VARCHAR(50)');
+    safeColumnAdd($conn, 'user_progress', 'last_revised', 'DATETIME');
+    safeColumnAdd($conn, 'user_progress', 'revision_level', 'INT');
+    safeColumnAdd($conn, 'user_progress', 'next_revision_date', 'DATETIME');
+    safeColumnAdd($conn, 'user_progress', 'solved_questions_json', 'LONGTEXT'); // JSON
+
     // Timetable
-    checkAndAddColumn($conn, 'timetable', 'config_json', 'LONGTEXT');
-    checkAndAddColumn($conn, 'timetable', 'slots_json', 'LONGTEXT');
-    
+    safeColumnAdd($conn, 'timetable', 'config_json', 'LONGTEXT');
+    safeColumnAdd($conn, 'timetable', 'slots_json', 'LONGTEXT');
+    safeColumnAdd($conn, 'timetable', 'updated_at', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP');
+
     // Backlogs
-    checkAndAddColumn($conn, 'backlogs', 'user_id', 'VARCHAR(255)');
-    checkAndAddColumn($conn, 'backlogs', 'title', 'VARCHAR(255)');
-    checkAndAddColumn($conn, 'backlogs', 'subject', 'VARCHAR(50)');
-    checkAndAddColumn($conn, 'backlogs', 'priority', 'VARCHAR(50)');
-    checkAndAddColumn($conn, 'backlogs', 'status', 'VARCHAR(50)');
-    checkAndAddColumn($conn, 'backlogs', 'deadline', 'DATE');
-    
+    safeColumnAdd($conn, 'backlogs', 'user_id', 'VARCHAR(255)');
+    safeColumnAdd($conn, 'backlogs', 'title', 'VARCHAR(255)');
+    safeColumnAdd($conn, 'backlogs', 'subject', 'VARCHAR(50)');
+    safeColumnAdd($conn, 'backlogs', 'priority', 'VARCHAR(50)');
+    safeColumnAdd($conn, 'backlogs', 'status', 'VARCHAR(50)');
+    safeColumnAdd($conn, 'backlogs', 'deadline', 'DATE');
+    safeColumnAdd($conn, 'backlogs', 'created_at', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP');
+
     // Goals
-    checkAndAddColumn($conn, 'goals', 'user_id', 'VARCHAR(255)');
-    checkAndAddColumn($conn, 'goals', 'text', 'VARCHAR(255)');
-    checkAndAddColumn($conn, 'goals', 'completed', 'TINYINT(1) DEFAULT 0');
-    
+    safeColumnAdd($conn, 'goals', 'user_id', 'VARCHAR(255)');
+    safeColumnAdd($conn, 'goals', 'text', 'VARCHAR(255)');
+    safeColumnAdd($conn, 'goals', 'completed', 'TINYINT(1) DEFAULT 0');
+    safeColumnAdd($conn, 'goals', 'created_at', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP');
+
     // Mistake Logs
-    checkAndAddColumn($conn, 'mistake_logs', 'user_id', 'VARCHAR(255)');
-    checkAndAddColumn($conn, 'mistake_logs', 'question', 'TEXT');
-    checkAndAddColumn($conn, 'mistake_logs', 'subject', 'VARCHAR(50)');
-    checkAndAddColumn($conn, 'mistake_logs', 'note', 'TEXT');
-    checkAndAddColumn($conn, 'mistake_logs', 'date', 'DATETIME');
-    
-    // Content (Flashcards/Hacks)
-    checkAndAddColumn($conn, 'content', 'type', 'VARCHAR(50)');
-    checkAndAddColumn($conn, 'content', 'title', 'VARCHAR(255)');
-    checkAndAddColumn($conn, 'content', 'content_json', 'LONGTEXT');
-    
+    safeColumnAdd($conn, 'mistake_logs', 'user_id', 'VARCHAR(255)');
+    safeColumnAdd($conn, 'mistake_logs', 'question', 'TEXT');
+    safeColumnAdd($conn, 'mistake_logs', 'subject', 'VARCHAR(50)');
+    safeColumnAdd($conn, 'mistake_logs', 'note', 'TEXT');
+    safeColumnAdd($conn, 'mistake_logs', 'date', 'DATETIME');
+
+    // Content
+    safeColumnAdd($conn, 'content', 'type', 'VARCHAR(50)');
+    safeColumnAdd($conn, 'content', 'title', 'VARCHAR(255)');
+    safeColumnAdd($conn, 'content', 'content_json', 'LONGTEXT');
+    safeColumnAdd($conn, 'content', 'created_at', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP');
+
     // Notifications
-    checkAndAddColumn($conn, 'notifications', 'from_id', 'VARCHAR(255)');
-    checkAndAddColumn($conn, 'notifications', 'from_name', 'VARCHAR(255)');
-    checkAndAddColumn($conn, 'notifications', 'to_id', 'VARCHAR(255)');
-    checkAndAddColumn($conn, 'notifications', 'type', 'VARCHAR(50)');
-    checkAndAddColumn($conn, 'notifications', 'message', 'TEXT');
+    safeColumnAdd($conn, 'notifications', 'from_id', 'VARCHAR(255)');
+    safeColumnAdd($conn, 'notifications', 'from_name', 'VARCHAR(255)');
+    safeColumnAdd($conn, 'notifications', 'to_id', 'VARCHAR(255)');
+    safeColumnAdd($conn, 'notifications', 'type', 'VARCHAR(50)');
+    safeColumnAdd($conn, 'notifications', 'message', 'TEXT');
+    safeColumnAdd($conn, 'notifications', 'created_at', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP');
 
     // Psychometric
-    checkAndAddColumn($conn, 'psychometric_results', 'user_id', 'VARCHAR(255)');
-    checkAndAddColumn($conn, 'psychometric_results', 'report_json', 'LONGTEXT');
-    checkAndAddColumn($conn, 'psychometric_results', 'date', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP');
+    safeColumnAdd($conn, 'psychometric_results', 'user_id', 'VARCHAR(255)');
+    safeColumnAdd($conn, 'psychometric_results', 'report_json', 'LONGTEXT');
+    safeColumnAdd($conn, 'psychometric_results', 'date', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP');
 
-    echo json_encode(["status" => "success", "message" => "Database schema verified and updated successfully."]);
+    // Questions (Bank)
+    safeColumnAdd($conn, 'questions', 'subject_id', 'VARCHAR(50)');
+    safeColumnAdd($conn, 'questions', 'topic_id', 'VARCHAR(255)');
+    safeColumnAdd($conn, 'questions', 'text', 'TEXT');
+    safeColumnAdd($conn, 'questions', 'options_json', 'TEXT');
+    safeColumnAdd($conn, 'questions', 'correct_idx', 'INT');
+    safeColumnAdd($conn, 'questions', 'difficulty', 'VARCHAR(20)');
+    safeColumnAdd($conn, 'questions', 'source', 'VARCHAR(100)');
+    safeColumnAdd($conn, 'questions', 'year', 'INT');
+
+    // Tests (Config)
+    safeColumnAdd($conn, 'tests', 'title', 'VARCHAR(255)');
+    safeColumnAdd($conn, 'tests', 'duration', 'INT');
+    safeColumnAdd($conn, 'tests', 'category', 'VARCHAR(50)');
+    safeColumnAdd($conn, 'tests', 'difficulty', 'VARCHAR(50)');
+    safeColumnAdd($conn, 'tests', 'exam_type', 'VARCHAR(50)');
+    safeColumnAdd($conn, 'tests', 'questions_json', 'LONGTEXT');
+    safeColumnAdd($conn, 'tests', 'created_at', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP');
+
+    // Topics (Syllabus)
+    safeColumnAdd($conn, 'topics', 'name', 'VARCHAR(255)');
+    safeColumnAdd($conn, 'topics', 'chapter', 'VARCHAR(255)');
+    safeColumnAdd($conn, 'topics', 'subject', 'VARCHAR(50)');
+
+    // Chapter Notes
+    safeColumnAdd($conn, 'chapter_notes', 'topic_id', 'VARCHAR(255)');
+    safeColumnAdd($conn, 'chapter_notes', 'content_json', 'LONGTEXT');
+    safeColumnAdd($conn, 'chapter_notes', 'updated_at', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP');
+
+    // Video Lessons
+    safeColumnAdd($conn, 'video_lessons', 'topic_id', 'VARCHAR(255)');
+    safeColumnAdd($conn, 'video_lessons', 'url', 'VARCHAR(500)');
+    safeColumnAdd($conn, 'video_lessons', 'description', 'TEXT');
+
+    // Settings
+    safeColumnAdd($conn, 'settings', 'value', 'TEXT');
+
+    // Contact Messages
+    safeColumnAdd($conn, 'contact_messages', 'name', 'VARCHAR(255)');
+    safeColumnAdd($conn, 'contact_messages', 'email', 'VARCHAR(255)');
+    safeColumnAdd($conn, 'contact_messages', 'subject', 'VARCHAR(255)');
+    safeColumnAdd($conn, 'contact_messages', 'message', 'TEXT');
+    safeColumnAdd($conn, 'contact_messages', 'created_at', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP');
+
+    // Analytics
+    safeColumnAdd($conn, 'analytics_visits', 'count', 'INT DEFAULT 0');
+
+    echo json_encode(["status" => "success", "message" => "Database schema validated and updated."]);
 
 } catch(Exception $e) {
     http_response_code(500);
@@ -645,7 +724,7 @@ if(!$user_id) {
 try {
     $response = [];
 
-    // Profile: Use SELECT * to avoid 1054 error if specific columns (school, phone) are missing in DB
+    // Profile
     $stmt = $conn->prepare("SELECT * FROM users WHERE id = ?");
     $stmt->execute([$user_id]);
     $u = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -701,12 +780,10 @@ try {
     $response['backlogs'] = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
     // Timetable
-    // Use SELECT * to avoid 1054 if columns missing, handle in PHP
     $stmt = $conn->prepare("SELECT * FROM timetable WHERE user_id = ?");
     $stmt->execute([$user_id]);
     $tt = $stmt->fetch(PDO::FETCH_ASSOC);
     if($tt) {
-        // Handle potentially missing keys gracefully
         $config = isset($tt['config_json']) ? $tt['config_json'] : '{}';
         $slots = isset($tt['slots_json']) ? $tt['slots_json'] : '[]';
         $response['timetable'] = ['config' => json_decode($config), 'slots' => json_decode($slots)];
