@@ -416,14 +416,18 @@ export default function App() {
           if (Array.isArray(data.progress)) {
               const progMap: Record<string, UserProgress> = {};
               data.progress.forEach((p: any) => {
-                  progMap[p.topic_id] = {
-                      topicId: p.topic_id,
-                      status: p.status,
-                      lastRevised: p.last_revised,
-                      revisionLevel: parseInt(p.revision_level),
-                      nextRevisionDate: p.next_revision_date,
-                      solvedQuestions: p.solved_questions_json ? JSON.parse(p.solved_questions_json) : [] 
-                  };
+                  // Handle both snake_case (from new API) and camelCase (legacy)
+                  const id = p.topic_id || p.topicId;
+                  if (id) {
+                      progMap[id] = {
+                          topicId: id,
+                          status: p.status,
+                          lastRevised: p.last_revised || p.lastRevised,
+                          revisionLevel: p.revision_level !== undefined ? parseInt(p.revision_level) : (p.revisionLevel || 0),
+                          nextRevisionDate: p.next_revision_date || p.nextRevisionDate,
+                          solvedQuestions: p.solved_questions_json ? JSON.parse(p.solved_questions_json) : (p.solvedQuestions || [])
+                      };
+                  }
               });
               setProgress(progMap);
           }
@@ -461,14 +465,17 @@ export default function App() {
               const progMap: Record<string, UserProgress> = {};
               if(Array.isArray(data.progress)) {
                   data.progress.forEach((p: any) => {
-                      progMap[p.topic_id] = {
-                          topicId: p.topic_id,
-                          status: p.status,
-                          lastRevised: p.last_revised,
-                          revisionLevel: p.revision_level,
-                          nextRevisionDate: p.next_revision_date,
-                          solvedQuestions: p.solved_questions_json ? JSON.parse(p.solved_questions_json) : []
-                      };
+                      const id = p.topic_id || p.topicId;
+                      if(id) {
+                          progMap[id] = {
+                              topicId: id,
+                              status: p.status,
+                              lastRevised: p.last_revised || p.lastRevised,
+                              revisionLevel: p.revision_level !== undefined ? parseInt(p.revision_level) : (p.revisionLevel || 0),
+                              nextRevisionDate: p.next_revision_date || p.nextRevisionDate,
+                              solvedQuestions: p.solved_questions_json ? JSON.parse(p.solved_questions_json) : (p.solvedQuestions || [])
+                          };
+                      }
                   });
               }
               setLinkedStudentData({
@@ -541,7 +548,7 @@ export default function App() {
       }
       const updated = { ...current, ...updates };
       
-      // Update Server
+      // Update Server - IMPORTANT: We send 'topic_id' to match PHP expectation in sync_progress.php
       apiCall('/api/sync_progress.php', 'POST', { user_id: user.id, topic_id: topicId, ...updated });
       
       return { ...prev, [topicId]: updated };

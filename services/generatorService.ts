@@ -58,8 +58,6 @@ try {
         folder: 'deployment/api',
         content: `${phpHeader}
 // STRICT SCHEMA ENFORCEMENT
-// This script ensures the database structure exactly matches the application requirements.
-
 $schema = [
     'users' => [
         'id' => 'VARCHAR(255) PRIMARY KEY',
@@ -110,53 +108,6 @@ $schema = [
         'solved_questions_json' => 'LONGTEXT',
         'unique_constraint' => 'UNIQUE KEY (user_id, topic_id)'
     ],
-    'timetable' => [
-        'user_id' => 'VARCHAR(255) PRIMARY KEY',
-        'config_json' => 'LONGTEXT',
-        'slots_json' => 'LONGTEXT',
-        'updated_at' => 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP'
-    ],
-    'backlogs' => [
-        'id' => 'VARCHAR(255) PRIMARY KEY',
-        'user_id' => 'VARCHAR(255)',
-        'title' => 'VARCHAR(255)',
-        'subject' => 'VARCHAR(50)',
-        'priority' => 'VARCHAR(50)',
-        'status' => 'VARCHAR(50)',
-        'deadline' => 'DATE',
-        'created_at' => 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP'
-    ],
-    'goals' => [
-        'id' => 'VARCHAR(255) PRIMARY KEY',
-        'user_id' => 'VARCHAR(255)',
-        'text' => 'VARCHAR(255)',
-        'completed' => 'TINYINT(1) DEFAULT 0',
-        'created_at' => 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP'
-    ],
-    'mistake_logs' => [
-        'id' => 'VARCHAR(255) PRIMARY KEY',
-        'user_id' => 'VARCHAR(255)',
-        'question' => 'TEXT',
-        'subject' => 'VARCHAR(50)',
-        'note' => 'TEXT',
-        'date' => 'DATETIME'
-    ],
-    'content' => [
-        'id' => 'INT AUTO_INCREMENT PRIMARY KEY',
-        'type' => 'VARCHAR(50)',
-        'title' => 'VARCHAR(255)',
-        'content_json' => 'LONGTEXT',
-        'created_at' => 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP'
-    ],
-    'notifications' => [
-        'id' => 'VARCHAR(255) PRIMARY KEY',
-        'from_id' => 'VARCHAR(255)',
-        'from_name' => 'VARCHAR(255)',
-        'to_id' => 'VARCHAR(255)',
-        'type' => 'VARCHAR(50)',
-        'message' => 'TEXT',
-        'created_at' => 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP'
-    ],
     'psychometric_results' => [
         'id' => 'INT AUTO_INCREMENT PRIMARY KEY',
         'user_id' => 'VARCHAR(255)',
@@ -164,66 +115,30 @@ $schema = [
         'date' => 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP',
         'unique_constraint' => 'UNIQUE KEY (user_id)'
     ],
-    'questions' => [
-        'id' => 'VARCHAR(255) PRIMARY KEY',
-        'subject_id' => 'VARCHAR(50)',
-        'topic_id' => 'VARCHAR(255)',
-        'text' => 'TEXT',
-        'options_json' => 'TEXT',
-        'correct_idx' => 'INT',
-        'difficulty' => 'VARCHAR(20)',
-        'source' => 'VARCHAR(100)',
-        'year' => 'INT'
-    ],
-    'tests' => [
-        'id' => 'VARCHAR(255) PRIMARY KEY',
-        'title' => 'VARCHAR(255)',
-        'duration' => 'INT',
-        'category' => 'VARCHAR(50)',
-        'difficulty' => 'VARCHAR(50)',
-        'exam_type' => 'VARCHAR(50)',
-        'questions_json' => 'LONGTEXT',
-        'created_at' => 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP'
-    ],
-    'settings' => [
-        'setting_key' => 'VARCHAR(255) PRIMARY KEY',
-        'value' => 'TEXT'
-    ],
-    'topics' => [
-        'id' => 'VARCHAR(255) PRIMARY KEY',
-        'name' => 'VARCHAR(255)',
-        'chapter' => 'VARCHAR(255)',
-        'subject' => 'VARCHAR(50)'
-    ],
-    'chapter_notes' => [
-        'id' => 'INT AUTO_INCREMENT PRIMARY KEY',
-        'topic_id' => 'VARCHAR(255)',
-        'content_json' => 'LONGTEXT',
+    'timetable' => [
+        'user_id' => 'VARCHAR(255) PRIMARY KEY',
+        'config_json' => 'LONGTEXT',
+        'slots_json' => 'LONGTEXT',
         'updated_at' => 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP'
     ],
-    'video_lessons' => [
-        'id' => 'INT AUTO_INCREMENT PRIMARY KEY',
-        'topic_id' => 'VARCHAR(255)',
-        'url' => 'VARCHAR(500)',
-        'description' => 'TEXT'
-    ],
-    'analytics_visits' => [
-        'date' => 'DATE PRIMARY KEY',
-        'count' => 'INT DEFAULT 0'
-    ],
-    'contact_messages' => [
-        'id' => 'INT AUTO_INCREMENT PRIMARY KEY',
-        'name' => 'VARCHAR(255)',
-        'email' => 'VARCHAR(255)',
-        'subject' => 'VARCHAR(255)',
-        'message' => 'TEXT',
-        'created_at' => 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP'
-    ]
+    // ... other tables maintained ...
+    'backlogs' => ['id' => 'VARCHAR(255) PRIMARY KEY', 'user_id' => 'VARCHAR(255)', 'title' => 'VARCHAR(255)', 'subject' => 'VARCHAR(50)', 'priority' => 'VARCHAR(50)', 'status' => 'VARCHAR(50)', 'deadline' => 'DATE', 'created_at' => 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP'],
+    'goals' => ['id' => 'VARCHAR(255) PRIMARY KEY', 'user_id' => 'VARCHAR(255)', 'text' => 'VARCHAR(255)', 'completed' => 'TINYINT(1) DEFAULT 0', 'created_at' => 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP'],
+    'mistake_logs' => ['id' => 'VARCHAR(255) PRIMARY KEY', 'user_id' => 'VARCHAR(255)', 'question' => 'TEXT', 'subject' => 'VARCHAR(50)', 'note' => 'TEXT', 'date' => 'DATETIME'],
+    'content' => ['id' => 'INT AUTO_INCREMENT PRIMARY KEY', 'type' => 'VARCHAR(50)', 'title' => 'VARCHAR(255)', 'content_json' => 'LONGTEXT', 'created_at' => 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP'],
+    'notifications' => ['id' => 'VARCHAR(255) PRIMARY KEY', 'from_id' => 'VARCHAR(255)', 'from_name' => 'VARCHAR(255)', 'to_id' => 'VARCHAR(255)', 'type' => 'VARCHAR(50)', 'message' => 'TEXT', 'created_at' => 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP'],
+    'questions' => ['id' => 'VARCHAR(255) PRIMARY KEY', 'subject_id' => 'VARCHAR(50)', 'topic_id' => 'VARCHAR(255)', 'text' => 'TEXT', 'options_json' => 'TEXT', 'correct_idx' => 'INT', 'difficulty' => 'VARCHAR(20)', 'source' => 'VARCHAR(100)', 'year' => 'INT'],
+    'tests' => ['id' => 'VARCHAR(255) PRIMARY KEY', 'title' => 'VARCHAR(255)', 'duration' => 'INT', 'category' => 'VARCHAR(50)', 'difficulty' => 'VARCHAR(50)', 'exam_type' => 'VARCHAR(50)', 'questions_json' => 'LONGTEXT', 'created_at' => 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP'],
+    'settings' => ['setting_key' => 'VARCHAR(255) PRIMARY KEY', 'value' => 'TEXT'],
+    'topics' => ['id' => 'VARCHAR(255) PRIMARY KEY', 'name' => 'VARCHAR(255)', 'chapter' => 'VARCHAR(255)', 'subject' => 'VARCHAR(50)'],
+    'chapter_notes' => ['id' => 'INT AUTO_INCREMENT PRIMARY KEY', 'topic_id' => 'VARCHAR(255)', 'content_json' => 'LONGTEXT', 'updated_at' => 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP'],
+    'video_lessons' => ['id' => 'INT AUTO_INCREMENT PRIMARY KEY', 'topic_id' => 'VARCHAR(255)', 'url' => 'VARCHAR(500)', 'description' => 'TEXT'],
+    'analytics_visits' => ['date' => 'DATE PRIMARY KEY', 'count' => 'INT DEFAULT 0'],
+    'contact_messages' => ['id' => 'INT AUTO_INCREMENT PRIMARY KEY', 'name' => 'VARCHAR(255)', 'email' => 'VARCHAR(255)', 'subject' => 'VARCHAR(255)', 'message' => 'TEXT', 'created_at' => 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP']
 ];
 
 try {
     foreach ($schema as $table => $columns) {
-        // 1. Create Table if not exists
         $colDefs = [];
         foreach ($columns as $name => $def) {
             if ($name !== 'unique_constraint') {
@@ -237,32 +152,24 @@ try {
         $sql = "CREATE TABLE IF NOT EXISTS $table (" . implode(", ", $colDefs) . ")";
         $conn->exec($sql);
 
-        // 2. Add Columns if missing (Self-Healing)
         foreach ($columns as $name => $def) {
             if ($name === 'unique_constraint') continue;
-            
             try {
-                // Check if column exists
                 $stmt = $conn->prepare("SHOW COLUMNS FROM $table LIKE ?");
                 $stmt->execute([$name]);
-                
                 if ($stmt->rowCount() == 0) {
-                    // Column missing, add it
                     $alterSql = "ALTER TABLE $table ADD COLUMN $name $def";
                     $conn->exec($alterSql);
                 }
-            } catch (Exception $e) {
-                // Ignore harmless errors during alter
-            }
+            } catch (Exception $e) {}
         }
     }
     
-    // Explicitly add UNIQUE constraint for psychometric_results if missing (Fixes retake issues)
-    try {
-        $conn->exec("ALTER TABLE psychometric_results ADD UNIQUE (user_id)");
-    } catch (Exception $e) { /* Ignore if exists */ }
+    // Explicit Fixes
+    try { $conn->exec("ALTER TABLE psychometric_results ADD UNIQUE (user_id)"); } catch (Exception $e) {}
+    try { $conn->exec("ALTER TABLE user_progress ADD UNIQUE (user_id, topic_id)"); } catch (Exception $e) {}
     
-    echo json_encode(["status" => "success", "message" => "Database schema synchronized successfully."]);
+    echo json_encode(["status" => "success", "message" => "Database schema synchronized."]);
 
 } catch(Exception $e) {
     http_response_code(500);
@@ -271,56 +178,11 @@ try {
 ?>`
     },
     {
-        name: 'save_attempt.php',
-        folder: 'deployment/api',
-        content: `${phpHeader}
-$data = json_decode(file_get_contents("php://input"));
-if(isset($data->user_id) && isset($data->testId)) {
-    try {
-        // Strict JSON encoding for LONGTEXT column
-        $details = isset($data->detailedResults) ? json_encode($data->detailedResults) : '[]';
-        
-        // Use updated schema fields
-        $stmt = $conn->prepare("INSERT INTO test_attempts (
-            id, user_id, test_id, score, total_marks, accuracy, detailed_results, 
-            topic_id, difficulty, total_questions, correct_count, incorrect_count, unattempted_count, date
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())");
-        
-        $stmt->execute([
-            $data->id, 
-            $data->user_id, 
-            $data->testId, 
-            $data->score, 
-            $data->totalMarks, 
-            $data->accuracy_percent, // Stored in 'accuracy' column
-            $details,
-            $data->topicId ?? null,
-            $data->difficulty ?? 'MIXED',
-            $data->totalQuestions ?? 0,
-            $data->correctCount ?? 0,
-            $data->incorrectCount ?? 0,
-            $data->unattemptedCount ?? 0
-        ]);
-        echo json_encode(["message" => "Saved"]);
-    } catch(Exception $e) {
-        http_response_code(500);
-        echo json_encode(["error" => $e->getMessage()]);
-    }
-} else {
-    http_response_code(400);
-    echo json_encode(["error" => "Missing User ID or Test ID"]);
-}
-?>`
-    },
-    {
         name: 'get_dashboard.php',
         folder: 'deployment/api',
         content: `${phpHeader}
 $user_id = $_GET['user_id'] ?? '';
-if(!$user_id) {
-    echo json_encode(["error" => "No User ID"]);
-    exit();
-}
+if(!$user_id) { echo json_encode(["error" => "No User ID"]); exit(); }
 
 try {
     $response = [];
@@ -329,7 +191,6 @@ try {
     $stmt = $conn->prepare("SELECT * FROM users WHERE id = ?");
     $stmt->execute([$user_id]);
     $u = $stmt->fetch(PDO::FETCH_ASSOC);
-    
     if($u) {
         $response['userProfileSync'] = [
             "id" => $u['id'],
@@ -346,29 +207,26 @@ try {
             "phone" => $u['phone'] ?? '',
             "avatarUrl" => $u['avatar_url'] ?? ''
         ];
-    } else {
-        $response['userProfileSync'] = null;
-    }
+    } else { $response['userProfileSync'] = null; }
 
-    // Progress - MAP DB columns to Frontend types
+    // Progress - Return keys matching App.tsx expectations (snake_case)
     $stmt = $conn->prepare("SELECT * FROM user_progress WHERE user_id = ?");
     $stmt->execute([$user_id]);
     $rawProgress = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
-    $response['progress'] = []; // Sending array, frontend handles it if it expects array or map
-    // Actually existing frontend expects array in "progress" key but processes it into a Map.
-    // We send raw array of objects with correct keys.
+    $response['progress'] = []; 
     foreach($rawProgress as $p) {
+        // Crucial: Use snake_case here because App.tsx reads p.topic_id, p.last_revised, etc.
         $response['progress'][] = [
-            "topicId" => $p['topic_id'],
+            "topic_id" => $p['topic_id'], 
             "status" => $p['status'],
-            "lastRevised" => $p['last_revised'],
-            "revisionLevel" => (int)$p['revision_level'],
-            "nextRevisionDate" => $p['next_revision_date'],
-            "solvedQuestions_json" => $p['solved_questions_json'] // Frontend handles parse
+            "last_revised" => $p['last_revised'],
+            "revision_level" => (int)$p['revision_level'],
+            "next_revision_date" => $p['next_revision_date'],
+            "solved_questions_json" => $p['solved_questions_json']
         ];
     }
 
-    // Attempts - CRITICAL FIX: MAP snake_case to camelCase
+    // Attempts
     $stmt = $conn->prepare("SELECT * FROM test_attempts WHERE user_id = ? ORDER BY date DESC");
     $stmt->execute([$user_id]);
     $rawAttempts = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
@@ -380,7 +238,7 @@ try {
             "testId" => $att['test_id'],
             "score" => (int)$att['score'],
             "totalMarks" => (int)$att['total_marks'],
-            "accuracy_percent" => (float)$att['accuracy'], // DB has 'accuracy', Frontend wants 'accuracy_percent'
+            "accuracy_percent" => (float)$att['accuracy'],
             "detailedResults" => !empty($att['detailed_results']) ? json_decode($att['detailed_results']) : [],
             "topicId" => $att['topic_id'],
             "difficulty" => $att['difficulty'],
@@ -393,22 +251,18 @@ try {
     }
     $response['attempts'] = $attempts;
 
-    // Goals
     $stmt = $conn->prepare("SELECT * FROM goals WHERE user_id = ?");
     $stmt->execute([$user_id]);
     $response['goals'] = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
-    // Mistakes
     $stmt = $conn->prepare("SELECT * FROM mistake_logs WHERE user_id = ?");
     $stmt->execute([$user_id]);
     $response['mistakes'] = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
-    // Backlogs
     $stmt = $conn->prepare("SELECT * FROM backlogs WHERE user_id = ?");
     $stmt->execute([$user_id]);
     $response['backlogs'] = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
-    // Timetable
     $stmt = $conn->prepare("SELECT * FROM timetable WHERE user_id = ?");
     $stmt->execute([$user_id]);
     $tt = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -418,11 +272,9 @@ try {
         $response['timetable'] = ['config' => json_decode($config), 'slots' => json_decode($slots)];
     }
 
-    // Notifications
     $stmt = $conn->prepare("SELECT * FROM notifications WHERE to_id = ? ORDER BY created_at DESC");
     $stmt->execute([$user_id]);
     $notifications = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
-    // Map notifications too just in case
     $response['notifications'] = [];
     foreach($notifications as $n) {
         $response['notifications'][] = [
@@ -443,13 +295,58 @@ try {
 }
 ?>`
     },
-    // Keep other files intact
     {
-        name: 'index.php',
+        name: 'get_psychometric.php',
         folder: 'deployment/api',
-        content: `${phpHeader} echo json_encode(["status" => "active", "version" => "12.21"]); ?>`
+        content: `${phpHeader}
+$user_id = $_GET['user_id'] ?? '';
+if($user_id) {
+    try {
+        // Order by ID desc to get latest if duplicates exist
+        $stmt = $conn->prepare("SELECT * FROM psychometric_results WHERE user_id = ? ORDER BY id DESC LIMIT 1");
+        $stmt->execute([$user_id]);
+        $res = $stmt->fetch(PDO::FETCH_ASSOC);
+        if($res && !empty($res['report_json'])) {
+            echo json_encode(["status" => "success", "report" => json_decode($res['report_json'])]);
+        } else {
+            echo json_encode(["status" => "empty", "report" => null]);
+        }
+    } catch(Exception $e) {
+        http_response_code(500);
+        echo json_encode(["error" => $e->getMessage()]);
+    }
+} else {
+    http_response_code(400);
+    echo json_encode(["error" => "Missing User ID"]);
+}
+?>`
     },
-    // ... Include all other standard files ...
+    {
+        name: 'save_psychometric.php',
+        folder: 'deployment/api',
+        content: `${phpHeader}
+$data = json_decode(file_get_contents("php://input"));
+if(!empty($data->user_id) && !empty($data->report)) {
+    try {
+        $reportJson = json_encode($data->report);
+        $sql = "INSERT INTO psychometric_results (user_id, report_json, date) 
+                VALUES (?, ?, NOW()) 
+                ON DUPLICATE KEY UPDATE report_json = VALUES(report_json), date = NOW()";
+        $stmt = $conn->prepare($sql);
+        $stmt->execute([$data->user_id, $reportJson]);
+        echo json_encode(["status" => "success"]);
+    } catch(Exception $e) {
+        http_response_code(500);
+        echo json_encode(["error" => $e->getMessage()]);
+    }
+} else {
+    http_response_code(400);
+    echo json_encode(["error" => "Invalid input"]);
+}
+?>`
+    },
+    // Standard files
+    { name: 'index.php', folder: 'deployment/api', content: `${phpHeader} echo json_encode(["status" => "active", "version" => "12.21"]); ?>` },
     { name: 'test_db.php', folder: 'deployment/api', content: `${phpHeader} try { $tables = []; $res = $conn->query("SHOW TABLES"); while($row = $res->fetch(PDO::FETCH_NUM)) { $count = $conn->query("SELECT COUNT(*) FROM " . $row[0])->fetchColumn(); $tables[] = ["name" => $row[0], "rows" => $count]; } echo json_encode(["status" => "CONNECTED", "tables" => $tables]); } catch(PDOException $e) { http_response_code(500); echo json_encode(["status" => "ERROR", "message" => $e->getMessage()]); } ?>` },
     { name: 'save_timetable.php', folder: 'deployment/api', content: `${phpHeader} $data = json_decode(file_get_contents("php://input")); if(isset($data->user_id)) { try { $config = isset($data->config) ? json_encode($data->config) : '{}'; $slots = isset($data->slots) ? json_encode($data->slots) : '[]'; $sql = "INSERT INTO timetable (user_id, config_json, slots_json, updated_at) VALUES (?, ?, ?, NOW()) ON DUPLICATE KEY UPDATE config_json = VALUES(config_json), slots_json = VALUES(slots_json), updated_at = NOW()"; $stmt = $conn->prepare($sql); $stmt->execute([$data->user_id, $config, $slots]); echo json_encode(["message" => "Saved"]); } catch(Exception $e) { http_response_code(500); echo json_encode(["error" => $e->getMessage()]); } } else { http_response_code(400); echo json_encode(["error" => "Missing User ID"]); } ?>` },
     { name: 'sync_progress.php', folder: 'deployment/api', content: `${phpHeader} $data = json_decode(file_get_contents("php://input")); if($data && isset($data->user_id) && isset($data->topic_id)) { try { $solvedJson = isset($data->solvedQuestions) ? json_encode($data->solvedQuestions) : '[]'; $sql = "INSERT INTO user_progress (user_id, topic_id, status, last_revised, revision_level, next_revision_date, solved_questions_json) VALUES (?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE status = VALUES(status), last_revised = VALUES(last_revised), revision_level = VALUES(revision_level), next_revision_date = VALUES(next_revision_date), solved_questions_json = VALUES(solved_questions_json)"; $stmt = $conn->prepare($sql); $stmt->execute([$data->user_id, $data->topic_id, $data->status, $data->lastRevised, $data->revisionLevel, $data->nextRevisionDate, $solvedJson]); echo json_encode(["message" => "Synced Successfully"]); } catch (PDOException $e) { http_response_code(500); echo json_encode(["error" => "Database Error: " . $e->getMessage()]); } } else { http_response_code(400); echo json_encode(["error" => "Invalid Data Payload"]); } ?>` },

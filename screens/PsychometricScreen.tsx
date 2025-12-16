@@ -18,16 +18,16 @@ export const PsychometricScreen: React.FC<Props> = ({ user, reportData: initialR
     const [analyzing, setAnalyzing] = useState(false);
     const [report, setReport] = useState<PsychometricReport | null>(initialReport || null);
     const [fetchError, setFetchError] = useState(false);
-    const [hasFetched, setHasFetched] = useState(false);
+    const [loading, setLoading] = useState(false);
     
     const isParent = user.role === 'PARENT';
 
     // Check if user already has a report on load
     useEffect(() => {
-        // Only fetch if we haven't already fetched or manually reset via retake
-        if (!report && !hasFetched) {
+        // Only fetch if we don't have a report yet and we aren't in the middle of a retake flow
+        if (!report && !started) {
             const checkReport = async () => {
-                setHasFetched(true);
+                setLoading(true);
                 try {
                     const targetId = isParent && user.linkedStudentId ? user.linkedStudentId : user.id;
                     if (!targetId) return;
@@ -38,7 +38,7 @@ export const PsychometricScreen: React.FC<Props> = ({ user, reportData: initialR
                         if(data && data.report) {
                             setReport(data.report);
                         } else {
-                            // Only fallback to local if API explicitly returns nothing AND we are same user
+                            // Fallback to local only if server explicitly says empty and we are the student
                             if (!isParent) {
                                 const saved = localStorage.getItem(`psych_report_${user.id}`);
                                 if(saved) setReport(JSON.parse(saved));
@@ -49,11 +49,13 @@ export const PsychometricScreen: React.FC<Props> = ({ user, reportData: initialR
                     }
                 } catch(e) { 
                     setFetchError(true);
+                } finally {
+                    setLoading(false);
                 }
             };
             checkReport();
         }
-    }, [user.id, report, isParent, user.linkedStudentId, hasFetched]);
+    }, [user.id, isParent, user.linkedStudentId]); // Removed 'report' from dependency to prevent loop, added logic check inside
 
     const handleStart = () => setStarted(true);
 
@@ -106,8 +108,6 @@ export const PsychometricScreen: React.FC<Props> = ({ user, reportData: initialR
 
     const handleRetake = () => {
         if(confirm("Are you sure? This will overwrite your previous assessment analysis.")) {
-            // Prevent auto-fetch of old data by marking as fetched
-            setHasFetched(true);
             setReport(null);
             setResponses({});
             setCurrentStep(0);
@@ -123,16 +123,18 @@ export const PsychometricScreen: React.FC<Props> = ({ user, reportData: initialR
         return <Lightbulb className="w-5 h-5 text-slate-500" />;
     };
 
-    if (analyzing) {
+    if (analyzing || loading) {
         return (
             <div className="flex flex-col items-center justify-center h-[70vh] animate-in fade-in">
                 <div className="w-20 h-20 bg-violet-100 rounded-full flex items-center justify-center mb-6 relative">
                     <div className="absolute inset-0 border-4 border-violet-200 rounded-full animate-ping opacity-30"></div>
                     <Brain className="w-10 h-10 text-violet-600 animate-pulse" />
                 </div>
-                <h2 className="text-2xl font-bold text-slate-800 mb-2">Analyzing your psyche...</h2>
+                <h2 className="text-2xl font-bold text-slate-800 mb-2">
+                    {loading ? 'Loading Profile...' : 'Analyzing your psyche...'}
+                </h2>
                 <p className="text-slate-500 text-center max-w-md">
-                    Our AI expert is evaluating your stress levels, study patterns, and exam temperament to build a personalized profile.
+                    {loading ? 'Fetching your assessment history.' : 'Our AI expert is evaluating your stress levels, study patterns, and exam temperament.'}
                 </p>
             </div>
         );
