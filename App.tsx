@@ -44,7 +44,7 @@ import { DEFAULT_CHAPTER_NOTES } from './lib/chapterContent';
 import { MOCK_TESTS_DATA, generateInitialQuestionBank } from './lib/mockTestsData';
 import { TrendingUp, Bell, LogOut, Cloud, CloudOff, RefreshCw, Check, WifiOff, AlertTriangle } from 'lucide-react';
 
-const APP_VERSION = '12.21';
+const APP_VERSION = '12.22';
 
 const ComingSoonScreen = ({ title, icon }: { title: string, icon: string }) => (
   <div className="flex flex-col items-center justify-center h-[70vh] text-center">
@@ -698,108 +698,4 @@ export default function App() {
   };
 
   const toggleBacklog = (id: string) => { setBacklogs(prev => prev.map(b => b.id === id ? { ...b, status: b.status === 'PENDING' ? 'COMPLETED' : 'PENDING' } : b)); };
-  const deleteBacklog = (id: string) => { setBacklogs(prev => prev.filter(b => b.id !== id)); };
-
-  if (currentScreen === 'public-blog' || currentScreen === 'blog') return <PublicBlogScreen blogs={blogs} onBack={() => user ? setCurrentScreen('dashboard') : setCurrentScreen('dashboard')} />;
-  if (currentScreen === 'about') return <PublicLayout onNavigate={handleNavigation} currentScreen="about" socialConfig={socialConfig}><AboutUsScreen /></PublicLayout>;
-  if (currentScreen === 'contact') return <PublicLayout onNavigate={handleNavigation} currentScreen="contact" socialConfig={socialConfig}><ContactUsScreen /></PublicLayout>;
-  if (currentScreen === 'exams' && !user) return <PublicLayout onNavigate={handleNavigation} currentScreen="exams" socialConfig={socialConfig}><ExamGuideScreen /></PublicLayout>;
-  if (currentScreen === 'privacy') return <PublicLayout onNavigate={handleNavigation} currentScreen="privacy" socialConfig={socialConfig}><PrivacyPolicyScreen /></PublicLayout>;
-  if (currentScreen === 'features') return <PublicLayout onNavigate={handleNavigation} currentScreen="features" socialConfig={socialConfig}><FeaturesScreen /></PublicLayout>;
-
-  if (!user) { return <AuthScreen onLogin={handleLogin} onNavigate={handleNavigation} enableGoogleLogin={enableGoogleLogin} socialConfig={socialConfig} />; }
-
-  return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-900 flex">
-      <Navigation currentScreen={currentScreen} setScreen={setCurrentScreen} logout={handleLogout} user={user} />
-      <main className="flex-1 md:ml-64 p-4 md:p-8 overflow-y-auto h-screen pb-24 md:pb-8 relative">
-        <div className="md:hidden flex justify-between items-center mb-4 sticky top-0 bg-slate-50/90 backdrop-blur-xl z-30 py-3 border-b border-slate-200/50 -mx-4 px-4 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07)]">
-            <div className="flex items-center gap-2"><div className="w-8 h-8 bg-slate-900 rounded-full flex items-center justify-center text-blue-400 shadow-md"><TrendingUp className="w-5 h-5" /></div><span className="font-bold text-lg text-slate-800 tracking-tight">IIT<span className="text-blue-600">GEE</span>Prep</span></div>
-            <div className="flex items-center gap-3">
-                <SyncIndicator status={syncStatus} onRetry={() => fetchRemoteData(user.id)} />
-                {user.notifications && user.notifications.length > 0 && <div className="relative p-2"><Bell className="w-6 h-6 text-slate-600" /><span className="absolute top-1 right-2 w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse border border-white"></span></div>}
-                <button onClick={handleLogout} className="p-2 text-slate-400 hover:text-red-500 transition-colors rounded-full hover:bg-slate-100 active:scale-95">
-                    <LogOut className="w-5 h-5" />
-                </button>
-                {user.avatarUrl && <img src={user.avatarUrl} className="w-8 h-8 rounded-full border border-slate-300" alt="Avatar" />}
-            </div>
-        </div>
-        
-        {/* Desktop Sync Indicator */}
-        <div className="hidden md:block absolute top-6 right-8 z-50">
-            <SyncIndicator status={syncStatus} onRetry={() => fetchRemoteData(user.id)} />
-        </div>
-
-        {/* Sync Error Banner - Only display if NOT 404 (Offline Mode handled silently/gracefully) or if user is admin */}
-        {syncErrorMsg && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl mb-4 flex items-center justify-between shadow-sm animate-in slide-in-from-top-2">
-                <div className="flex items-center gap-2">
-                    <AlertTriangle className="w-5 h-5" />
-                    <span className="font-bold text-sm">{syncErrorMsg}</span>
-                </div>
-                <div className="flex gap-4">
-                    {syncErrorMsg.includes("404") || syncErrorMsg.includes("missing") && (
-                        <button onClick={() => setCurrentScreen('deployment')} className="text-xs font-bold underline hover:text-red-900 bg-red-100 px-2 py-1 rounded">Check Setup</button>
-                    )}
-                    <button onClick={() => fetchRemoteData(user.id)} className="text-xs font-bold underline hover:text-red-900">Retry</button>
-                </div>
-            </div>
-        )}
-
-        <div className="max-w-6xl mx-auto">
-          {user.role === 'PARENT' && (
-             <>
-                {currentScreen === 'dashboard' && <DashboardScreen user={user} viewingStudentName={linkedStudentData?.studentName} progress={linkedStudentData?.progress || {}} testAttempts={linkedStudentData?.tests || []} goals={[]} addGoal={()=>{}} toggleGoal={()=>{}} setScreen={setCurrentScreen} />}
-                {currentScreen === 'family' && <ParentFamilyScreen user={user} onSendRequest={sendConnectionRequest} linkedData={linkedStudentData} />}
-                {currentScreen === 'analytics' && <AnalyticsScreen user={user} viewingStudentName={linkedStudentData?.studentName} progress={linkedStudentData?.progress || {}} testAttempts={linkedStudentData?.tests || []} />}
-                {currentScreen === 'tests' && <TestScreen user={user} history={linkedStudentData?.tests || []} addTestAttempt={()=>{}} availableTests={adminTests} />}
-                {currentScreen === 'syllabus' && <SyllabusScreen user={user} viewingStudentName={linkedStudentData?.studentName} subjects={syllabus} progress={linkedStudentData?.progress || {}} onUpdateProgress={()=>{}} readOnly={true} videoMap={videoMap} chapterNotes={chapterNotes} questionBank={questionBank} addTestAttempt={()=>{}} testAttempts={linkedStudentData?.tests || []} />}
-                {currentScreen === 'profile' && <ProfileScreen user={user} onAcceptRequest={()=>{}} onUpdateUser={(u) => { const updated = { ...user, ...u }; setUser(updated); }} linkedStudentName={linkedStudentData?.studentName} />} 
-             </>
-          )}
-          {user.role === 'STUDENT' && (
-              <>
-                <AITutorChat isFullScreen={currentScreen === 'ai-tutor'} />
-                
-                {currentScreen === 'dashboard' && <DashboardScreen user={user} progress={progress} testAttempts={testAttempts} goals={goals} addGoal={addGoal} toggleGoal={toggleGoal} setScreen={setCurrentScreen} />}
-                {currentScreen === 'syllabus' && <SyllabusScreen user={user} subjects={syllabus} progress={progress} onUpdateProgress={updateTopicProgress} videoMap={videoMap} chapterNotes={chapterNotes} questionBank={questionBank} onToggleQuestion={toggleQuestionSolved} addTestAttempt={addTestAttempt} testAttempts={testAttempts} />}
-                {currentScreen === 'revision' && <RevisionScreen progress={progress} handleRevisionComplete={handleRevisionComplete} />}
-                {currentScreen === 'tests' && <TestScreen user={user} history={testAttempts} addTestAttempt={addTestAttempt} availableTests={adminTests} />}
-                {currentScreen === 'psychometric' && <PsychometricScreen user={user} />}
-                {currentScreen === 'timetable' && <TimetableScreen user={user} savedConfig={timetableData?.config} savedSlots={timetableData?.slots} onSave={saveTimetable} progress={progress} />}
-                {currentScreen === 'focus' && <FocusScreen />}
-                {currentScreen === 'exams' && <ExamGuideScreen />}
-                {currentScreen === 'ai-tutor' && (
-                   <div className="h-full hidden md:block"></div> 
-                )}
-                {currentScreen === 'flashcards' && <FlashcardScreen flashcards={flashcards} />}
-                {currentScreen === 'mistakes' && <MistakesScreen mistakes={mistakes} addMistake={addMistake} />}
-                {currentScreen === 'backlogs' && <BacklogScreen backlogs={backlogs} onAddBacklog={addBacklog} onToggleBacklog={toggleBacklog} onDeleteBacklog={deleteBacklog} />}
-                {currentScreen === 'hacks' && <HacksScreen hacks={hacks} />}
-                {currentScreen === 'analytics' && <AnalyticsScreen user={user} progress={progress} testAttempts={testAttempts} />}
-                {currentScreen === 'wellness' && <WellnessScreen />}
-                {currentScreen === 'profile' && <ProfileScreen user={user} onAcceptRequest={acceptConnectionRequest} onUpdateUser={(u) => { const updated = { ...user, ...u }; setUser(updated); }} />}
-              </>
-          )}
-          {user.role === 'ADMIN' && (
-              <>
-                {currentScreen === 'overview' && <AdminDashboardScreen user={user} onNavigate={setCurrentScreen} />}
-                {currentScreen === 'users' && <AdminUserManagementScreen />}
-                {currentScreen === 'syllabus_admin' && <AdminSyllabusScreen syllabus={syllabus} onAddTopic={handleAddTopic} onDeleteTopic={handleDeleteTopic} chapterNotes={chapterNotes} onUpdateNotes={updateChapterNotes} videoMap={videoMap} onUpdateVideo={updateVideo} />}
-                {(currentScreen === 'inbox' || currentScreen === 'content_admin') && <AdminInboxScreen />}
-                {currentScreen === 'content' && <ContentManagerScreen flashcards={flashcards} hacks={hacks} blogs={blogs} onAddFlashcard={addFlashcard} onAddHack={addHack} onAddBlog={addBlog} onDelete={deleteContent} initialTab='flashcards' />}
-                {currentScreen === 'blog_admin' && <AdminBlogScreen blogs={blogs} onAddBlog={addBlog} onUpdateBlog={updateBlog} onDeleteBlog={(id) => deleteContent('blog', id)} />}
-                {(currentScreen === 'tests' || currentScreen === 'tests_admin') && <AdminTestManagerScreen questionBank={questionBank} tests={adminTests} onAddQuestion={addQuestion} onCreateTest={createTest} onDeleteQuestion={deleteQuestion} onDeleteTest={deleteTest} syllabus={syllabus} />}
-                {currentScreen === 'analytics' && <AdminAnalyticsScreen />}
-                {currentScreen === 'diagnostics' && <DiagnosticsScreen />}
-                {currentScreen === 'deployment' && <DeploymentScreen />}
-                {currentScreen === 'system' && <AdminSystemScreen />}
-              </>
-          )}
-          {['admin_analytics'].includes(currentScreen) && <ComingSoonScreen title={currentScreen.charAt(0).toUpperCase() + currentScreen.slice(1)} icon="🚧" />}
-        </div>
-      </main>
-      <MobileNavigation currentScreen={currentScreen} setScreen={setCurrentScreen} logout={handleLogout} user={user} />
-    </div>
-  );
-}
+  const deleteBacklog = (id: string) =>
