@@ -527,9 +527,10 @@ export const SyllabusScreen: React.FC<SyllabusTrackerProps> = ({
                                                                                   {new Date(attempt.date).toLocaleDateString()}
                                                                               </span>
                                                                           </div>
-                                                                          <span className="text-xs text-slate-500 font-medium">
-                                                                              {attempt.totalQuestions} Questions
-                                                                          </span>
+                                                                          <div className="flex gap-2 text-xs font-medium mt-1">
+                                                                              <span className="text-green-600 flex items-center gap-1"><CheckCircle2 className="w-3 h-3"/> {attempt.correctCount} Correct</span>
+                                                                              <span className="text-red-500 flex items-center gap-1"><X className="w-3 h-3"/> {attempt.incorrectCount} Incorrect</span>
+                                                                          </div>
                                                                       </div>
                                                                       
                                                                       <div className="text-right">

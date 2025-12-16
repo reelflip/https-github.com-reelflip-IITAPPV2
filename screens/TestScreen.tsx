@@ -17,6 +17,12 @@ export const TestScreen: React.FC<Props> = ({ user, addTestAttempt, history, ava
   const [activeTest, setActiveTest] = useState<Test | null>(null);
   const [reviewAttempt, setReviewAttempt] = useState<TestAttempt | null>(null);
   
+  // Test Taking State
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [answers, setAnswers] = useState<Record<string, number>>({});
+  const [timeLeft, setTimeLeft] = useState(0);
+  const [testSubmitted, setTestSubmitted] = useState(false);
+
   // Filter Toggle
   const [showAllTests, setShowAllTests] = useState(false);
 
@@ -33,6 +39,17 @@ export const TestScreen: React.FC<Props> = ({ user, addTestAttempt, history, ava
       }
   }, [history.length, isParent]);
 
+  // Timer logic for active test
+  useEffect(() => {
+    let timer: any;
+    if (activeTest && !testSubmitted && timeLeft > 0) {
+        timer = setInterval(() => {
+            setTimeLeft((prev) => prev - 1);
+        }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [activeTest, testSubmitted, timeLeft]);
+
   // Handle Manual Submit
   const handleManualSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,496 +65,369 @@ export const TestScreen: React.FC<Props> = ({ user, addTestAttempt, history, ava
       totalMarks: totalVal,
       accuracy: accuracyVal,
       mistakes: [],
-      testId: 'manual_' + Date.now(),
+      testId: `manual_${Date.now()}`,
       totalQuestions: 0,
       correctCount: 0,
       incorrectCount: 0,
       unattemptedCount: 0,
       accuracy_percent: accuracyVal
     };
+    
     addTestAttempt(attempt);
     setIsManualEntry(false);
     setManualForm({ title: '', score: '', totalMarks: '300' });
-    setActiveTab('history');
   };
 
-  // Filter Logic
-  const filteredTests = useMemo(() => {
-      if (showAllTests || !user) return availableTests;
+  const startTest = (test: Test) => {
+      setActiveTest(test);
+      setAnswers({});
+      setCurrentQuestionIndex(0);
+      setTimeLeft(test.durationMinutes * 60);
+      setTestSubmitted(false);
+  };
 
-      const target = user.targetExam || 'JEE Main & Advanced';
+  const submitTest = () => {
+      if(!activeTest) return;
       
-      return availableTests.filter(test => {
-          if (target.includes('JEE') && test.examType === 'JEE') return true;
-          if (target.includes('BITSAT') && test.examType === 'BITSAT') return true;
-          if (target.includes('VITEEE') && test.examType === 'VITEEE') return true;
-          if (target.includes('MHT-CET') && test.examType === 'OTHER') return true; // Mapping assumption
-          
-          return false;
-      });
-  }, [availableTests, user, showAllTests]);
+      let correct = 0;
+      let incorrect = 0;
+      let unattempted = 0;
+      const detailedResults: QuestionResult[] = [];
 
-  const displayTests = filteredTests.length > 0 ? filteredTests : (showAllTests ? [] : availableTests); 
+      activeTest.questions.forEach(q => {
+          const ans = answers[q.id];
+          if(ans === undefined) {
+              unattempted++;
+              detailedResults.push({
+                  questionId: q.id,
+                  subjectId: q.subjectId,
+                  topicId: q.topicId,
+                  status: 'UNATTEMPTED'
+              });
+          } else if(ans === q.correctOptionIndex) {
+              correct++;
+              detailedResults.push({
+                  questionId: q.id,
+                  subjectId: q.subjectId,
+                  topicId: q.topicId,
+                  status: 'CORRECT',
+                  selectedOptionIndex: ans
+              });
+          } else {
+              incorrect++;
+              detailedResults.push({
+                  questionId: q.id,
+                  subjectId: q.subjectId,
+                  topicId: q.topicId,
+                  status: 'INCORRECT',
+                  selectedOptionIndex: ans
+              });
+          }
+      });
+
+      // Scoring: +4 for correct, -1 for incorrect (JEE Pattern)
+      const score = (correct * 4) - (incorrect * 1);
+      const totalMarks = activeTest.questions.length * 4;
+      const accuracy = correct + incorrect > 0 ? Math.round((correct / (correct + incorrect)) * 100) : 0;
+
+      const attempt: TestAttempt = {
+          id: Date.now().toString(),
+          date: new Date().toISOString(),
+          title: activeTest.title,
+          testId: activeTest.id,
+          score,
+          totalMarks,
+          accuracy, // Keep legacy accuracy
+          accuracy_percent: accuracy,
+          totalQuestions: activeTest.questions.length,
+          correctCount: correct,
+          incorrectCount: incorrect,
+          unattemptedCount: unattempted,
+          detailedResults
+      };
+
+      addTestAttempt(attempt);
+      setTestSubmitted(true);
+  };
+
+  const formatTime = (seconds: number) => {
+      const h = Math.floor(seconds / 3600);
+      const m = Math.floor((seconds % 3600) / 60);
+      const s = seconds % 60;
+      return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
 
   if (activeTest) {
+      // Test Taking Interface
       return (
-          <ActiveTestSession 
-            test={activeTest} 
-            onFinish={(result) => {
-                addTestAttempt(result);
-                setActiveTest(null);
-                setActiveTab('history');
-            }}
-            onCancel={() => setActiveTest(null)}
-          />
-      );
-  }
+          <div className="fixed inset-0 z-50 bg-white flex flex-col animate-in fade-in">
+              {/* Header */}
+              <div className="border-b border-slate-200 px-6 py-4 flex justify-between items-center bg-slate-50">
+                  <div>
+                      <h2 className="text-xl font-bold text-slate-800">{activeTest.title}</h2>
+                      <p className="text-xs text-slate-500">Question {currentQuestionIndex + 1} of {activeTest.questions.length}</p>
+                  </div>
+                  <div className="flex items-center gap-4">
+                      <div className={`flex items-center gap-2 font-mono text-lg font-bold ${timeLeft < 300 ? 'text-red-600 animate-pulse' : 'text-slate-700'}`}>
+                          <Clock className="w-5 h-5" />
+                          {formatTime(timeLeft)}
+                      </div>
+                      {!testSubmitted ? (
+                          <button 
+                              onClick={submitTest} 
+                              className="bg-green-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-green-700 transition-colors"
+                          >
+                              Submit Test
+                          </button>
+                      ) : (
+                          <button 
+                              onClick={() => setActiveTest(null)} 
+                              className="bg-slate-800 text-white px-6 py-2 rounded-lg font-bold hover:bg-slate-900 transition-colors"
+                          >
+                              Close
+                          </button>
+                      )}
+                  </div>
+              </div>
 
-  if (reviewAttempt) {
-      // Find the original test questions to render the review
-      const originalTest = availableTests.find(t => t.id === reviewAttempt.testId);
-      const questions = originalTest ? originalTest.questions : [];
+              {/* Content */}
+              <div className="flex-1 overflow-y-auto p-6 md:p-12">
+                  {testSubmitted ? (
+                      <div className="max-w-2xl mx-auto text-center space-y-6">
+                          <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto">
+                              <Target className="w-10 h-10 text-green-600" />
+                          </div>
+                          <h2 className="text-3xl font-bold text-slate-900">Test Submitted!</h2>
+                          <p className="text-slate-500">Your results have been saved to History.</p>
+                          <div className="grid grid-cols-3 gap-4 text-center">
+                              <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
+                                  <div className="text-2xl font-bold text-slate-800">{history[history.length - 1]?.score}</div>
+                                  <div className="text-xs text-slate-500 uppercase font-bold">Score</div>
+                              </div>
+                              <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
+                                  <div className="text-2xl font-bold text-green-600">{history[history.length - 1]?.accuracy}%</div>
+                                  <div className="text-xs text-slate-500 uppercase font-bold">Accuracy</div>
+                              </div>
+                              <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
+                                  <div className="text-2xl font-bold text-blue-600">{history[history.length - 1]?.correctCount}</div>
+                                  <div className="text-xs text-slate-500 uppercase font-bold">Correct</div>
+                              </div>
+                          </div>
+                      </div>
+                  ) : (
+                      <div className="max-w-3xl mx-auto">
+                          <div className="mb-8">
+                              <p className="text-lg font-medium text-slate-800 leading-relaxed">
+                                  {activeTest.questions[currentQuestionIndex].text}
+                              </p>
+                          </div>
+                          <div className="space-y-3">
+                              {activeTest.questions[currentQuestionIndex].options.map((opt, idx) => (
+                                  <button
+                                      key={idx}
+                                      onClick={() => setAnswers({...answers, [activeTest.questions[currentQuestionIndex].id]: idx})}
+                                      className={`w-full text-left p-4 rounded-xl border-2 transition-all ${
+                                          answers[activeTest.questions[currentQuestionIndex].id] === idx 
+                                          ? 'border-blue-500 bg-blue-50 text-blue-800 font-medium' 
+                                          : 'border-slate-200 hover:border-slate-300 text-slate-700'
+                                      }`}
+                                  >
+                                      <span className="inline-block w-6 h-6 rounded-full border-2 border-current text-center text-xs leading-5 mr-3 opacity-60">
+                                          {String.fromCharCode(65 + idx)}
+                                      </span>
+                                      {opt}
+                                  </button>
+                              ))}
+                          </div>
+                      </div>
+                  )}
+              </div>
 
-      return (
-          <ReviewView 
-              attempt={reviewAttempt} 
-              questions={questions}
-              onClose={() => setReviewAttempt(null)} 
-          />
+              {/* Footer Nav */}
+              {!testSubmitted && (
+                  <div className="border-t border-slate-200 p-4 bg-slate-50 flex justify-between">
+                      <button 
+                          onClick={() => setCurrentQuestionIndex(prev => Math.max(0, prev - 1))}
+                          disabled={currentQuestionIndex === 0}
+                          className="px-4 py-2 text-slate-600 font-bold disabled:opacity-50"
+                      >
+                          Previous
+                      </button>
+                      
+                      <div className="flex gap-1 overflow-x-auto max-w-[50%] no-scrollbar px-2">
+                          {activeTest.questions.map((q, idx) => (
+                              <button 
+                                  key={idx}
+                                  onClick={() => setCurrentQuestionIndex(idx)}
+                                  className={`w-8 h-8 rounded text-xs font-bold shrink-0 ${
+                                      currentQuestionIndex === idx ? 'bg-blue-600 text-white' :
+                                      answers[q.id] !== undefined ? 'bg-green-100 text-green-700' :
+                                      'bg-white border border-slate-300 text-slate-500'
+                                  }`}
+                              >
+                                  {idx + 1}
+                              </button>
+                          ))}
+                      </div>
+
+                      <button 
+                          onClick={() => setCurrentQuestionIndex(prev => Math.min(activeTest.questions.length - 1, prev + 1))}
+                          disabled={currentQuestionIndex === activeTest.questions.length - 1}
+                          className="px-4 py-2 text-slate-600 font-bold disabled:opacity-50"
+                      >
+                          Next
+                      </button>
+                  </div>
+              )}
+          </div>
       );
   }
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
-      {/* Header Banner */}
-      <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-8 text-white shadow-xl relative overflow-hidden">
-          <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-              <div>
-                  <div className="flex items-center space-x-3 mb-2">
-                      <Target className="w-8 h-8 text-white" />
-                      <h1 className="text-3xl font-bold">{isParent ? "Student Test Records" : "Test Center"}</h1>
-                  </div>
-                  <p className="text-indigo-100 text-lg opacity-90 max-w-2xl">
-                      {isParent ? "Detailed history of mock tests taken by the student." : "Attempt mock tests, practice chapter-wise problems, and review your performance history."}
-                  </p>
-              </div>
-              
-              {!isParent && (
-                  <div className="flex bg-white/20 p-1 rounded-xl backdrop-blur-sm border border-white/20">
-                      <button onClick={() => setActiveTab('practice')} className={`px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${activeTab === 'practice' ? 'bg-white text-indigo-700 shadow-md' : 'text-indigo-100 hover:bg-white/10'}`}>Practice Zone</button>
-                      <button onClick={() => setActiveTab('history')} className={`px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${activeTab === 'history' ? 'bg-white text-indigo-700 shadow-md' : 'text-indigo-100 hover:bg-white/10'}`}>History</button>
-                  </div>
-              )}
-          </div>
-          <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 rounded-full bg-white opacity-10"></div>
-          <div className="absolute bottom-0 right-20 w-32 h-32 rounded-full bg-white opacity-10"></div>
-      </div>
-
-      {activeTab === 'practice' && !isParent && (
-          <div className="space-y-6">
-              
-              {/* Filter Controls */}
-              <div className="flex justify-between items-center bg-blue-50/50 p-3 rounded-xl border border-blue-100">
-                  <div className="flex items-center gap-2">
-                      <Filter className="w-4 h-4 text-blue-500" />
-                      <span className="text-xs font-bold text-blue-800 uppercase tracking-wide">
-                          Showing: {showAllTests ? 'All Available Tests' : `Recommended for ${user?.targetExam || 'You'}`}
-                      </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                      <span className={`text-xs font-bold ${!showAllTests ? 'text-slate-400' : 'text-blue-600'}`}>All</span>
-                      <button 
-                          onClick={() => setShowAllTests(!showAllTests)}
-                          className={`w-10 h-5 rounded-full p-1 transition-colors ${!showAllTests ? 'bg-blue-600' : 'bg-slate-300'}`}
-                      >
-                          <div className={`w-3 h-3 bg-white rounded-full shadow-md transform transition-transform ${!showAllTests ? 'translate-x-5' : 'translate-x-0'}`}></div>
-                      </button>
-                      <span className={`text-xs font-bold ${!showAllTests ? 'text-blue-600' : 'text-slate-400'}`}>Recommended</span>
-                  </div>
-              </div>
-
-              {displayTests.length === 0 ? (
-                  <div className="text-center py-12 bg-slate-50 rounded-xl border border-dashed border-slate-300">
-                      <p className="text-slate-500 font-medium">No matching tests found for your target exam.</p>
-                      <button onClick={() => setShowAllTests(true)} className="text-xs text-blue-600 font-bold mt-2 hover:underline">
-                          Show all available tests
-                      </button>
-                  </div>
-              ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {displayTests.map(test => (
-                          <div key={test.id} className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all group">
-                              <div className="flex justify-between items-start mb-4">
-                                  <div>
-                                      <div className="flex gap-2 mb-2">
-                                          <span className="text-[10px] uppercase font-bold bg-slate-100 text-slate-600 px-2 py-1 rounded border border-slate-200">{test.examType || 'GENERIC'}</span>
-                                          <span className={`text-[10px] uppercase font-bold px-2 py-1 rounded border ${
-                                              test.difficulty === 'ADVANCED' ? 'bg-red-50 text-red-700 border-red-100' : 
-                                              test.difficulty === 'MAINS' ? 'bg-blue-50 text-blue-700 border-blue-100' : 'bg-slate-50 text-slate-700 border-slate-100'
-                                          }`}>
-                                              {test.difficulty}
-                                          </span>
-                                      </div>
-                                      <h3 className="font-bold text-lg text-slate-800 leading-tight">{test.title}</h3>
-                                  </div>
-                              </div>
-                              <div className="flex items-center gap-4 text-xs text-slate-500 mb-6 font-medium">
-                                  <span className="flex items-center"><Clock size={14} className="mr-1"/> {test.durationMinutes} mins</span>
-                                  <span>•</span>
-                                  <span>{test.questions.length} Questions</span>
-                              </div>
-                              <Button onClick={() => setActiveTest(test)} className="w-full group-hover:bg-blue-700">
-                                  Start Test <PlayCircle size={16} className="ml-2 group-hover:translate-x-1 transition-transform"/>
-                              </Button>
-                          </div>
-                      ))}
-                  </div>
-              )}
-          </div>
-      )}
-
-      {activeTab === 'history' && (
-          <div className="space-y-6">
-              {!isManualEntry && !isParent && (
-                  <div className="flex justify-end">
-                      <Button variant="outline" size="sm" onClick={() => setIsManualEntry(true)}>+ Log Manual Result</Button>
-                  </div>
-              )}
-
-              {isManualEntry && (
-                  <div className="bg-slate-50 p-6 rounded-xl border border-slate-200">
-                      <h4 className="font-bold text-slate-800 mb-4">Log External Test Result</h4>
-                      <form onSubmit={handleManualSubmit} className="flex flex-col md:flex-row gap-4 items-end">
-                          <div className="flex-1 w-full">
-                              <label className="block text-xs font-bold text-slate-500 mb-1">Title</label>
-                              <input required value={manualForm.title} onChange={e => setManualForm({...manualForm, title: e.target.value})} className="w-full p-2 border rounded" placeholder="e.g. Allen Major Test 1"/>
-                          </div>
-                          <div className="w-full md:w-24">
-                              <label className="block text-xs font-bold text-slate-500 mb-1">Score</label>
-                              <input required type="number" value={manualForm.score} onChange={e => setManualForm({...manualForm, score: e.target.value})} className="w-full p-2 border rounded"/>
-                          </div>
-                          <div className="w-full md:w-24">
-                              <label className="block text-xs font-bold text-slate-500 mb-1">Total</label>
-                              <input required type="number" value={manualForm.totalMarks} onChange={e => setManualForm({...manualForm, totalMarks: e.target.value})} className="w-full p-2 border rounded"/>
-                          </div>
-                          <div className="flex gap-2 w-full md:w-auto">
-                              <Button type="submit" className="flex-1 md:flex-none">Save</Button>
-                              <Button type="button" variant="ghost" onClick={() => setIsManualEntry(false)} className="flex-1 md:flex-none">Cancel</Button>
-                          </div>
-                      </form>
-                  </div>
-              )}
-
-              <div className="space-y-4">
-                  {history.length === 0 && (
-                      <div className="text-center py-16 bg-slate-50 rounded-xl border border-dashed border-slate-300">
-                          <div className="bg-white w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3 shadow-sm">
-                              <FileText className="w-6 h-6 text-slate-300" />
-                          </div>
-                          <p className="text-slate-500 font-medium">No test history found.</p>
-                          {isParent && <p className="text-xs text-slate-400 mt-1">Once the student attempts a test, results will appear here.</p>}
-                      </div>
-                  )}
-                  {[...history].reverse().map(attempt => {
-                      const hasDetailedResults = attempt.detailedResults && attempt.detailedResults.length > 0;
-                      // Only can review if we have detailed results AND we can find the questions (either via ID or logic)
-                      const canReview = hasDetailedResults && availableTests.some(t => t.id === attempt.testId);
-
-                      return (
-                      <div key={attempt.id} className="bg-white p-5 rounded-xl border border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center hover:shadow-md transition-all gap-4">
-                          <div className="flex-1">
-                              <h4 className="font-bold text-lg text-slate-800">{attempt.title}</h4>
-                              <div className="flex items-center gap-3 text-xs text-slate-500 mt-1">
-                                  <span>📅 {new Date(attempt.date).toLocaleDateString()}</span>
-                                  <span>•</span>
-                                  <span>{attempt.totalQuestions || 0} Questions</span>
-                              </div>
-                          </div>
-                          
-                          <div className="flex items-center gap-6 w-full md:w-auto border-t md:border-t-0 border-slate-100 pt-4 md:pt-0">
-                              <div className="text-center">
-                                  <span className="block text-xs font-bold text-slate-400 uppercase tracking-wider">Score</span>
-                                  <span className="text-xl font-black text-slate-800">{attempt.score}<span className="text-sm font-normal text-slate-400">/{attempt.totalMarks}</span></span>
-                              </div>
-                              <div className="text-center">
-                                  <span className="block text-xs font-bold text-slate-400 uppercase tracking-wider">Accuracy</span>
-                                  <span className={`text-lg font-bold ${attempt.accuracy_percent > 80 ? 'text-green-600' : attempt.accuracy_percent > 50 ? 'text-yellow-600' : 'text-red-600'}`}>
-                                      {attempt.accuracy_percent}%
-                                  </span>
-                              </div>
-                              
-                              <div className="flex flex-col gap-2">
-                                  {canReview && (
-                                      <Button variant="outline" size="sm" onClick={() => setReviewAttempt(attempt)}>
-                                          Review Mistakes
-                                      </Button>
-                                  )}
-                              </div>
-                          </div>
-                      </div>
-                  )})}
-              </div>
-          </div>
-      )}
-    </div>
-  );
-};
-
-// --- Review View Component ---
-const ReviewView = ({ attempt, questions, onClose }: { attempt: TestAttempt, questions: Question[], onClose: () => void }) => {
-    // Helper to get result for a specific question
-    const getResult = (qId: string) => attempt.detailedResults?.find(r => r.questionId === qId);
-
-    return (
-        <div className="fixed inset-0 z-50 bg-slate-50 flex flex-col animate-in slide-in-from-right-4 duration-300">
-            {/* Header */}
-            <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shadow-sm shrink-0 sticky top-0 z-10">
-                <div className="flex items-center gap-4">
-                    <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-500 hover:text-slate-800">
-                        <ArrowLeft className="w-6 h-6" />
-                    </button>
-                    <div>
-                        <h2 className="text-xl font-black text-slate-900 leading-tight">Test Review</h2>
-                        <p className="text-xs text-slate-500 font-bold uppercase tracking-wide">{attempt.title}</p>
+        {/* Header */}
+        <div className="bg-gradient-to-r from-blue-600 to-cyan-600 rounded-2xl p-8 text-white shadow-xl relative overflow-hidden">
+            <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                <div>
+                    <div className="flex items-center space-x-3 mb-2">
+                        <FileText className="w-8 h-8 text-white" />
+                        <h1 className="text-3xl font-bold">Test Center</h1>
                     </div>
+                    <p className="text-blue-100 text-lg opacity-90 max-w-2xl">
+                        Practice mock tests, track your history, and analyze performance.
+                    </p>
                 </div>
                 
-                <div className="flex gap-4 items-center">
-                    <div className="text-right hidden md:block">
-                        <span className="block text-xs font-bold text-slate-400 uppercase">Score</span>
-                        <span className="text-lg font-black text-blue-600">{attempt.score}/{attempt.totalMarks}</span>
-                    </div>
-                    <div className="w-px bg-slate-200 h-8 hidden md:block"></div>
-                    <div className="text-right hidden md:block">
-                        <span className="block text-xs font-bold text-slate-400 uppercase">Accuracy</span>
-                        <span className={`text-lg font-bold ${attempt.accuracy_percent > 80 ? 'text-green-600' : 'text-slate-700'}`}>
-                            {attempt.accuracy_percent}%
-                        </span>
-                    </div>
+                <div className="flex bg-white/20 p-1 rounded-xl backdrop-blur-sm border border-white/20">
+                    <button onClick={() => setActiveTab('practice')} className={`flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${activeTab === 'practice' ? 'bg-white text-blue-700 shadow-md' : 'text-blue-100 hover:bg-white/10'}`}>
+                        <PlayCircle className="w-4 h-4" /> Practice
+                    </button>
+                    <button onClick={() => setActiveTab('history')} className={`flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${activeTab === 'history' ? 'bg-white text-blue-700 shadow-md' : 'text-blue-100 hover:bg-white/10'}`}>
+                        <RotateCcw className="w-4 h-4" /> History
+                    </button>
                 </div>
             </div>
+            <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 rounded-full bg-white opacity-10"></div>
+            <div className="absolute bottom-0 right-20 w-32 h-32 rounded-full bg-white opacity-10"></div>
+        </div>
 
-            {/* Questions List */}
-            <div className="flex-1 overflow-y-auto bg-slate-50 p-4 md:p-8">
-                <div className="max-w-4xl mx-auto space-y-6">
-                    {questions.length === 0 && (
-                        <div className="text-center py-12 text-slate-400 bg-white rounded-xl border border-dashed border-slate-300">
-                            <p>Questions data not available for this test type.</p>
+        {activeTab === 'practice' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {availableTests.map(test => (
+                    <div key={test.id} className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all group">
+                        <div className="flex justify-between items-start mb-4">
+                            <div className={`p-3 rounded-lg ${test.examType === 'JEE' ? 'bg-orange-50 text-orange-600' : 'bg-purple-50 text-purple-600'}`}>
+                                <Target className="w-6 h-6" />
+                            </div>
+                            <span className="bg-slate-100 text-slate-600 px-3 py-1 rounded-full text-xs font-bold uppercase">{test.difficulty}</span>
                         </div>
-                    )}
-                    
-                    {questions.map((q, idx) => {
-                        const result = getResult(q.id);
-                        const userSelected = result?.selectedOptionIndex;
-                        const isCorrect = result?.status === 'CORRECT';
-                        const isSkipped = result?.status === 'UNATTEMPTED';
-                        
-                        return (
-                            <div key={q.id} className={`bg-white p-6 rounded-xl border-2 transition-all ${
-                                isCorrect ? 'border-green-100' : isSkipped ? 'border-slate-100' : 'border-red-100'
-                            }`}>
-                                <div className="flex gap-4">
-                                    <div className={`w-8 h-8 shrink-0 rounded-full flex items-center justify-center font-bold text-sm ${
-                                        isCorrect ? 'bg-green-100 text-green-700' : 
-                                        isSkipped ? 'bg-slate-100 text-slate-500' : 
-                                        'bg-red-100 text-red-700'
-                                    }`}>
-                                        {idx + 1}
+                        <h3 className="text-lg font-bold text-slate-800 mb-2">{test.title}</h3>
+                        <div className="flex gap-4 text-sm text-slate-500 mb-6">
+                            <span className="flex items-center"><Clock className="w-4 h-4 mr-1"/> {test.durationMinutes} mins</span>
+                            <span className="flex items-center"><FileText className="w-4 h-4 mr-1"/> {test.questions.length} Qs</span>
+                        </div>
+                        <button 
+                            onClick={() => startTest(test)}
+                            className="w-full py-3 rounded-lg bg-slate-900 text-white font-bold hover:bg-blue-600 transition-colors flex items-center justify-center gap-2"
+                        >
+                            Start Test <ArrowLeft className="w-4 h-4 rotate-180" />
+                        </button>
+                    </div>
+                ))}
+                
+                {availableTests.length === 0 && (
+                    <div className="col-span-full py-12 text-center text-slate-400 bg-slate-50 rounded-xl border border-dashed border-slate-300">
+                        <FileText className="w-12 h-12 mx-auto mb-3 opacity-20" />
+                        <p>No mock tests available at the moment.</p>
+                    </div>
+                )}
+            </div>
+        )}
+
+        {activeTab === 'history' && (
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="p-4 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
+                    <h3 className="font-bold text-slate-700">Attempt History</h3>
+                    <div className="flex gap-2">
+                        {!isParent && (
+                            <button 
+                                onClick={() => setIsManualEntry(true)}
+                                className="px-4 py-2 bg-white border border-slate-300 rounded-lg text-xs font-bold hover:bg-slate-50 text-slate-600"
+                            >
+                                + Manual Entry
+                            </button>
+                        )}
+                    </div>
+                </div>
+
+                {/* Manual Entry Form */}
+                {isManualEntry && (
+                    <div className="p-6 bg-blue-50/50 border-b border-blue-100 animate-in slide-in-from-top-2">
+                        <form onSubmit={handleManualSubmit} className="flex flex-wrap gap-4 items-end">
+                            <div className="flex-1 min-w-[200px]">
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Test Title</label>
+                                <input 
+                                    className="w-full p-2 border border-slate-300 rounded-lg text-sm" 
+                                    value={manualForm.title} 
+                                    onChange={e => setManualForm({...manualForm, title: e.target.value})} 
+                                    required 
+                                />
+                            </div>
+                            <div className="w-24">
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Score</label>
+                                <input 
+                                    type="number" 
+                                    className="w-full p-2 border border-slate-300 rounded-lg text-sm" 
+                                    value={manualForm.score} 
+                                    onChange={e => setManualForm({...manualForm, score: e.target.value})} 
+                                    required 
+                                />
+                            </div>
+                            <div className="w-24">
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Total</label>
+                                <input 
+                                    type="number" 
+                                    className="w-full p-2 border border-slate-300 rounded-lg text-sm" 
+                                    value={manualForm.totalMarks} 
+                                    onChange={e => setManualForm({...manualForm, totalMarks: e.target.value})} 
+                                    required 
+                                />
+                            </div>
+                            <div className="flex gap-2">
+                                <Button type="submit">Save</Button>
+                                <Button type="button" variant="ghost" onClick={() => setIsManualEntry(false)}>Cancel</Button>
+                            </div>
+                        </form>
+                    </div>
+                )}
+
+                <div className="divide-y divide-slate-100">
+                    {history.length === 0 ? (
+                        <div className="p-8 text-center text-slate-400">No history available.</div>
+                    ) : (
+                        history.map(attempt => (
+                            <div key={attempt.id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                                <div>
+                                    <h4 className="font-bold text-slate-800 text-sm">{attempt.title}</h4>
+                                    <div className="flex gap-3 text-xs text-slate-500 mt-1">
+                                        <span>{new Date(attempt.date).toLocaleDateString()}</span>
+                                        {attempt.difficulty && <span>• {attempt.difficulty}</span>}
                                     </div>
-                                    <div className="flex-1">
-                                        <div className="mb-4">
-                                            <div className="flex items-center gap-2 mb-2">
-                                                {isCorrect && <span className="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded uppercase">Correct</span>}
-                                                {!isCorrect && !isSkipped && <span className="bg-red-100 text-red-700 text-[10px] font-bold px-2 py-0.5 rounded uppercase">Incorrect</span>}
-                                                {isSkipped && <span className="bg-slate-100 text-slate-600 text-[10px] font-bold px-2 py-0.5 rounded uppercase">Skipped</span>}
-                                                <span className="text-[10px] font-bold text-slate-400 border px-1.5 py-0.5 rounded">{q.subjectId}</span>
-                                            </div>
-                                            <p className="text-slate-800 font-medium text-lg leading-relaxed">{q.text}</p>
-                                        </div>
-
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                            {q.options.map((opt, i) => {
-                                                const isThisCorrect = i === q.correctOptionIndex;
-                                                const isThisSelected = i === userSelected;
-                                                
-                                                let cardClass = "border-slate-100 bg-white text-slate-600";
-                                                
-                                                if (isThisCorrect) {
-                                                    cardClass = "border-green-500 bg-green-50 text-green-800 font-bold ring-1 ring-green-500";
-                                                } else if (isThisSelected && !isThisCorrect) {
-                                                    cardClass = "border-red-400 bg-red-50 text-red-800 font-medium";
-                                                } else {
-                                                    cardClass = "opacity-60 grayscale";
-                                                }
-
-                                                return (
-                                                    <div key={i} className={`p-3 rounded-lg border flex items-center gap-3 text-sm ${cardClass}`}>
-                                                        <div className={`w-6 h-6 rounded-full border flex items-center justify-center text-xs shrink-0 ${
-                                                            isThisCorrect ? 'border-green-600 bg-green-200 text-green-800' :
-                                                            (isThisSelected ? 'border-red-500 bg-red-200 text-red-800' : 'border-slate-300')
-                                                        }`}>
-                                                            {String.fromCharCode(65 + i)}
-                                                        </div>
-                                                        {opt}
-                                                        {isThisCorrect && <CheckCircle2 className="w-4 h-4 ml-auto text-green-600" />}
-                                                        {isThisSelected && !isThisCorrect && <X className="w-4 h-4 ml-auto text-red-500" />}
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
+                                </div>
+                                <div className="text-right">
+                                    <div className="text-lg font-bold text-blue-600">
+                                        {attempt.score}<span className="text-slate-400 text-sm">/{attempt.totalMarks}</span>
+                                    </div>
+                                    <div className={`text-xs font-bold ${attempt.accuracy_percent >= 80 ? 'text-green-600' : attempt.accuracy_percent >= 50 ? 'text-orange-500' : 'text-red-500'}`}>
+                                        {attempt.accuracy_percent}% Accuracy
                                     </div>
                                 </div>
                             </div>
-                        );
-                    })}
-                </div>
-            </div>
-        </div>
-    );
-};
-
-// --- Active Test Component ---
-
-const ActiveTestSession = ({ test, onFinish, onCancel }: { test: Test, onFinish: (r: TestAttempt) => void, onCancel: () => void }) => {
-    const [timeLeft, setTimeLeft] = useState(test.durationMinutes * 60);
-    const [answers, setAnswers] = useState<Record<string, number>>({});
-    const [currentQ, setCurrentQ] = useState(0);
-
-    // Timer
-    useEffect(() => {
-        const timer = setInterval(() => {
-            setTimeLeft((prev) => {
-                if (prev <= 1) {
-                    clearInterval(timer);
-                    handleSubmit();
-                    return 0;
-                }
-                return prev - 1;
-            });
-        }, 1000);
-        return () => clearInterval(timer);
-    }, []);
-
-    const handleSubmit = () => {
-        let score = 0;
-        let correct = 0;
-        let incorrect = 0;
-        let unattempted = 0;
-        
-        const detailedResults: QuestionResult[] = [];
-
-        test.questions.forEach(q => {
-            const ans = answers[q.id];
-            let status: QuestionResult['status'] = 'UNATTEMPTED';
-
-            if (ans === undefined) {
-                unattempted++;
-            } else if (ans === q.correctOptionIndex) {
-                score += 4;
-                correct++;
-                status = 'CORRECT';
-            } else {
-                score -= 1;
-                incorrect++;
-                status = 'INCORRECT';
-            }
-
-            detailedResults.push({
-                questionId: q.id,
-                subjectId: q.subjectId,
-                topicId: q.topicId,
-                status,
-                selectedOptionIndex: ans
-            });
-        });
-
-        const totalQs = test.questions.length;
-        const attempt: TestAttempt = {
-            id: Date.now().toString(),
-            testId: test.id,
-            date: new Date().toISOString(),
-            title: test.title,
-            score,
-            totalMarks: totalQs * 4,
-            accuracy: 0, // Legacy field
-            accuracy_percent: correct + incorrect > 0 ? Number(((correct / (correct + incorrect)) * 100).toFixed(2)) : 0,
-            totalQuestions: totalQs,
-            correctCount: correct,
-            incorrectCount: incorrect,
-            unattemptedCount: unattempted,
-            detailedResults
-        };
-        onFinish(attempt);
-    };
-
-    const formatTime = (s: number) => {
-        const mins = Math.floor(s / 60);
-        const secs = s % 60;
-        return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
-    };
-
-    const question = test.questions[currentQ];
-
-    return (
-        <div className="bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden flex flex-col h-[calc(100vh-140px)] md:h-[600px] mt-0 md:mt-4">
-            {/* Header */}
-            <div className="bg-slate-900 text-white p-4 flex justify-between items-center sticky top-0 z-10">
-                <div>
-                    <h3 className="font-bold text-sm md:text-base">{test.title}</h3>
-                    <p className="text-xs text-slate-400">Question {currentQ + 1} / {test.questions.length}</p>
-                </div>
-                <div className={`font-mono text-lg font-bold ${timeLeft < 300 ? 'text-red-400 animate-pulse' : ''}`}>
-                    {formatTime(timeLeft)}
-                </div>
-            </div>
-
-            {/* Question Area */}
-            <div className="flex-1 p-6 md:p-8 overflow-y-auto">
-                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 block">{question.subjectId}</span>
-                <p className="text-base md:text-lg font-medium text-slate-800 mb-8">{question.text}</p>
-                
-                <div className="space-y-3">
-                    {question.options.map((opt, idx) => (
-                        <div 
-                            key={idx}
-                            onClick={() => setAnswers(prev => ({ ...prev, [question.id]: idx }))}
-                            className={`p-4 rounded-lg border-2 cursor-pointer transition-all flex items-center ${
-                                answers[question.id] === idx 
-                                    ? 'border-blue-500 bg-blue-50 text-blue-700' 
-                                    : 'border-slate-100 hover:border-slate-300'
-                            }`}
-                        >
-                            <div className={`w-6 h-6 rounded-full border-2 mr-4 flex items-center justify-center text-xs shrink-0 ${
-                                answers[question.id] === idx ? 'border-blue-500 bg-blue-500 text-white' : 'border-slate-300'
-                            }`}>
-                                {String.fromCharCode(65 + idx)}
-                            </div>
-                            <span className="text-sm md:text-base">{opt}</span>
-                        </div>
-                    ))}
-                </div>
-            </div>
-
-            {/* Footer */}
-            <div className="p-4 border-t bg-slate-50 flex justify-between items-center sticky bottom-0">
-                <Button 
-                    variant="secondary" 
-                    onClick={() => setCurrentQ(prev => Math.max(0, prev - 1))}
-                    disabled={currentQ === 0}
-                    size="sm"
-                >
-                    Previous
-                </Button>
-                
-                <div className="flex gap-2">
-                    <Button variant="ghost" onClick={onCancel} className="text-red-500 hover:text-red-600 hover:bg-red-50" size="sm">Quit</Button>
-                    {currentQ < test.questions.length - 1 ? (
-                        <Button onClick={() => setCurrentQ(prev => prev + 1)} size="sm">Next</Button>
-                    ) : (
-                        <Button onClick={handleSubmit} className="bg-green-600 hover:bg-green-700" size="sm">Submit Test</Button>
+                        ))
                     )}
                 </div>
             </div>
-        </div>
-    );
+        )}
+    </div>
+  );
 };
