@@ -18,13 +18,16 @@ export const PsychometricScreen: React.FC<Props> = ({ user, reportData: initialR
     const [analyzing, setAnalyzing] = useState(false);
     const [report, setReport] = useState<PsychometricReport | null>(initialReport || null);
     const [fetchError, setFetchError] = useState(false);
+    const [hasFetched, setHasFetched] = useState(false);
     
     const isParent = user.role === 'PARENT';
 
     // Check if user already has a report on load
     useEffect(() => {
-        if (!report) {
+        // Only fetch if we haven't already fetched or manually reset via retake
+        if (!report && !hasFetched) {
             const checkReport = async () => {
+                setHasFetched(true);
                 try {
                     const targetId = isParent && user.linkedStudentId ? user.linkedStudentId : user.id;
                     if (!targetId) return;
@@ -50,7 +53,7 @@ export const PsychometricScreen: React.FC<Props> = ({ user, reportData: initialR
             };
             checkReport();
         }
-    }, [user.id, report, isParent, user.linkedStudentId]);
+    }, [user.id, report, isParent, user.linkedStudentId, hasFetched]);
 
     const handleStart = () => setStarted(true);
 
@@ -103,6 +106,8 @@ export const PsychometricScreen: React.FC<Props> = ({ user, reportData: initialR
 
     const handleRetake = () => {
         if(confirm("Are you sure? This will overwrite your previous assessment analysis.")) {
+            // Prevent auto-fetch of old data by marking as fetched
+            setHasFetched(true);
             setReport(null);
             setResponses({});
             setCurrentStep(0);
@@ -147,7 +152,7 @@ export const PsychometricScreen: React.FC<Props> = ({ user, reportData: initialR
                     <div className="relative z-10">
                         <div className="flex items-center gap-3 mb-2">
                             <Brain className="w-8 h-8 text-violet-400" />
-                            <h2 className="text-2xl font-bold">Psychometric Profile</h2>
+                            <h2 className="text-2xl font-bold">Psychometric Assessment</h2>
                         </div>
                         <p className="text-slate-400 max-w-xl">
                             Assessment Date: {new Date(report.date).toLocaleDateString()}
@@ -339,7 +344,7 @@ export const PsychometricScreen: React.FC<Props> = ({ user, reportData: initialR
                     <div className="w-24 h-24 bg-violet-100 rounded-full flex items-center justify-center mx-auto mb-8">
                         <HeartPulse className="w-12 h-12 text-violet-600" />
                     </div>
-                    <h1 className="text-3xl font-bold text-slate-900 mb-4">IIT-JEE Psychometric Assessment</h1>
+                    <h1 className="text-3xl font-bold text-slate-900 mb-4">Psychometric Assessment</h1>
                     <p className="text-lg text-slate-500 mb-8 max-w-lg mx-auto leading-relaxed">
                         Success in JEE isn't just about Physics, Chemistry, and Maths. It's about your mindset, stress management, and strategy.
                     </p>
