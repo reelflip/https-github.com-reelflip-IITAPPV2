@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Database, RefreshCw, Server, CheckCircle2, AlertTriangle, XCircle, Activity, Globe, Play, Loader2, Terminal, AlertCircle, ChevronDown, List, Shield, LayoutGrid, Clock, Users, Brain, Bot, Lock, FileText, Download, Trash2 } from 'lucide-react';
+import { Database, RefreshCw, Server, CheckCircle2, AlertTriangle, XCircle, Activity, Globe, Play, Loader2, Terminal, AlertCircle as AlertIcon, ChevronDown, List, Shield, LayoutGrid, Clock, Users, Brain, Bot, Lock, FileText, Download, Trash2 } from 'lucide-react';
 
 export const DiagnosticsScreen: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'VISUAL' | 'TERMINAL' | 'DB'>('VISUAL');
@@ -320,7 +320,7 @@ const useTestRunner = () => {
     const generateReport = () => {
         const reportData = {
             timestamp: new Date().toISOString(),
-            appVersion: '12.21',
+            appVersion: '12.22',
             results: suites
         };
         const blob = new Blob([JSON.stringify(reportData, null, 2)], { type: 'application/json' });

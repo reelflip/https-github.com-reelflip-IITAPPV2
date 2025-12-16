@@ -473,7 +473,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate, ena
           <button onClick={handleSetupLogin} className="text-[10px] font-bold text-slate-400 hover:text-blue-600 flex items-center justify-center gap-1 mx-auto transition-colors">
               <Settings className="w-3 h-3" /> System Setup / Download Bundle
           </button>
-          <div className="mt-2 text-[10px] font-mono text-slate-300">v12.21</div>
+          <div className="mt-2 text-[10px] font-mono text-slate-300">v12.22</div>
       </div>
     </div>
   );
