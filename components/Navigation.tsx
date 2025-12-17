@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Screen, User } from '../lib/types';
 import { Menu, X, MoreHorizontal, LogOut, LayoutDashboard, BookOpen, FileText, Bot, Timer, BarChart2, Calendar, RotateCw, AlertCircle, Layers, ListTodo, Lightbulb, Heart, User as UserIcon, Users, Inbox, Video, PenTool, Activity, Terminal, Settings, UploadCloud, Brain, Star, GraduationCap } from 'lucide-react';
@@ -61,7 +60,7 @@ const PARENT_MENU: {id: Screen, icon: any, label: string}[] = [
   { id: 'profile', icon: Settings, label: "Settings" },
 ];
 
-const getMenu = (role: string) => {
+const getMenu = (role?: string) => {
   switch(role) {
     case 'ADMIN': return ADMIN_MENU;
     case 'PARENT': return PARENT_MENU;
@@ -87,8 +86,8 @@ const NavItem: React.FC<NavItemProps> = ({ id, icon: Icon, label, isActive, onCl
 );
 
 export const Navigation: React.FC<NavigationProps> = ({ currentScreen, setScreen, logout, user }) => {
-  const hasNotifications = user.notifications && user.notifications.length > 0;
-  const menuItems = getMenu(user.role);
+  const hasNotifications = user?.notifications && user.notifications.length > 0;
+  const menuItems = getMenu(user?.role);
 
   return (
     <div className="w-64 bg-[#0f172a] h-screen flex flex-col fixed left-0 top-0 z-20 hidden md:flex overflow-y-auto custom-scrollbar shadow-xl">
@@ -97,7 +96,7 @@ export const Navigation: React.FC<NavigationProps> = ({ currentScreen, setScreen
             IIT<span className="text-blue-500">JEE</span>Prep
         </h1>
         <div className="flex items-center gap-2 mt-1">
-          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1.5 py-0.5 bg-slate-800 rounded">{user.role}</p>
+          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1.5 py-0.5 bg-slate-800 rounded">{user?.role || 'Guest'}</p>
           <span className="text-[10px] text-slate-600">• v12.22</span>
         </div>
       </div>
@@ -130,7 +129,7 @@ export const Navigation: React.FC<NavigationProps> = ({ currentScreen, setScreen
 
 export const MobileNavigation: React.FC<NavigationProps> = ({ currentScreen, setScreen, logout, user }) => {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const menuItems = getMenu(user.role);
+  const menuItems = getMenu(user?.role);
   
   const showMore = menuItems.length > 4;
   const primaryCount = showMore ? 4 : 5;
@@ -157,7 +156,7 @@ export const MobileNavigation: React.FC<NavigationProps> = ({ currentScreen, set
               
               <div className={`relative p-1.5 rounded-2xl transition-all duration-300 ${isActive ? 'bg-blue-50 -translate-y-1' : ''}`}>
                 <item.icon className={`w-6 h-6 ${isActive ? 'stroke-[2.5px] drop-shadow-sm' : 'stroke-[1.5px]'}`} />
-                {item.id === 'profile' && user.notifications && user.notifications.length > 0 && (
+                {item.id === 'profile' && user?.notifications && user.notifications.length > 0 && (
                   <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white shadow-sm"></span>
                 )}
               </div>
