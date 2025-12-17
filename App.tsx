@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { Navigation, MobileNavigation } from './components/Navigation';
 import { AuthScreen } from './screens/AuthScreen';
@@ -371,9 +372,8 @@ export default function App() {
               parent_id: notification.fromId,
               notification_id: notificationId
           });
-          const updatedNotifs = user.notifications.filter(n => n.id !== notificationId);
-          const updatedUser = { ...user, notifications: updatedNotifs, parentId: notification.fromId };
-          setUser(updatedUser);
+          // CRITICAL: Refresh user data to show linked state immediately
+          fetchRemoteData(user.id);
       } catch(e) { console.error("Accept failed", e); }
   };
 
@@ -451,15 +451,7 @@ export default function App() {
       });
   };
 
-  // --- Public View Handlers ---
-  if (currentScreen === 'public-blog' || currentScreen === 'blog') return <PublicBlogScreen blogs={blogs} onBack={() => user ? setCurrentScreen('dashboard') : setCurrentScreen('dashboard')} />;
-  if (currentScreen === 'about') return <PublicLayout onNavigate={handleNavigation} currentScreen="about" socialConfig={socialConfig}><AboutUsScreen /></PublicLayout>;
-  if (currentScreen === 'contact') return <PublicLayout onNavigate={handleNavigation} currentScreen="contact" socialConfig={socialConfig}><ContactUsScreen /></PublicLayout>;
-  if (currentScreen === 'exams' && !user) return <PublicLayout onNavigate={handleNavigation} currentScreen="exams" socialConfig={socialConfig}><ExamGuideScreen /></PublicLayout>;
-  if (currentScreen === 'privacy') return <PublicLayout onNavigate={handleNavigation} currentScreen="privacy" socialConfig={socialConfig}><PrivacyPolicyScreen /></PublicLayout>;
-  if (currentScreen === 'features') return <PublicLayout onNavigate={handleNavigation} currentScreen="features" socialConfig={socialConfig}><FeaturesScreen /></PublicLayout>;
-
-  // --- Authentication Guard ---
+  // --- View Flow ---
   if (!user) {
     return <AuthScreen onLogin={handleLogin} onNavigate={handleNavigation} enableGoogleLogin={enableGoogleLogin} socialConfig={socialConfig} />;
   }

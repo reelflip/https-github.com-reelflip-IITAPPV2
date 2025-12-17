@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Screen, User } from '../lib/types';
 import { Menu, X, MoreHorizontal, LogOut, LayoutDashboard, BookOpen, FileText, Bot, Timer, BarChart2, Calendar, RotateCw, AlertCircle, Layers, ListTodo, Lightbulb, Heart, User as UserIcon, Users, Inbox, Video, PenTool, Activity, Terminal, Settings, UploadCloud, Brain, Star, GraduationCap } from 'lucide-react';
@@ -96,7 +97,7 @@ export const Navigation: React.FC<NavigationProps> = ({ currentScreen, setScreen
             IIT<span className="text-blue-500">JEE</span>Prep
         </h1>
         <div className="flex items-center gap-2 mt-1">
-          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1.5 py-0.5 bg-slate-800 rounded">{user?.role || 'Guest'}</p>
+          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1.5 py-0.5 bg-slate-800 rounded">{user?.role || 'STUDENT'}</p>
           <span className="text-[10px] text-slate-600">• v12.22</span>
         </div>
       </div>
