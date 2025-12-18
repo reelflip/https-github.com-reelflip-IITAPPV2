@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { User, Role, SocialConfig } from '../lib/types';
 import { 
   TrendingUp,
@@ -42,11 +42,89 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [googleConfig, setGoogleConfig] = useState<{ enabled: boolean, clientId: string } | null>(null);
+  const googleBtnRef = useRef<HTMLDivElement>(null);
+  
   const showDemo = window.IITJEE_CONFIG?.enableDemoLogin ?? false;
 
   const [formData, setFormData] = useState({
     name: '', email: '', password: ''
   });
+
+  // Load Google Auth Config from backend
+  useEffect(() => {
+    const fetchConfig = async () => {
+        try {
+            const [enabledRes, clientIdRes] = await Promise.all([
+                fetch('/api/manage_settings.php?key=google_auth_enabled'),
+                fetch('/api/manage_settings.php?key=google_client_id')
+            ]);
+            
+            const enabledData = await enabledRes.json();
+            const clientIdData = await clientIdRes.json();
+            
+            if (enabledData?.value === '1' && clientIdData?.value) {
+                setGoogleConfig({
+                    enabled: true,
+                    clientId: clientIdData.value
+                });
+            }
+        } catch (e) {}
+    };
+    fetchConfig();
+  }, []);
+
+  // Initialize Google SDK when config is available
+  useEffect(() => {
+    if (googleConfig?.enabled && googleConfig.clientId && window.google) {
+        window.google.accounts.id.initialize({
+            client_id: googleConfig.clientId,
+            callback: handleGoogleCredentialResponse,
+            auto_select: false,
+            cancel_on_tap_outside: true
+        });
+
+        if (googleBtnRef.current) {
+            window.google.accounts.id.renderButton(googleBtnRef.current, {
+                theme: "outline",
+                size: "large",
+                width: googleBtnRef.current.offsetWidth,
+                text: view === 'REGISTER' ? "signup_with" : "signin_with",
+                shape: "rectangular"
+            });
+        }
+        
+        // Show One Tap if on Login
+        if (view === 'LOGIN') {
+            window.google.accounts.id.prompt();
+        }
+    }
+  }, [googleConfig, view]);
+
+  const handleGoogleCredentialResponse = async (response: any) => {
+      setIsLoading(true);
+      setError('');
+      try {
+          const res = await fetch('/api/google_login.php', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ credential: response.credential, role: role })
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.message || 'Google authentication failed.');
+          
+          onLogin({
+              ...data.user,
+              id: String(data.user.id),
+              role: (data.user.role || 'STUDENT').toUpperCase() as Role,
+              isVerified: data.user.is_verified == 1
+          });
+      } catch (err: any) {
+          setError(err.message || "Google Login failed.");
+      } finally {
+          setIsLoading(false);
+      }
+  };
 
   const handleDemoLogin = (selectedRole: Role) => {
       const demoUser: User = {
@@ -122,6 +200,17 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
             </div>
 
             <div className="space-y-5">
+                {googleConfig?.enabled && (
+                    <div className="space-y-4">
+                        <div ref={googleBtnRef} className="w-full min-h-[40px]"></div>
+                        <div className="relative flex items-center justify-center">
+                            <div className="flex-grow border-t border-slate-200"></div>
+                            <span className="flex-shrink mx-4 text-xs font-bold text-slate-400 uppercase tracking-widest">or use email</span>
+                            <div className="flex-grow border-t border-slate-200"></div>
+                        </div>
+                    </div>
+                )}
+
                 {showDemo && view === 'LOGIN' && (
                     <div className="grid grid-cols-3 gap-2 mb-6">
                         <button onClick={() => handleDemoLogin('STUDENT')} className="flex flex-col items-center justify-center p-2 rounded-xl border border-blue-100 bg-blue-50 text-blue-700 hover:bg-blue-100 transition-all">

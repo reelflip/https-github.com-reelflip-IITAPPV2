@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, Component, ErrorInfo, ReactNode, Suspense, lazy } from 'react';
+import React, { Component, useState, useEffect, useCallback, ErrorInfo, ReactNode, Suspense, lazy } from 'react';
 import { Navigation, MobileNavigation } from './components/Navigation';
 import { AITutorChat } from './components/AITutorChat';
 import { PublicLayout } from './components/PublicLayout';
@@ -33,6 +33,7 @@ const AdminTestManagerScreen = lazy(() => import('./screens/AdminTestManagerScre
 const AdminAnalyticsScreen = lazy(() => import('./screens/AdminAnalyticsScreen').then(m => ({ default: m.AdminAnalyticsScreen })));
 const AdminSystemScreen = lazy(() => import('./screens/AdminSystemScreen').then(m => ({ default: m.AdminSystemScreen })));
 const DeploymentScreen = lazy(() => import('./screens/DeploymentScreen').then(m => ({ default: m.DeploymentScreen })));
+const DiagnosticsScreen = lazy(() => import('./screens/DiagnosticsScreen').then(m => ({ default: m.DiagnosticsScreen })));
 const ContentManagerScreen = lazy(() => import('./screens/ContentManagerScreen').then(m => ({ default: m.ContentManagerScreen })));
 const AdminBlogScreen = lazy(() => import('./screens/AdminBlogScreen').then(m => ({ default: m.AdminBlogScreen })));
 const PublicBlogScreen = lazy(() => import('./screens/PublicBlogScreen').then(m => ({ default: m.PublicBlogScreen })));
@@ -52,20 +53,18 @@ interface ErrorBoundaryState {
   hasError: boolean;
 }
 
-// Fix: Explicitly extending React.Component and initializing state to fix TypeScript property access errors
-class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  public override state: ErrorBoundaryState = { hasError: false };
+// Fix: Using named Component import to ensure TypeScript correctly recognizes this.props and this.state.
+class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  // Fix: Removed redundant constructor and initialized state directly for better type inference.
+  public state: ErrorBoundaryState = { hasError: false };
 
-  constructor(props: ErrorBoundaryProps) {
-    super(props);
-  }
-  
-  static getDerivedStateFromError() { return { hasError: true }; }
+  // Fix: Added error parameter to static getDerivedStateFromError to correctly implement the error boundary.
+  static getDerivedStateFromError(_error: Error) { return { hasError: true }; }
   
   componentDidCatch(error: Error, errorInfo: ErrorInfo) { console.error("App Crash:", error, errorInfo); }
   
   render() {
-    // Fix: access property via this.state
+    // Fix: access property via this.state correctly now that inheritance is resolved.
     if (this.state.hasError) {
       return (
         <div className="min-h-screen flex flex-col items-center justify-center p-4 text-center bg-slate-50">
@@ -78,7 +77,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
         </div>
       );
     }
-    // Fix: access property via this.props
+    // Fix: Property 'props' is now correctly inherited from Component when extending it using the named import.
     return this.props.children;
   }
 }
@@ -314,6 +313,7 @@ const App: React.FC = () => {
       case 'blog_admin':
         return <AdminBlogScreen blogs={blogs} onAddBlog={(b) => setBlogs([...blogs, b])} onDeleteBlog={(id) => setBlogs(blogs.filter(b => b.id !== id))} />;
       case 'diagnostics':
+        return <DiagnosticsScreen />;
       case 'deployment':
         return <DeploymentScreen />;
       case 'system':

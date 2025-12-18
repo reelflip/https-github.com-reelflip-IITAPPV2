@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Save, Bot, Zap, CheckCircle2, AlertCircle, MessageSquare, Loader2, Play, Check, Brain, Key, BarChart3, ToggleLeft, ToggleRight, Share2, Instagram, Facebook, Twitter, Youtube, Linkedin, ShieldCheck, Database, FileCode, RefreshCw, Activity, Terminal, ExternalLink, Sparkles, Send, ShieldAlert } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Save, Bot, Zap, CheckCircle2, AlertCircle, MessageSquare, Loader2, Play, Check, Brain, Key, BarChart3, ToggleLeft, ToggleRight, Share2, Instagram, Facebook, Twitter, Youtube, Linkedin, ShieldCheck, Database, FileCode, RefreshCw, Activity, Terminal, ExternalLink, Sparkles, Send, ShieldAlert, Globe, Lock } from 'lucide-react';
 import { SocialConfig } from '../lib/types';
 
 interface DBTable { name: string; columns: number; rows: number; }
@@ -32,6 +32,7 @@ const API_FILE_LIST = [
 export const AdminSystemScreen: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'ai' | 'auth' | 'health'>('ai');
   const [aiConfig, setAiConfig] = useState({ enabled: true, model: 'gemini-3-flash-preview' });
+  const [googleAuthEnabled, setGoogleAuthEnabled] = useState(false);
   const [googleClientId, setGoogleClientId] = useState('');
   const [gaId, setGaId] = useState('');
   const [saving, setSaving] = useState(false);
@@ -50,10 +51,15 @@ export const AdminSystemScreen: React.FC = () => {
     try {
       const aiRes = await fetch('/api/manage_settings.php?key=ai_config');
       if(aiRes.ok) { const data = await aiRes.json(); if (data?.value) setAiConfig(JSON.parse(data.value)); }
+      
       const gaRes = await fetch('/api/manage_settings.php?key=google_analytics_id');
       if(gaRes.ok) { const data = await gaRes.json(); if(data?.value) setGaId(data.value); }
+      
       const oRes = await fetch('/api/manage_settings.php?key=google_client_id');
       if(oRes.ok) { const data = await oRes.json(); if(data?.value) setGoogleClientId(data.value); }
+
+      const oEnableRes = await fetch('/api/manage_settings.php?key=google_auth_enabled');
+      if(oEnableRes.ok) { const data = await oEnableRes.json(); if(data?.value) setGoogleAuthEnabled(data.value === '1'); }
     } catch (e) {}
   };
 
@@ -84,7 +90,41 @@ export const AdminSystemScreen: React.FC = () => {
 
   const handleSaveAI = async () => {
       setSaving(true);
-      try { await fetch('/api/manage_settings.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: 'ai_config', value: JSON.stringify(aiConfig) }) }); setSaveSuccess(true); setTimeout(() => setSaveSuccess(false), 3000); } catch (e) {}
+      try { 
+        await fetch('/api/manage_settings.php', { 
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json' }, 
+            body: JSON.stringify({ key: 'ai_config', value: JSON.stringify(aiConfig) }) 
+        }); 
+        setSaveSuccess(true); 
+        setTimeout(() => setSaveSuccess(false), 3000); 
+      } catch (e) {}
+      setSaving(false);
+  };
+
+  const handleSaveAuth = async () => {
+      setSaving(true);
+      try {
+          await Promise.all([
+              fetch('/api/manage_settings.php', { 
+                  method: 'POST', 
+                  headers: { 'Content-Type': 'application/json' }, 
+                  body: JSON.stringify({ key: 'google_client_id', value: googleClientId }) 
+              }),
+              fetch('/api/manage_settings.php', { 
+                  method: 'POST', 
+                  headers: { 'Content-Type': 'application/json' }, 
+                  body: JSON.stringify({ key: 'google_auth_enabled', value: googleAuthEnabled ? '1' : '0' }) 
+              }),
+              fetch('/api/manage_settings.php', { 
+                  method: 'POST', 
+                  headers: { 'Content-Type': 'application/json' }, 
+                  body: JSON.stringify({ key: 'google_analytics_id', value: gaId }) 
+              })
+          ]);
+          setSaveSuccess(true);
+          setTimeout(() => setSaveSuccess(false), 3000);
+      } catch (e) {}
       setSaving(false);
   };
 
@@ -95,7 +135,7 @@ export const AdminSystemScreen: React.FC = () => {
           <div><h2 className="text-3xl font-black flex items-center gap-3"><Activity className="text-blue-400" /> Admin System</h2><p className="text-slate-400 mt-2">v12.23 Maintenance Panel</p></div>
           <div className="flex bg-slate-800 p-1 rounded-xl border border-slate-700">
              <button onClick={() => setActiveTab('ai')} className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'ai' ? 'bg-blue-600 text-white' : 'text-slate-400'}`}>AI</button>
-             <button onClick={() => setActiveTab('auth')} className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'auth' ? 'bg-blue-600 text-white' : 'text-slate-400'}`}>Auth</button>
+             <button onClick={() => setActiveTab('auth')} className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'auth' ? 'bg-blue-600 text-white' : 'text-slate-400'}`}>Auth & Analytics</button>
              <button onClick={() => setActiveTab('health')} className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'health' ? 'bg-blue-600 text-white' : 'text-slate-400'}`}>Health</button>
           </div>
         </div>
@@ -113,15 +153,88 @@ export const AdminSystemScreen: React.FC = () => {
                   ))}
               </div>
               <div className="bg-white rounded-2xl border border-slate-200 p-6">
-                  <div className="flex items-center gap-3 mb-6"><Terminal className="text-slate-400" /> <h3 className="font-bold">Sandbox Verification</h3></div>
+                  <div className="flex items-center gap-3 mb-6"><Terminal className="text-slate-400" /> <h3 className="font-bold">AI Sandbox Verification</h3></div>
                   <div className="flex flex-col md:flex-row gap-6">
                       <textarea value={testInput} onChange={e => setTestInput(e.target.value)} className="flex-1 p-4 bg-slate-50 border rounded-xl text-sm h-32" placeholder="Send a test doubt..."/>
                       <div className="flex-1 bg-slate-50 rounded-xl p-4 border overflow-y-auto text-sm min-h-[128px]">{testResponse || 'No output.'}</div>
                   </div>
                   <div className="mt-6 flex justify-between items-center">
                       <button onClick={handleTestAI} disabled={verifying} className="bg-slate-900 text-white px-6 py-2.5 rounded-lg font-bold flex items-center gap-2">{verifying && <Loader2 className="animate-spin" size={16}/>} Test Model</button>
-                      <button onClick={handleSaveAI} disabled={!verified} className="bg-blue-600 text-white px-8 py-2.5 rounded-lg font-bold shadow-lg">Save & Deploy</button>
+                      <button onClick={handleSaveAI} disabled={!verified} className="bg-blue-600 text-white px-8 py-2.5 rounded-lg font-bold shadow-lg">Save AI Config</button>
                   </div>
+              </div>
+          </div>
+      )}
+
+      {activeTab === 'auth' && (
+          <div className="space-y-6 animate-in slide-in-from-bottom-4">
+              <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+                  <div className="p-6 border-b border-slate-100 bg-slate-50/50">
+                      <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                              <div className="p-2 bg-blue-100 text-blue-600 rounded-lg"><Lock size={20}/></div>
+                              <div>
+                                  <h3 className="font-bold text-slate-800">Google Authentication</h3>
+                                  <p className="text-xs text-slate-500">Allow students to sign up and login using their Google accounts.</p>
+                              </div>
+                          </div>
+                          <button onClick={() => setGoogleAuthEnabled(!googleAuthEnabled)} className={`flex items-center gap-2 transition-colors ${googleAuthEnabled ? 'text-blue-600' : 'text-slate-400'}`}>
+                              {googleAuthEnabled ? <ToggleRight size={32} /> : <ToggleLeft size={32} />}
+                          </button>
+                      </div>
+                  </div>
+                  <div className={`p-6 space-y-4 transition-all ${googleAuthEnabled ? 'opacity-100' : 'opacity-50 pointer-events-none'}`}>
+                      <div>
+                          <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Google OAuth Client ID</label>
+                          <div className="relative">
+                              <Key className="absolute left-3 top-3 text-slate-400" size={16} />
+                              <input 
+                                  value={googleClientId} 
+                                  onChange={e => setGoogleClientId(e.target.value)} 
+                                  placeholder="xxxx-xxxx.apps.googleusercontent.com"
+                                  className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-100 outline-none"
+                              />
+                          </div>
+                          <p className="text-[10px] text-slate-400 mt-2">Obtain this from Google Cloud Console (APIs & Services > Credentials).</p>
+                      </div>
+                  </div>
+              </div>
+
+              <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+                  <div className="p-6 border-b border-slate-100 bg-slate-50/50">
+                      <div className="flex items-center gap-3">
+                          <div className="p-2 bg-emerald-100 text-emerald-600 rounded-lg"><BarChart3 size={20}/></div>
+                          <div>
+                              <h3 className="font-bold text-slate-800">Analytics & Tracking</h3>
+                              <p className="text-xs text-slate-500">Monitor visitor behavior and platform engagement.</p>
+                          </div>
+                      </div>
+                  </div>
+                  <div className="p-6">
+                      <div>
+                          <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Google Analytics ID (G-XXXXXX)</label>
+                          <div className="relative">
+                              <Globe className="absolute left-3 top-3 text-slate-400" size={16} />
+                              <input 
+                                  value={gaId} 
+                                  onChange={e => setGaId(e.target.value)} 
+                                  placeholder="G-XXXXXXXXXX"
+                                  className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-100 outline-none"
+                              />
+                          </div>
+                      </div>
+                  </div>
+              </div>
+
+              <div className="flex justify-end">
+                  <button 
+                      onClick={handleSaveAuth} 
+                      disabled={saving} 
+                      className="bg-slate-900 text-white px-8 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-slate-800 transition-all disabled:opacity-50"
+                  >
+                      {saving ? <Loader2 className="animate-spin" size={18}/> : <Save size={18}/>}
+                      {saving ? 'Saving...' : 'Save Configuration'}
+                  </button>
               </div>
           </div>
       )}
@@ -150,6 +263,13 @@ export const AdminSystemScreen: React.FC = () => {
                 </div>
             </div>
         </div>
+      )}
+
+      {saveSuccess && (
+          <div className="fixed bottom-24 left-1/2 -translate-x-1/2 bg-green-600 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 animate-in fade-in slide-in-from-bottom-4 z-50">
+              <CheckCircle2 size={20} />
+              <span className="font-bold">System Settings Updated Successfully</span>
+          </div>
       )}
     </div>
   );
