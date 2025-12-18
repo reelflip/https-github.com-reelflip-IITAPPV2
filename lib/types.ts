@@ -4,6 +4,8 @@ declare global {
   interface Window {
     IITJEE_CONFIG: {
       enableDevTools: boolean;
+      /* Fix: Added missing property enableDemoLogin to window.IITJEE_CONFIG to resolve TypeScript error in AuthScreen.tsx */
+      enableDemoLogin?: boolean;
     };
     dataLayer: any[];
     gtag: (...args: any[]) => void;

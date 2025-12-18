@@ -48,7 +48,7 @@ try {
     $conn->exec("set names utf8mb4");
 } catch(PDOException $exception) {
     http_response_code(500);
-    echo json_encode(["status" => "error", "message" => "Database Connection Error: " . $exception->getMessage()]);
+    echo json_encode(["status" => "error", "message" => "Database Connection Error: " . $exception.getMessage()]);
     exit();
 }
 ?>`
@@ -335,7 +335,7 @@ try {
     { name: 'manage_goals.php', folder: 'deployment/api', content: `${phpHeader} $data = json_decode(file_get_contents("php://input")); try { if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['user_id'])) { $stmt = $conn->prepare("SELECT * FROM goals WHERE user_id = ?"); $stmt->execute([$_GET['user_id']]); echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC)); } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') { $stmt = $conn->prepare("INSERT INTO goals (id, user_id, text, completed) VALUES (?, ?, ?, 0)"); $stmt->execute([$data->id, $data->user_id, $data->text]); echo json_encode(["message" => "Goal Added"]); } elseif ($_SERVER['REQUEST_METHOD'] === 'PUT') { $conn->prepare("UPDATE goals SET completed = ? WHERE id = ?")->execute([$data->completed ? 1 : 0, $data->id]); echo json_encode(["message" => "Updated"]); } elseif ($_SERVER['REQUEST_METHOD'] === 'DELETE') { $conn->prepare("DELETE FROM goals WHERE id = ?")->execute([$_GET['id']]); echo json_encode(["message" => "Deleted"]); } } catch(Exception $e) { http_response_code(500); echo json_encode(["error" => $e->getMessage()]); } ?>` },
     { name: 'manage_mistakes.php', folder: 'deployment/api', content: `${phpHeader} $data = json_decode(file_get_contents("php://input")); try { if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['user_id'])) { $stmt = $conn->prepare("SELECT * FROM mistake_logs WHERE user_id = ? ORDER BY date DESC"); $stmt->execute([$_GET['user_id']]); echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC)); } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') { $stmt = $conn->prepare("INSERT INTO mistake_logs (id, user_id, question, subject, note, date) VALUES (?, ?, ?, ?, ?, ?)"); $stmt->execute([$data->id, $data->user_id, $data->question, $data->subject, $data->note, $data->date]); echo json_encode(["message" => "Saved"]); } } catch(Exception $e) { http_response_code(500); echo json_encode(["error" => $e->getMessage()]); } ?>` },
     { name: 'manage_content.php', folder: 'deployment/api', content: `${phpHeader} $method = $_SERVER['REQUEST_METHOD']; $type = $_GET['type'] ?? 'flashcard'; if ($method === 'GET') { $stmt = $conn->prepare("SELECT * FROM content WHERE type = ?"); $stmt->execute([$type]); echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC)); } elseif ($method === 'POST') { $data = json_decode(file_get_contents("php://input")); $stmt = $conn->prepare("INSERT INTO content (type, title, content_json) VALUES (?, ?, ?)"); $stmt->execute([$type, $data->title ?? '', json_encode($data)]); echo json_encode(["status" => "success", "id" => $conn->lastInsertId()]); } elseif ($method === 'DELETE') { $conn->prepare("DELETE FROM content WHERE id = ?")->execute([$_GET['id']]); } ?>` },
-    { name: 'manage_users.php', folder: 'deployment/api', content: `${phpHeader} $method = $_SERVER['REQUEST_METHOD']; if ($method === 'GET') { $stmt = $conn->query("SELECT id, name, email, role, is_verified, created_at FROM users ORDER BY created_at DESC"); echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC)); } elseif ($method === 'PUT') { $data = json_decode(file_get_contents("php://input")); $val = $data->isVerified ? 1 : 0; $conn->prepare("UPDATE users SET is_verified = ? WHERE id = ?")->execute([$val, $data->id]); echo json_encode(["message" => "Updated"]); } elseif ($method === 'DELETE') { $conn->prepare("DELETE FROM users WHERE id = ?")->execute([$_GET['id']]); echo json_encode(["message" => "Deleted"]); } ?>` },
+    { name: 'manage_users.php', folder: 'deployment/api', content: `${phpHeader} $method = $_SERVER['REQUEST_METHOD']; if ($method === 'GET') { $stmt = $conn->query("SELECT id, name, email, role, is_verified, created_at FROM users ORDER BY created_at DESC"); echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC)); } elseif ($method === 'PUT') { $data = json_decode(file_get_contents("php://input")); $val = $data->isVerified ? 1 : 0; $conn->prepare("UPDATE users SET is_verified = ? WHERE id = ?")->execute([$val, $data->id]); echo json_encode(["message" => "Updated"]); } elseif ($method === 'DELETE') { $conn->prepare("DELETE FROM users WHERE id = ?")->execute([$_GET['id']]); } ?>` },
     { name: 'search_students.php', folder: 'deployment/api', content: `${phpHeader} try { $query = $_GET['q'] ?? ''; if (strlen($query) < 2) { echo json_encode([]); exit(); } $sql = "SELECT id, name, email, institute FROM users WHERE role = 'STUDENT' AND (name LIKE ? OR id LIKE ? OR email LIKE ?) LIMIT 10"; $stmt = $conn->prepare($sql); $searchTerm = "%" . $query . "%"; $stmt->execute([$searchTerm, $searchTerm, $searchTerm]); echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC)); } catch (Exception $e) { http_response_code(500); echo json_encode(["error" => $e->getMessage()]); } ?>` },
     { name: 'send_request.php', folder: 'deployment/api', content: `${phpHeader} $data = json_decode(file_get_contents("php://input")); if($data && isset($data->action) && $data->action === 'send') { try { $stmt = $conn->prepare("SELECT id FROM users WHERE id = ? AND role = 'STUDENT'"); $stmt->execute([$data->student_identifier]); if($stmt->rowCount() > 0) { $notif_id = uniqid('notif_'); $sql = "INSERT INTO notifications (id, from_id, from_name, to_id, type, message) VALUES (?, ?, ?, ?, 'connection_request', 'Parent Connection Request')"; $conn->prepare($sql)->execute([$notif_id, $data->parent_id, $data->parent_name, $data->student_identifier]); echo json_encode(["message" => "Request Sent"]); } else { http_response_code(404); echo json_encode(["message" => "Student Not Found"]); } } catch(Exception $e) { http_response_code(500); echo json_encode(["error" => $e->getMessage()]); } } else { http_response_code(400); echo json_encode(["error" => "Invalid Request"]); } ?>` },
     { name: 'respond_request.php', folder: 'deployment/api', content: `${phpHeader} $data = json_decode(file_get_contents("php://input")); if($data && isset($data->accept) && $data->accept) { try { $conn->prepare("UPDATE users SET parent_id = ? WHERE id = ?")->execute([$data->parent_id, $data->student_id]); $conn->prepare("UPDATE users SET linked_student_id = ? WHERE id = ?")->execute([$data->student_id, $data->parent_id]); $conn->prepare("DELETE FROM notifications WHERE id = ?")->execute([$data->notification_id]); echo json_encode(["status" => "success"]); } catch(Exception $e) { http_response_code(500); echo json_encode(["error" => $e->getMessage()]); } } else { http_response_code(400); echo json_encode(["error" => "Invalid Request"]); } ?>` },
@@ -356,13 +356,37 @@ try {
     { name: 'save_psychometric.php', folder: 'deployment/api', content: `${phpHeader} $data = json_decode(file_get_contents("php://input")); if(!empty($data->user_id) && !empty($data->report)) { try { $reportJson = json_encode($data->report); $stmt = $conn->prepare("INSERT INTO psychometric_results (user_id, report_json, date) VALUES (?, ?, NOW()) ON DUPLICATE KEY UPDATE report_json = VALUES(report_json), date = NOW()"); $stmt->execute([$data->user_id, $reportJson]); echo json_encode(["status" => "success"]); } catch(Exception $e) { http_response_code(500); echo json_encode(["error" => $e->getMessage()]); } } ?>` }
 ];
 
-const esc = (str: string | undefined) => {
-    if (!str) return '';
-    return str.replace(/\\/g, '\\\\').replace(/'/g, "''");
-};
+export const generateHtaccess = () => `
+# IITGEEPrep High-Compatibility .htaccess
+# Optimized for React Router and PHP API protection
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # 1. API Protection (Allow access but block direct file listing)
+  RewriteRule ^api/(.*)\\.php$ - [L]
+  
+  # 2. React Router SPA support
+  RewriteRule ^index\\.html$ - [L]
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule . /index.html [L]
+</IfModule>
+
+# 3. Disable Indexing
+Options -Indexes
+
+# 4. Security Headers to prevent 403 blocks during normal operations
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-XSS-Protection "1; mode=block"
+    Header set Access-Control-Allow-Origin "*"
+</IfModule>
+`;
 
 export const generateSQLSchema = () => {
-    let sql = `
+    let sql = \`
 CREATE TABLE IF NOT EXISTS users (
     id VARCHAR(255) PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
@@ -521,61 +545,55 @@ CREATE TABLE IF NOT EXISTS analytics_visits (
     count INT DEFAULT 0
 );
 -- SEED DATA --
-`;
+\`;
 
     if (SYLLABUS_DATA.length > 0) {
-        sql += `INSERT IGNORE INTO topics (id, name, chapter, subject) VALUES \n`;
-        const values = SYLLABUS_DATA.map(t => `('${esc(t.id)}', '${esc(t.name)}', '${esc(t.chapter)}', '${esc(t.subject)}')`).join(',\n');
+        sql += \`INSERT IGNORE INTO topics (id, name, chapter, subject) VALUES \n\`;
+        const values = SYLLABUS_DATA.map(t => \`('\${esc(t.id)}', '\${esc(t.name)}', '\${esc(t.chapter)}', '\${esc(t.subject)}')\`).join(',\n');
         sql += values + ';\n';
     }
 
     const questions = generateInitialQuestionBank();
     if (questions.length > 0) {
-        sql += `INSERT IGNORE INTO questions (id, subject_id, topic_id, text, options_json, correct_idx, difficulty, source, year) VALUES \n`;
+        sql += \`INSERT IGNORE INTO questions (id, subject_id, topic_id, text, options_json, correct_idx, difficulty, source, year) VALUES \n\`;
         const values = questions.map(q => {
             const opts = JSON.stringify(q.options).replace(/'/g, "''");
-            return `('${esc(q.id)}', '${esc(q.subjectId)}', '${esc(q.topicId)}', '${esc(q.text)}', '${opts}', ${q.correctOptionIndex}, '${esc(q.difficulty)}', '${esc(q.source)}', ${q.year || 0})`;
+            return \`('\${esc(q.id)}', '\${esc(q.subjectId)}', '\${esc(q.topicId)}', '\${esc(q.text)}', '\${opts}', \${q.correctOptionIndex}, '\${esc(q.difficulty)}', '\${esc(q.source)}', \${q.year || 0})\`;
         }).join(',\n');
         sql += values + ';\n';
     }
 
     if (MOCK_TESTS_DATA.length > 0) {
-        sql += `INSERT IGNORE INTO tests (id, title, duration, category, difficulty, exam_type, questions_json) VALUES \n`;
+        sql += \`INSERT IGNORE INTO tests (id, title, duration, category, difficulty, exam_type, questions_json) VALUES \n\`;
         const values = MOCK_TESTS_DATA.map(t => {
-            const qs = JSON.stringify(t.questions).replace(/\\/g, '\\\\').replace(/'/g, "''");
-            return `('${esc(t.id)}', '${esc(t.title)}', ${t.durationMinutes}, '${esc(t.category)}', '${esc(t.difficulty)}', '${esc(t.examType)}', '${qs}')`;
+            const qs = JSON.stringify(t.questions).replace(/\\\\/g, '\\\\\\\\').replace(/'/g, "''");
+            return \`('\${esc(t.id)}', '\${esc(t.title)}', \${t.durationMinutes}, '\${esc(t.category)}', '\${esc(t.difficulty)}', '\${esc(t.examType)}', '\${qs}')\`;
         }).join(',\n');
         sql += values + ';\n';
     }
 
     const noteEntries = Object.entries(DEFAULT_CHAPTER_NOTES);
     if (noteEntries.length > 0) {
-        sql += `INSERT IGNORE INTO chapter_notes (topic_id, content_json, updated_at) VALUES \n`;
+        sql += \`INSERT IGNORE INTO chapter_notes (topic_id, content_json, updated_at) VALUES \n\`;
         const values = noteEntries.map(([topicId, note]) => {
-            const content = JSON.stringify(note.pages).replace(/\\/g, '\\\\').replace(/'/g, "''");
-            return `('${esc(topicId)}', '${content}', NOW())`;
+            const content = JSON.stringify(note.pages).replace(/\\\\/g, '\\\\\\\\').replace(/'/g, "''");
+            return \`('\${esc(topicId)}', '\${content}', NOW())\`;
         }).join(',\n');
         sql += values + ';\n';
     }
 
-    sql += `
+    sql += \`
     INSERT IGNORE INTO content (type, title, content_json) VALUES 
     ('flashcard', 'Newton Law', '{"id":1,"front":"Newton Law","back":"F=ma","type":"flashcard"}'),
     ('flashcard', 'Integration Sin', '{"id":2,"front":"Integral sin(x)","back":"-cos(x)+C","type":"flashcard"}'),
     ('hack', 'Trig', '{"id":1,"title":"Trig Values","trick":"SOH CAH TOA","tag":"Maths","type":"hack"}'),
     ('hack', 'Resistor', '{"id":2,"title":"Resistor Codes","trick":"BB ROY of Great Britain","tag":"Physics","type":"hack"}');
-    `;
+    \`;
 
     return sql;
 };
 
-export const generateHtaccess = () => `
-<IfModule mod_rewrite.c>
-  RewriteEngine On
-  RewriteBase /
-  RewriteRule ^index\\.html$ - [L]
-  RewriteCond %{REQUEST_FILENAME} !-f
-  RewriteCond %{REQUEST_FILENAME} !-d
-  RewriteRule . /index.html [L]
-</IfModule>
-`;
+const esc = (str: string | undefined) => {
+    if (!str) return '';
+    return str.replace(/\\\\/g, '\\\\\\\\').replace(/'/g, "''");
+};
