@@ -18,6 +18,8 @@ declare global {
         }
       }
     };
+    // Helper to switch screens for diagnostics
+    setCurrentScreen?: (s: any) => void;
   }
 }
 
@@ -25,7 +27,7 @@ export type Subject = 'Physics' | 'Chemistry' | 'Maths';
 
 export type TopicStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'BACKLOG' | 'REVISE' | 'NOT_STARTED';
 
-export type Role = 'STUDENT' | 'ADMIN' | 'PARENT';
+export type Role = 'STUDENT' | 'ADMIN' | 'PARENT' | 'ADMIN_EXECUTIVE';
 
 export interface SocialConfig {
   enabled: boolean;

@@ -53,6 +53,18 @@ const ADMIN_MENU: {id: Screen, icon: any, label: string}[] = [
   { id: 'deployment', icon: UploadCloud, label: "Deploy" },
 ];
 
+const ADMIN_EXECUTIVE_MENU: {id: Screen, icon: any, label: string}[] = [
+  { id: 'overview', icon: LayoutDashboard, label: "Overview" },
+  { id: 'inbox', icon: Inbox, label: "Inbox" },
+  { id: 'syllabus_admin', icon: BookOpen, label: "Syllabus" },
+  { id: 'tests', icon: FileText, label: "Tests" },
+  { id: 'content', icon: Layers, label: "Content" },
+  { id: 'blog_admin', icon: PenTool, label: "Blog" },
+  { id: 'analytics', icon: BarChart2, label: "Analytics" },
+  { id: 'diagnostics', icon: Activity, label: "Diagnostics" },
+  { id: 'profile', icon: UserIcon, label: "Profile" },
+];
+
 const PARENT_MENU: {id: Screen, icon: any, label: string}[] = [
   { id: 'dashboard', icon: LayoutDashboard, label: "Overview" },
   { id: 'family', icon: Users, label: "Family" },
@@ -64,6 +76,7 @@ const PARENT_MENU: {id: Screen, icon: any, label: string}[] = [
 const getMenu = (role?: string) => {
   switch(role) {
     case 'ADMIN': return ADMIN_MENU;
+    case 'ADMIN_EXECUTIVE': return ADMIN_EXECUTIVE_MENU;
     case 'PARENT': return PARENT_MENU;
     default: return STUDENT_MENU;
   }
