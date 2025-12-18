@@ -1,7 +1,6 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { ContactMessage } from '../lib/types';
-import { Inbox, Mail, Clock, Trash2, User, Search, RefreshCw } from 'lucide-react';
+import { Inbox, Mail, Clock, Trash2, User, Search, RefreshCw, AlertTriangle } from 'lucide-react';
 
 interface Props {}
 
@@ -10,47 +9,74 @@ export const AdminInboxScreen: React.FC<Props> = () => {
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
     const [expandedId, setExpandedId] = useState<number | null>(null);
+    const [error, setError] = useState<string | null>(null);
 
-    const fetchMessages = async () => {
+    const fetchMessages = useCallback(async () => {
         setLoading(true);
+        setError(null);
         try {
-            const res = await fetch('/api/manage_contact.php');
-            if (res.ok) {
-                const data = await res.json();
-                setMessages(data);
-            } else {
-                // Mock data if API fails
-                setMessages([
-                    { id: 1, name: 'John Doe', email: 'john@example.com', subject: 'Login Issue', message: 'I cannot login to my account. Please help.', created_at: new Date().toISOString() },
-                    { id: 2, name: 'Jane Smith', email: 'jane@test.com', subject: 'Feature Request', message: 'Can you add a Dark Mode?', created_at: new Date(Date.now() - 86400000).toISOString() }
-                ]);
+            const res = await fetch('/api/manage_contact.php', { cache: 'no-store' });
+            const text = await res.text();
+            
+            if (!res.ok) {
+                throw new Error(`Server returned ${res.status}: ${text.slice(0, 100)}`);
             }
-        } catch (e) {
+
+            if (!text || text.trim() === "") {
+                setMessages([]);
+                return;
+            }
+
+            try {
+                const data = JSON.parse(text);
+                // CRITICAL FIX: Only set if data is an array
+                if (Array.isArray(data)) {
+                    setMessages(data);
+                } else {
+                    console.error("Inbox API expected array but got:", data);
+                    setMessages([]);
+                    if (data && typeof data === 'object' && data.error) {
+                        setError(data.error);
+                    }
+                }
+            } catch (parseErr) {
+                console.error("Failed to parse Inbox JSON:", text);
+                setError("The server sent an invalid data format.");
+                setMessages([]);
+            }
+        } catch (e: any) {
             console.error("Failed to fetch messages", e);
+            setError(e.message || "An unexpected error occurred while loading messages.");
+            setMessages([]);
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
 
     useEffect(() => {
         fetchMessages();
-    }, []);
+    }, [fetchMessages]);
 
     const handleDelete = async (id: number, e: React.MouseEvent) => {
         e.stopPropagation();
         if(!confirm("Are you sure you want to delete this message?")) return;
         
         // Optimistic update
-        setMessages(prev => prev.filter(m => m.id !== id));
+        setMessages(prev => Array.isArray(prev) ? prev.filter(m => m.id !== id) : []);
         
-        // API Call (Assuming the endpoint supports DELETE, if not, it's just frontend)
-        // await fetch(`/api/manage_contact.php?id=${id}`, { method: 'DELETE' }); 
+        try {
+            await fetch(`/api/manage_contact.php?id=${id}`, { method: 'DELETE' });
+        } catch (err) {
+            console.error("Delete failed", err);
+        }
     };
 
-    const filteredMessages = messages.filter(m => 
-        m.name.toLowerCase().includes(search.toLowerCase()) || 
-        m.subject.toLowerCase().includes(search.toLowerCase()) ||
-        m.email.toLowerCase().includes(search.toLowerCase())
+    // Defensive check to ensure filter doesn't run on non-array
+    const safeMessages = Array.isArray(messages) ? messages : [];
+    const filteredMessages = safeMessages.filter(m => 
+        (m.name?.toLowerCase().includes(search.toLowerCase()) || false) || 
+        (m.subject?.toLowerCase().includes(search.toLowerCase()) || false) ||
+        (m.email?.toLowerCase().includes(search.toLowerCase()) || false)
     );
 
     return (
@@ -72,7 +98,7 @@ export const AdminInboxScreen: React.FC<Props> = () => {
             </div>
 
             <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                <h3 className="font-bold text-slate-700">All Messages ({messages.length})</h3>
+                <h3 className="font-bold text-slate-700">All Messages ({safeMessages.length})</h3>
                 <div className="flex gap-2 w-full md:w-auto">
                     <div className="relative flex-1 md:w-64">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
@@ -86,7 +112,8 @@ export const AdminInboxScreen: React.FC<Props> = () => {
                     </div>
                     <button 
                         onClick={fetchMessages}
-                        className="p-2 bg-white border border-slate-200 rounded-lg text-slate-600 hover:text-purple-600 hover:bg-purple-50 transition-colors"
+                        disabled={loading}
+                        className="p-2 bg-white border border-slate-200 rounded-lg text-slate-600 hover:text-purple-600 hover:bg-purple-50 transition-colors disabled:opacity-50"
                         title="Refresh"
                     >
                         <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
@@ -94,8 +121,16 @@ export const AdminInboxScreen: React.FC<Props> = () => {
                 </div>
             </div>
 
+            {error && (
+                <div className="bg-red-50 border border-red-200 p-4 rounded-xl flex items-center gap-3 text-red-700 animate-in slide-in-from-top-2">
+                    <AlertTriangle className="w-5 h-5 shrink-0" />
+                    <div className="text-sm font-medium">{error}</div>
+                    <button onClick={fetchMessages} className="ml-auto text-xs font-bold uppercase bg-white px-3 py-1 rounded border border-red-200 hover:bg-red-100 transition-colors">Retry</button>
+                </div>
+            )}
+
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden min-h-[400px]">
-                {loading ? (
+                {loading && safeMessages.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-64 text-slate-400">
                         <RefreshCw className="w-8 h-8 animate-spin mb-2" />
                         <p>Loading messages...</p>
@@ -103,7 +138,7 @@ export const AdminInboxScreen: React.FC<Props> = () => {
                 ) : filteredMessages.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-64 text-slate-400">
                         <Mail className="w-12 h-12 mb-2 opacity-50" />
-                        <p>No messages found.</p>
+                        <p>{error ? "Unable to load data" : "No messages found."}</p>
                     </div>
                 ) : (
                     <div className="divide-y divide-slate-100">
@@ -116,14 +151,13 @@ export const AdminInboxScreen: React.FC<Props> = () => {
                                 <div className="flex justify-between items-start">
                                     <div className="flex items-start gap-3 overflow-hidden">
                                         <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 font-bold text-sm ${expandedId === msg.id ? 'bg-purple-100 text-purple-700' : 'bg-slate-100 text-slate-500'}`}>
-                                            {msg.name.charAt(0).toUpperCase()}
+                                            {(msg.name || "U").charAt(0).toUpperCase()}
                                         </div>
                                         <div className="min-w-0">
                                             <div className="flex items-center gap-2 mb-0.5">
                                                 <h4 className={`font-bold text-sm truncate ${expandedId === msg.id ? 'text-purple-900' : 'text-slate-800'}`}>
-                                                    {msg.subject}
+                                                    {msg.subject || "(No Subject)"}
                                                 </h4>
-                                                {/* <span className="w-2 h-2 rounded-full bg-blue-500"></span> New indicator logic could go here */}
                                             </div>
                                             <p className="text-xs text-slate-500 flex items-center truncate">
                                                 <User className="w-3 h-3 mr-1" /> {msg.name} &lt;{msg.email}&gt;
@@ -147,7 +181,7 @@ export const AdminInboxScreen: React.FC<Props> = () => {
                                 
                                 {expandedId === msg.id && (
                                     <div className="mt-4 pl-14 pr-4 animate-in fade-in slide-in-from-top-1">
-                                        <p className="text-sm text-slate-700 leading-relaxed bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
+                                        <p className="text-sm text-slate-700 leading-relaxed bg-white p-4 rounded-lg border border-slate-200 shadow-sm whitespace-pre-wrap">
                                             {msg.message}
                                         </p>
                                         <div className="mt-2 flex justify-end">

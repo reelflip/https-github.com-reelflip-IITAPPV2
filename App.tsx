@@ -66,7 +66,15 @@ const SyncIndicator = ({ status, onRetry }: { status: 'SYNCED' | 'SAVING' | 'ERR
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
-  const [currentScreen, setCurrentScreen] = useState<Screen>(() => (localStorage.getItem('iitjee_last_screen') as Screen) || 'dashboard');
+  
+  // CRITICAL FIX: Validate screen before setting initial state to prevent persistent crash loops
+  const [currentScreen, setCurrentScreen] = useState<Screen>(() => {
+    const saved = localStorage.getItem('iitjee_last_screen');
+    // Ensure the saved screen is valid, or fallback to dashboard
+    const validScreens: Screen[] = ['dashboard', 'syllabus', 'tests', 'ai-tutor', 'focus', 'analytics', 'timetable', 'revision', 'mistakes', 'flashcards', 'backlogs', 'hacks', 'wellness', 'profile', 'psychometric', 'overview', 'users', 'videos', 'content', 'diagnostics', 'system', 'deployment', 'tests_admin', 'content_admin', 'video_admin', 'admin_analytics', 'syllabus_admin', 'inbox', 'blog_admin', 'family', 'public-blog', 'about', 'blog', 'exams', 'privacy', 'contact', 'features'];
+    return (saved && validScreens.includes(saved as Screen)) ? (saved as Screen) : 'dashboard';
+  });
+
   const [enableGoogleLogin] = useState(false);
   const [socialConfig] = useState<SocialConfig>({ enabled: false });
   
