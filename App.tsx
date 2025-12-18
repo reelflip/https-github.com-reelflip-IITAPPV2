@@ -53,9 +53,13 @@ interface ErrorBoundaryState {
   hasError: boolean;
 }
 
-// Fix: Correctly extending the Component class imported from 'react' to ensure 'this.props' and 'this.state' are properly typed
-class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+// Fix: Change ErrorBoundary to extend React.Component explicitly to ensure props is correctly recognized as a member to resolve Error in file App.tsx on line 81
+class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
   public state: ErrorBoundaryState = { hasError: false };
+
+  constructor(props: ErrorBoundaryProps) {
+    super(props);
+  }
 
   static getDerivedStateFromError(_error: Error) { return { hasError: true }; }
   
@@ -143,8 +147,8 @@ const App: React.FC = () => {
                 data.progress.forEach((p: any) => {
                     progMap[p.topic_id] = {
                         topicId: p.topic_id, status: p.status, lastRevised: p.last_revised,
-                        revision_level: p.revision_level, next_revision_date: p.next_revision_date,
-                        solved_questions_json: p.solved_questions_json ? JSON.parse(p.solved_questions_json) : []
+                        revisionLevel: (p.revision_level || 0), nextRevisionDate: p.next_revision_date,
+                        solvedQuestions: p.solved_questions_json ? JSON.parse(p.solved_questions_json) : []
                     } as any;
                 });
                 setProgress(progMap);
@@ -169,8 +173,8 @@ const App: React.FC = () => {
                         sData.progress?.forEach((p: any) => {
                            sProgMap[p.topic_id] = {
                                 topicId: p.topic_id, status: p.status, lastRevised: p.last_revised,
-                                revision_level: p.revision_level, next_revision_date: p.next_revision_date,
-                                solved_questions_json: p.solved_questions_json ? JSON.parse(p.solved_questions_json) : []
+                                revisionLevel: p.revision_level, nextRevisionDate: p.next_revision_date,
+                                solvedQuestions: p.solved_questions_json ? JSON.parse(p.solved_questions_json) : []
                             } as any;
                         });
                         
@@ -248,6 +252,19 @@ const App: React.FC = () => {
     }
   };
 
+  const handleAddTestAttempt = async (attempt: TestAttempt) => {
+    setTestAttempts(prev => [attempt, ...prev]);
+    if (user && !user.id.startsWith('demo_')) {
+        try {
+            await fetch('/api/save_attempt.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...attempt, user_id: user.id })
+            });
+        } catch (e) {}
+    }
+  };
+
   const updateProgress = async (topicId: string, updates: Partial<UserProgress>) => {
     const current = progress[topicId] || { topicId, status: 'NOT_STARTED', lastRevised: null, revisionLevel: 0, nextRevisionDate: null, solvedQuestions: [] };
     const updated = { ...current, ...updates };
@@ -256,7 +273,7 @@ const App: React.FC = () => {
         updated.nextRevisionDate = calculateNextRevision(0, updated.lastRevised);
     }
     setProgress(prev => ({ ...prev, [topicId]: updated }));
-    if (user) {
+    if (user && !user.id.startsWith('demo_')) {
         try {
             await fetch('/api/sync_progress.php', {
                 method: 'POST',
@@ -335,11 +352,11 @@ const App: React.FC = () => {
           ? <AdminDashboardScreen user={user} onNavigate={setScreen} messageCount={0} />
           : <DashboardScreen user={user} progress={linkedData?.progress || progress} testAttempts={linkedData?.tests || testAttempts} goals={goals} toggleGoal={toggleGoal} addGoal={addGoal} setScreen={setScreen} viewingStudentName={linkedData?.studentName} linkedPsychReport={linkedData?.psychReport} />;
       case 'syllabus':
-        return <SyllabusScreen user={user} subjects={SYLLABUS_DATA} progress={linkedData?.progress || progress} onUpdateProgress={updateProgress} chapterNotes={chapterNotes} videoMap={videoMap} questionBank={questionBank} viewingStudentName={linkedData?.studentName} readOnly={user.role === 'PARENT'} />;
+        return <SyllabusScreen user={user} subjects={SYLLABUS_DATA} progress={linkedData?.progress || progress} onUpdateProgress={updateProgress} chapterNotes={chapterNotes} videoMap={videoMap} questionBank={questionBank} viewingStudentName={linkedData?.studentName} readOnly={user.role === 'PARENT'} addTestAttempt={handleAddTestAttempt} testAttempts={linkedData?.tests || testAttempts} />;
       case 'tests':
         return isAdminRole
           ? <AdminTestManagerScreen questionBank={questionBank} tests={tests} syllabus={SYLLABUS_DATA} onAddQuestion={(q) => setQuestionBank([...questionBank, q])} onCreateTest={(t) => setTests([...tests, t])} onDeleteQuestion={(id) => setQuestionBank(questionBank.filter(q => q.id !== id))} onDeleteTest={(id) => setTests(tests.filter(t => t.id !== id))} />
-          : <TestScreen user={user} addTestAttempt={(a) => setTestAttempts([...testAttempts, a])} history={linkedData?.tests || testAttempts} availableTests={tests} />;
+          : <TestScreen user={user} addTestAttempt={handleAddTestAttempt} history={linkedData?.tests || testAttempts} availableTests={tests} />;
       case 'analytics':
         return isAdminRole ? <AdminAnalyticsScreen /> : <AnalyticsScreen user={user} progress={linkedData?.progress || progress} testAttempts={linkedData?.tests || testAttempts} viewingStudentName={linkedData?.studentName} />;
       case 'timetable':

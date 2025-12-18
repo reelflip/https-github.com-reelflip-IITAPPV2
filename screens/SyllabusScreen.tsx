@@ -1,10 +1,11 @@
-import React, { useState, useMemo } from 'react';
+
+import React, { useState, useMemo, useEffect } from 'react';
 import { UserProgress, TopicStatus, Topic, User, VideoLesson, ChapterNote, Question, TestAttempt } from '../lib/types';
 import { BookReader } from '../components/BookReader';
 import { 
   Search, ChevronDown, CheckCircle2, LayoutGrid, BookOpen, 
   Save, Loader2, PlayCircle, X, Youtube, Filter, Info, StickyNote, 
-  ArrowLeft, List, CheckSquare, Target, BarChart2, Video, FileText, Check, AlertCircle, Clock, Trophy, ChevronRight, Play, ExternalLink
+  ArrowLeft, List, CheckSquare, Target, BarChart2, Video, FileText, Check, AlertCircle, AlertTriangle, Clock, Trophy, ChevronRight, Play, ExternalLink, Send
 } from 'lucide-react';
 
 interface SyllabusTrackerProps {
@@ -43,7 +44,7 @@ const statusLabels: Record<TopicStatus, string> = {
 
 export const SyllabusScreen: React.FC<SyllabusTrackerProps> = ({ 
   user, viewingStudentName, subjects, progress, onUpdateProgress, readOnly = false, summaryOnly = false,
-  videoMap = {}, chapterNotes = {}, questionBank = [], onToggleQuestion, addTestAttempt, testAttempts = []
+  videoMap = {}, chapterNotes = {}, questionBank = [], addTestAttempt, testAttempts = []
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeSubjectFilter, setActiveSubjectFilter] = useState<string>('ALL');
@@ -72,13 +73,6 @@ export const SyllabusScreen: React.FC<SyllabusTrackerProps> = ({
           }))
       }));
   }, [subjects]);
-
-  const stats = useMemo(() => {
-    const totalTopics = subjects.length;
-    const completed = subjects.filter(t => progress[t.id]?.status === 'COMPLETED').length;
-    const percent = totalTopics > 0 ? Math.round((completed / totalTopics) * 100) : 0;
-    return { total: totalTopics, completed, percent };
-  }, [subjects, progress]);
 
   const filteredData = useMemo(() => {
     return structuredSubjects
@@ -109,32 +103,99 @@ export const SyllabusScreen: React.FC<SyllabusTrackerProps> = ({
   }
 
   const TopicDetailView = ({ topic, onClose }: { topic: Topic, onClose: () => void }) => {
-      const [activeTab, setActiveTab] = useState<'NOTES' | 'VIDEOS' | 'PRACTICE'>('PRACTICE');
-      const topicData = getTopicProgress(topic.id);
+      const [activeTab, setActiveTab] = useState<'NOTES' | 'VIDEOS' | 'PRACTICE' | 'TEST'>('PRACTICE');
+      const [isSubmitting, setIsSubmitting] = useState(false);
+      const [timeElapsed, setTimeElapsed] = useState(0);
       
-      const topicQuestions = useMemo(() => 
-          questionBank.filter(q => q.topicId === topic.id), 
-      [topic.id, questionBank]);
-
+      const topicData = getTopicProgress(topic.id);
+      const topicQuestions = useMemo(() => questionBank.filter(q => q.topicId === topic.id), [topic.id, questionBank]);
       const videoLesson = videoMap[topic.id];
       const chapterNote = chapterNotes[topic.id];
-
-      const solvedCount = topicData.solvedQuestions?.length || 0;
-      const totalCount = topicQuestions.length;
-      const solvedPercent = totalCount > 0 ? Math.round((solvedCount / totalCount) * 100) : 0;
 
       const [selectedAnswers, setSelectedAnswers] = useState<Record<string, number>>({});
       const [showResults, setShowResults] = useState<Record<string, boolean>>({});
 
+      // Auto-timer for formal test
+      useEffect(() => {
+          let interval: any;
+          if (activeTab === 'TEST') {
+              interval = setInterval(() => setTimeElapsed(prev => prev + 1), 1000);
+          }
+          return () => clearInterval(interval);
+      }, [activeTab]);
+
       const handleCheckAnswer = (qId: string, optionIdx: number, correctIdx: number) => {
-          if (showResults[qId]) return;
+          if (showResults[qId] || readOnly) return;
           setSelectedAnswers(prev => ({ ...prev, [qId]: optionIdx }));
           setShowResults(prev => ({ ...prev, [qId]: true }));
           
-          if (optionIdx === correctIdx && onToggleQuestion) {
-              onToggleQuestion(topic.id, qId);
+          if (optionIdx === correctIdx) {
+              const currentSolved = topicData.solvedQuestions || [];
+              if (!currentSolved.includes(qId)) {
+                  onUpdateProgress(topic.id, { solvedQuestions: [...currentSolved, qId] });
+              }
           }
       }
+
+      const handleSubmitTest = async () => {
+          if (Object.keys(selectedAnswers).length === 0) {
+              if(!confirm("You haven't answered any questions. Are you sure you want to submit?")) return;
+          }
+          
+          setIsSubmitting(true);
+          const results = topicQuestions.map(q => ({
+              questionId: q.id,
+              subjectId: q.subjectId,
+              topicId: q.topicId,
+              status: selectedAnswers[q.id] === undefined ? 'UNATTEMPTED' : (selectedAnswers[q.id] === q.correctOptionIndex ? 'CORRECT' : 'INCORRECT'),
+              selectedOptionIndex: selectedAnswers[q.id]
+          }));
+
+          const correctCount = results.filter(r => r.status === 'CORRECT').length;
+          const incorrectCount = results.filter(r => r.status === 'INCORRECT').length;
+          const unattemptedCount = results.filter(r => r.status === 'UNATTEMPTED').length;
+          const score = (correctCount * 4) - (incorrectCount * 1);
+          const totalMarks = topicQuestions.length * 4;
+
+          const attempt: TestAttempt = {
+              id: `ct_${Date.now()}`,
+              date: new Date().toISOString(),
+              title: `${topic.name} - Chapter Test`,
+              score,
+              totalMarks,
+              accuracy: Math.round((correctCount / (correctCount + incorrectCount || 1)) * 100),
+              accuracy_percent: Math.round((correctCount / (correctCount + incorrectCount || 1)) * 100),
+              testId: `ct_${topic.id}`,
+              totalQuestions: topicQuestions.length,
+              correctCount,
+              incorrectCount,
+              unattemptedCount,
+              detailedResults: results as any,
+              topicId: topic.id,
+              timeTakenSeconds: timeElapsed
+          };
+
+          if (addTestAttempt) {
+              try {
+                  await addTestAttempt(attempt);
+                  // Also mark as completed if score is good (>50%)
+                  if (score > (totalMarks / 2)) {
+                      onUpdateProgress(topic.id, { status: 'COMPLETED' });
+                  }
+                  alert(`Test Submitted Successfully! Score: ${score}/${totalMarks}`);
+                  onClose();
+              } catch (e) {
+                  alert("Error saving test result. Please check your connection.");
+              }
+          }
+          setIsSubmitting(false);
+      };
+
+      const formatTime = (seconds: number) => {
+          const m = Math.floor(seconds / 60);
+          const s = seconds % 60;
+          return `${m}:${s.toString().padStart(2, '0')}`;
+      };
 
       return (
           <div className="fixed inset-0 z-50 bg-slate-50 flex flex-col animate-in slide-in-from-right-4 duration-300">
@@ -153,7 +214,14 @@ export const SyllabusScreen: React.FC<SyllabusTrackerProps> = ({
                       </div>
                   </div>
                   
-                  {!readOnly && (
+                  {activeTab === 'TEST' && (
+                      <div className="flex items-center gap-4 px-4 py-2 bg-slate-900 text-white rounded-xl">
+                          <Clock className="w-4 h-4 text-blue-400" />
+                          <span className="font-mono font-bold">{formatTime(timeElapsed)}</span>
+                      </div>
+                  )}
+
+                  {!readOnly && activeTab !== 'TEST' && (
                       <div className="flex items-center gap-3">
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider hidden md:block">Update Status</span>
                         <select 
@@ -170,16 +238,16 @@ export const SyllabusScreen: React.FC<SyllabusTrackerProps> = ({
               </div>
 
               <div className="bg-white border-b border-slate-100 flex justify-center px-4">
-                  <div className="flex gap-8">
-                    {['PRACTICE', 'NOTES', 'VIDEOS'].map((tab) => (
+                  <div className="flex gap-4 md:gap-8 overflow-x-auto no-scrollbar">
+                    {['PRACTICE', 'TEST', 'NOTES', 'VIDEOS'].map((tab) => (
                         <button 
                             key={tab}
                             onClick={() => setActiveTab(tab as any)}
-                            className={`py-4 text-xs font-black uppercase tracking-widest border-b-2 transition-all ${
+                            className={`py-4 text-xs font-black uppercase tracking-widest border-b-2 transition-all whitespace-nowrap ${
                                 activeTab === tab ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600'
                             }`}
                         >
-                            {tab}
+                            {tab === 'TEST' ? '🔥 Chapter Test' : tab}
                         </button>
                     ))}
                   </div>
@@ -187,54 +255,63 @@ export const SyllabusScreen: React.FC<SyllabusTrackerProps> = ({
 
               <div className="flex-1 overflow-y-auto">
                   <div className="max-w-4xl mx-auto p-4 md:p-8 space-y-8">
-                      {activeTab === 'PRACTICE' && (
+                      {(activeTab === 'PRACTICE' || activeTab === 'TEST') && (
                           <div className="space-y-6">
                                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
                                   <div>
-                                      <h3 className="font-bold text-slate-800">Chapter Question Bank</h3>
-                                      <p className="text-xs text-slate-500 mt-1">Challenge yourself with {totalCount} practice problems.</p>
+                                      <h3 className="font-bold text-slate-800">{activeTab === 'TEST' ? 'Timed Assessment' : 'Chapter Question Bank'}</h3>
+                                      <p className="text-xs text-slate-500 mt-1">
+                                          {activeTab === 'TEST' 
+                                            ? "Formal attempt. Results will be saved to your scorecard and visible to parents." 
+                                            : `Review ${topicQuestions.length} practice problems at your own pace.`}
+                                      </p>
                                   </div>
-                                  <div className="text-right">
-                                      <span className="text-2xl font-black text-blue-600">{solvedPercent}%</span>
-                                      <p className="text-[10px] font-bold text-slate-400 uppercase">Mastery</p>
-                                  </div>
+                                  {activeTab === 'PRACTICE' && (
+                                      <div className="text-right">
+                                          <span className="text-2xl font-black text-blue-600">{Math.round(((topicData.solvedQuestions?.length || 0) / (topicQuestions.length || 1)) * 100)}%</span>
+                                          <p className="text-[10px] font-bold text-slate-400 uppercase">Mastery</p>
+                                      </div>
+                                  )}
                                </div>
 
-                               <div className="space-y-6 pb-20">
+                               <div className="space-y-6 pb-24">
                                    {topicQuestions.length === 0 ? (
                                        <div className="p-12 text-center text-slate-400 bg-white rounded-2xl border border-dashed">
                                            No questions available for this topic yet.
                                        </div>
                                    ) : (
                                        topicQuestions.map((q, idx) => (
-                                           <div key={q.id} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-                                               <div className="flex justify-between items-start">
+                                           <div key={q.id} className={`bg-white p-6 rounded-2xl border transition-all ${selectedAnswers[q.id] !== undefined ? 'border-blue-200' : 'border-slate-200 shadow-sm'}`}>
+                                               <div className="flex justify-between items-start mb-4">
                                                    <span className="text-[10px] font-black bg-slate-100 text-slate-500 px-2 py-1 rounded">QUESTION {idx + 1}</span>
                                                    <span className={`text-[10px] font-bold px-2 py-1 rounded uppercase ${
                                                        q.difficulty === 'HARD' ? 'bg-red-50 text-red-600' : 
                                                        q.difficulty === 'MEDIUM' ? 'bg-amber-50 text-amber-600' : 'bg-green-50 text-green-600'
                                                    }`}>{q.difficulty}</span>
                                                </div>
-                                               <p className="text-slate-800 font-medium leading-relaxed">{q.text}</p>
+                                               <p className="text-slate-800 font-medium leading-relaxed mb-4">{q.text}</p>
                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                                    {q.options.map((opt, oIdx) => {
                                                        const isSelected = selectedAnswers[q.id] === oIdx;
                                                        const isCorrect = oIdx === q.correctOptionIndex;
-                                                       const revealed = showResults[q.id];
+                                                       const revealed = showResults[q.id] || (activeTab === 'TEST' && isSubmitting);
                                                        
                                                        let btnStyle = "bg-slate-50 border-slate-100 text-slate-600 hover:bg-slate-100";
-                                                       if (revealed) {
+                                                       if (activeTab === 'PRACTICE' && revealed) {
                                                            if (isCorrect) btnStyle = "bg-green-100 border-green-500 text-green-800 ring-2 ring-green-500/20";
                                                            else if (isSelected) btnStyle = "bg-red-100 border-red-500 text-red-800";
                                                            else btnStyle = "bg-slate-50 border-slate-100 text-slate-400 opacity-50";
                                                        } else if (isSelected) {
-                                                           btnStyle = "bg-blue-600 border-blue-600 text-white";
+                                                           btnStyle = "bg-blue-600 border-blue-600 text-white shadow-lg";
                                                        }
 
                                                        return (
                                                            <button 
                                                                 key={oIdx}
-                                                                onClick={() => handleCheckAnswer(q.id, oIdx, q.correctOptionIndex)}
+                                                                onClick={() => {
+                                                                    if (activeTab === 'PRACTICE') handleCheckAnswer(q.id, oIdx, q.correctOptionIndex);
+                                                                    else setSelectedAnswers(prev => ({ ...prev, [q.id]: oIdx }));
+                                                                }}
                                                                 className={`p-4 rounded-xl border text-left text-sm font-medium transition-all ${btnStyle}`}
                                                            >
                                                                <span className="mr-2 font-bold uppercase">{String.fromCharCode(65 + oIdx)}.</span> {opt}
@@ -242,19 +319,39 @@ export const SyllabusScreen: React.FC<SyllabusTrackerProps> = ({
                                                        );
                                                    })}
                                                </div>
-                                               {showResults[q.id] && (
-                                                   <div className={`p-4 rounded-xl text-sm font-bold flex items-center gap-2 animate-in fade-in slide-in-from-top-2 ${
+                                               {activeTab === 'PRACTICE' && showResults[q.id] && (
+                                                   <div className={`mt-4 p-4 rounded-xl text-sm font-bold flex items-center gap-2 animate-in fade-in slide-in-from-top-2 ${
                                                        selectedAnswers[q.id] === q.correctOptionIndex ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
                                                    }`}>
                                                        {selectedAnswers[q.id] === q.correctOptionIndex ? (
-                                                           <><CheckCircle2 className="w-4 h-4" /> Correct Answer!</>
+                                                           <><CheckCircle2 className="w-4 h-4" /> Correct!</>
                                                        ) : (
-                                                           <><AlertCircle className="w-4 h-4" /> Incorrect. The right answer is {String.fromCharCode(65 + q.correctOptionIndex)}.</>
+                                                           /* Fix: Added AlertTriangle to imports and used here to resolve Error in file screens/SyllabusScreen.tsx on line 320 */
+                                                           <><AlertTriangle className="w-4 h-4" /> The right answer is {String.fromCharCode(65 + q.correctOptionIndex)}.</>
                                                        )}
                                                    </div>
                                                )}
                                            </div>
                                        ))
+                                   )}
+                                   
+                                   {activeTab === 'TEST' && topicQuestions.length > 0 && (
+                                       <div className="flex justify-center pt-8 pb-12 gap-4">
+                                           <button 
+                                                onClick={onClose}
+                                                className="bg-white border border-slate-200 text-slate-500 px-8 py-4 rounded-2xl font-black text-lg hover:bg-slate-50 transition-all shadow-sm active:scale-95"
+                                           >
+                                               Discard
+                                           </button>
+                                           <button 
+                                                onClick={handleSubmitTest}
+                                                disabled={isSubmitting}
+                                                className="bg-slate-900 text-white px-12 py-4 rounded-2xl font-black text-lg hover:bg-blue-600 transition-all shadow-xl flex items-center gap-3 active:scale-95 disabled:opacity-50"
+                                           >
+                                               {isSubmitting ? <Loader2 className="animate-spin" /> : <Send />}
+                                               Submit Chapter Test
+                                           </button>
+                                       </div>
                                    )}
                                </div>
                           </div>

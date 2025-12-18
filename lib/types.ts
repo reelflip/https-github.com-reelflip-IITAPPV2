@@ -106,6 +106,7 @@ export interface TestAttempt {
   // Chapter Test Specifics
   topicId?: string; 
   difficulty?: 'EASY' | 'MEDIUM' | 'HARD' | 'ALL';
+  timeTakenSeconds?: number;
 }
 
 export interface QuestionResult {
