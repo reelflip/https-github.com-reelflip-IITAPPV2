@@ -53,8 +53,8 @@ interface ErrorBoundaryState {
   hasError: boolean;
 }
 
-// Fix: Changed inheritance to use the directly imported Component type to ensure 'this.props' is correctly identified by TypeScript.
-class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+// Fix: Explicitly use React.Component and ensure generic parameters for props and state are correctly passed to resolve the 'props' property missing error.
+class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
   public state: ErrorBoundaryState = { hasError: false };
 
   static getDerivedStateFromError(_error: Error) { return { hasError: true }; }
@@ -74,6 +74,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
         </div>
       );
     }
+    // Fix: access this.props which is now correctly defined through React.Component inheritance.
     return this.props.children;
   }
 }
@@ -143,9 +144,9 @@ const App: React.FC = () => {
                 data.progress.forEach((p: any) => {
                     progMap[p.topic_id] = {
                         topicId: p.topic_id, status: p.status, lastRevised: p.last_revised,
-                        revisionLevel: p.revision_level, nextRevisionDate: p.next_revision_date,
-                        solvedQuestions: p.solved_questions_json ? JSON.parse(p.solved_questions_json) : []
-                    };
+                        revision_level: p.revision_level, next_revision_date: p.next_revision_date,
+                        solved_questions_json: p.solved_questions_json ? JSON.parse(p.solved_questions_json) : []
+                    } as any;
                 });
                 setProgress(progMap);
             }
