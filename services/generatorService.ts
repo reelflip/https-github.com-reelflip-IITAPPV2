@@ -54,6 +54,37 @@ try {
 ?>`
     },
     {
+        name: 'test_db.php',
+        folder: 'deployment/api',
+        content: `${phpHeader}
+try {
+    $tables = [];
+    $res = $conn->query("SHOW TABLES");
+    while($row = $res->fetch(PDO::FETCH_NUM)) {
+        $tableName = $row[0];
+        
+        // Count Columns
+        $colStmt = $conn->prepare("SELECT COUNT(*) FROM information_schema.columns WHERE table_name = ? AND table_schema = ?");
+        $colStmt->execute([$tableName, $db_name]);
+        $colCount = $colStmt->fetchColumn();
+        
+        // Count Rows
+        $rowCount = $conn->query("SELECT COUNT(*) FROM $tableName")->fetchColumn();
+        
+        $tables[] = [
+            "name" => $tableName, 
+            "columns" => (int)$colCount, 
+            "rows" => (int)$rowCount
+        ];
+    }
+    echo json_encode(["status" => "CONNECTED", "db_name" => $db_name, "tables" => $tables]);
+} catch(PDOException $e) {
+    http_response_code(500);
+    echo json_encode(["status" => "ERROR", "message" => $e->getMessage()]);
+}
+?>`
+    },
+    {
         name: 'migrate_db.php',
         folder: 'deployment/api',
         content: `${phpHeader}
@@ -121,7 +152,6 @@ $schema = [
         'slots_json' => 'LONGTEXT',
         'updated_at' => 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP'
     ],
-    // ... other tables maintained ...
     'backlogs' => ['id' => 'VARCHAR(255) PRIMARY KEY', 'user_id' => 'VARCHAR(255)', 'title' => 'VARCHAR(255)', 'subject' => 'VARCHAR(50)', 'priority' => 'VARCHAR(50)', 'status' => 'VARCHAR(50)', 'deadline' => 'DATE', 'created_at' => 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP'],
     'goals' => ['id' => 'VARCHAR(255) PRIMARY KEY', 'user_id' => 'VARCHAR(255)', 'text' => 'VARCHAR(255)', 'completed' => 'TINYINT(1) DEFAULT 0', 'created_at' => 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP'],
     'mistake_logs' => ['id' => 'VARCHAR(255) PRIMARY KEY', 'user_id' => 'VARCHAR(255)', 'question' => 'TEXT', 'subject' => 'VARCHAR(50)', 'note' => 'TEXT', 'date' => 'DATETIME'],
@@ -209,13 +239,12 @@ try {
         ];
     } else { $response['userProfileSync'] = null; }
 
-    // Progress - Return keys matching App.tsx expectations (snake_case)
+    // Progress
     $stmt = $conn->prepare("SELECT * FROM user_progress WHERE user_id = ?");
     $stmt->execute([$user_id]);
     $rawProgress = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     $response['progress'] = []; 
     foreach($rawProgress as $p) {
-        // Crucial: Use snake_case here because App.tsx reads p.topic_id, p.last_revised, etc.
         $response['progress'][] = [
             "topic_id" => $p['topic_id'], 
             "status" => $p['status'],
@@ -295,59 +324,7 @@ try {
 }
 ?>`
     },
-    {
-        name: 'get_psychometric.php',
-        folder: 'deployment/api',
-        content: `${phpHeader}
-$user_id = $_GET['user_id'] ?? '';
-if($user_id) {
-    try {
-        // Order by ID desc to get latest if duplicates exist
-        $stmt = $conn->prepare("SELECT * FROM psychometric_results WHERE user_id = ? ORDER BY id DESC LIMIT 1");
-        $stmt->execute([$user_id]);
-        $res = $stmt->fetch(PDO::FETCH_ASSOC);
-        if($res && !empty($res['report_json'])) {
-            echo json_encode(["status" => "success", "report" => json_decode($res['report_json'])]);
-        } else {
-            echo json_encode(["status" => "empty", "report" => null]);
-        }
-    } catch(Exception $e) {
-        http_response_code(500);
-        echo json_encode(["error" => $e->getMessage()]);
-    }
-} else {
-    http_response_code(400);
-    echo json_encode(["error" => "Missing User ID"]);
-}
-?>`
-    },
-    {
-        name: 'save_psychometric.php',
-        folder: 'deployment/api',
-        content: `${phpHeader}
-$data = json_decode(file_get_contents("php://input"));
-if(!empty($data->user_id) && !empty($data->report)) {
-    try {
-        $reportJson = json_encode($data->report);
-        $sql = "INSERT INTO psychometric_results (user_id, report_json, date) 
-                VALUES (?, ?, NOW()) 
-                ON DUPLICATE KEY UPDATE report_json = VALUES(report_json), date = NOW()";
-        $stmt = $conn->prepare($sql);
-        $stmt->execute([$data->user_id, $reportJson]);
-        echo json_encode(["status" => "success"]);
-    } catch(Exception $e) {
-        http_response_code(500);
-        echo json_encode(["error" => $e->getMessage()]);
-    }
-} else {
-    http_response_code(400);
-    echo json_encode(["error" => "Invalid input"]);
-}
-?>`
-    },
-    // Standard files
     { name: 'index.php', folder: 'deployment/api', content: `${phpHeader} echo json_encode(["status" => "active", "version" => "12.22"]); ?>` },
-    { name: 'test_db.php', folder: 'deployment/api', content: `${phpHeader} try { $tables = []; $res = $conn->query("SHOW TABLES"); while($row = $res->fetch(PDO::FETCH_NUM)) { $count = $conn->query("SELECT COUNT(*) FROM " . $row[0])->fetchColumn(); $tables[] = ["name" => $row[0], "rows" => $count]; } echo json_encode(["status" => "CONNECTED", "tables" => $tables]); } catch(PDOException $e) { http_response_code(500); echo json_encode(["status" => "ERROR", "message" => $e->getMessage()]); } ?>` },
     { name: 'save_timetable.php', folder: 'deployment/api', content: `${phpHeader} $data = json_decode(file_get_contents("php://input")); if(isset($data->user_id)) { try { $config = isset($data->config) ? json_encode($data->config) : '{}'; $slots = isset($data->slots) ? json_encode($data->slots) : '[]'; $sql = "INSERT INTO timetable (user_id, config_json, slots_json, updated_at) VALUES (?, ?, ?, NOW()) ON DUPLICATE KEY UPDATE config_json = VALUES(config_json), slots_json = VALUES(slots_json), updated_at = NOW()"; $stmt = $conn->prepare($sql); $stmt->execute([$data->user_id, $config, $slots]); echo json_encode(["message" => "Saved"]); } catch(Exception $e) { http_response_code(500); echo json_encode(["error" => $e->getMessage()]); } } else { http_response_code(400); echo json_encode(["error" => "Missing User ID"]); } ?>` },
     { name: 'sync_progress.php', folder: 'deployment/api', content: `${phpHeader} $data = json_decode(file_get_contents("php://input")); if($data && isset($data->user_id) && isset($data->topic_id)) { try { $solvedJson = isset($data->solvedQuestions) ? json_encode($data->solvedQuestions) : '[]'; $sql = "INSERT INTO user_progress (user_id, topic_id, status, last_revised, revision_level, next_revision_date, solved_questions_json) VALUES (?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE status = VALUES(status), last_revised = VALUES(last_revised), revision_level = VALUES(revision_level), next_revision_date = VALUES(next_revision_date), solved_questions_json = VALUES(solved_questions_json)"; $stmt = $conn->prepare($sql); $stmt->execute([$data->user_id, $data->topic_id, $data->status, $data->lastRevised, $data->revisionLevel, $data->nextRevisionDate, $solvedJson]); echo json_encode(["message" => "Synced Successfully"]); } catch (PDOException $e) { http_response_code(500); echo json_encode(["error" => "Database Error: " . $e->getMessage()]); } } else { http_response_code(400); echo json_encode(["error" => "Invalid Data Payload"]); } ?>` },
     { name: 'register.php', folder: 'deployment/api', content: `${phpHeader} $inputJSON = file_get_contents('php://input'); $data = json_decode($inputJSON); if (!$data) { http_response_code(400); echo json_encode(["status" => "error", "message" => "Invalid JSON payload"]); exit(); } if(!empty($data->name) && !empty($data->email) && !empty($data->password)) { try { $check = $conn->prepare("SELECT id FROM users WHERE email = ?"); $check->execute([$data->email]); if($check->rowCount() > 0) { http_response_code(409); echo json_encode(["status" => "error", "message" => "Email already exists"]); exit(); } $id = null; $attempts = 0; while($attempts < 5) { $tempId = str_pad(mt_rand(100000, 999999), 6, '0', STR_PAD_LEFT); $checkId = $conn->prepare("SELECT id FROM users WHERE id = ?"); $checkId->execute([$tempId]); if($checkId->rowCount() == 0) { $id = $tempId; break; } $attempts++; } if(!$id) { throw new Exception("Failed to generate unique User ID"); } $query = "INSERT INTO users (id, name, email, password_hash, role, target_exam, target_year, institute, gender, dob, security_question, security_answer, is_verified) VALUES (:id, :name, :email, :pass, :role, :exam, :year, :inst, :gender, :dob, :sq, :sa, 1)"; $stmt = $conn->prepare($query); $stmt->execute([':id' => $id, ':name' => $data->name, ':email' => $data->email, ':pass' => $data->password, ':role' => $data->role, ':exam' => $data->targetExam ?? '', ':year' => $data->targetYear ?? 2025, ':inst' => $data->institute ?? '', ':gender' => $data->gender ?? '', ':dob' => $data->dob ?? '', ':sq' => $data->securityQuestion ?? '', ':sa' => $data->securityAnswer ?? '']); echo json_encode(["status" => "success", "user" => ["id" => $id, "name" => $data->name, "role" => $data->role, "email" => $data->email, "is_verified" => 1]]); } catch(Exception $e) { http_response_code(500); echo json_encode(["status" => "error", "message" => "DB Error: " . $e->getMessage()]); } } else { http_response_code(400); echo json_encode(["status" => "error", "message" => "Missing required fields"]); } ?>` },
@@ -374,17 +351,17 @@ if(!empty($data->user_id) && !empty($data->report)) {
     { name: 'delete_account.php', folder: 'deployment/api', content: `${phpHeader} $data = json_decode(file_get_contents("php://input")); if($data->id) { try { $conn->prepare("DELETE FROM users WHERE id = ?")->execute([$data->id]); $conn->prepare("DELETE FROM user_progress WHERE user_id = ?")->execute([$data->id]); $conn->prepare("DELETE FROM test_attempts WHERE user_id = ?")->execute([$data->id]); echo json_encode(["status" => "success"]); } catch(Exception $e) { http_response_code(500); echo json_encode(["error" => $e->getMessage()]); } } ?>` },
     { name: 'upload_avatar.php', folder: 'deployment/api', content: `${phpHeader} echo json_encode(["status" => "error", "message" => "Upload not configured"]); ?>` },
     { name: 'track_visit.php', folder: 'deployment/api', content: `${phpHeader} $today = date('Y-m-d'); $conn->query("INSERT INTO analytics_visits (date, count) VALUES ('$today', 1) ON DUPLICATE KEY UPDATE count = count + 1"); echo json_encode(["status" => "tracked"]); ?>` },
-    { name: 'get_admin_stats.php', folder: 'deployment/api', content: `${phpHeader} $visits = $conn->query("SELECT SUM(count) FROM analytics_visits")->fetchColumn(); $users = $conn->query("SELECT COUNT(*) FROM users")->fetchColumn(); $traffic = $conn->query("SELECT date, count as visits FROM analytics_visits ORDER BY date DESC LIMIT 7")->fetchAll(PDO::FETCH_ASSOC); echo json_encode(["totalVisits" => (int)$visits, "totalUsers" => (int)$users, "dailyTraffic" => array_reverse($traffic)]); ?>` }
+    { name: 'get_admin_stats.php', folder: 'deployment/api', content: `${phpHeader} $visits = $conn->query("SELECT SUM(count) FROM analytics_visits")->fetchColumn(); $users = $conn->query("SELECT COUNT(*) FROM users")->fetchColumn(); $traffic = $conn->query("SELECT date, count as visits FROM analytics_visits ORDER BY date DESC LIMIT 7")->fetchAll(PDO::FETCH_ASSOC); echo json_encode(["totalVisits" => (int)$visits, "totalUsers" => (int)$users, "dailyTraffic" => array_reverse($traffic)]); ?>` },
+    { name: 'get_psychometric.php', folder: 'deployment/api', content: `${phpHeader} $user_id = $_GET['user_id'] ?? ''; if($user_id) { try { $stmt = $conn->prepare("SELECT * FROM psychometric_results WHERE user_id = ? ORDER BY id DESC LIMIT 1"); $stmt->execute([$user_id]); $res = $stmt->fetch(PDO::FETCH_ASSOC); if($res && !empty($res['report_json'])) { echo json_encode(["status" => "success", "report" => json_decode($res['report_json'])]); } else { echo json_encode(["status" => "empty", "report" => null]); } } catch(Exception $e) { http_response_code(500); echo json_encode(["error" => $e->getMessage()]); } } ?>` },
+    { name: 'save_psychometric.php', folder: 'deployment/api', content: `${phpHeader} $data = json_decode(file_get_contents("php://input")); if(!empty($data->user_id) && !empty($data->report)) { try { $reportJson = json_encode($data->report); $stmt = $conn->prepare("INSERT INTO psychometric_results (user_id, report_json, date) VALUES (?, ?, NOW()) ON DUPLICATE KEY UPDATE report_json = VALUES(report_json), date = NOW()"); $stmt->execute([$data->user_id, $reportJson]); echo json_encode(["status" => "success"]); } catch(Exception $e) { http_response_code(500); echo json_encode(["error" => $e->getMessage()]); } } ?>` }
 ];
 
-// Helper to escape SQL strings
 const esc = (str: string | undefined) => {
     if (!str) return '';
     return str.replace(/\\/g, '\\\\').replace(/'/g, "''");
 };
 
 export const generateSQLSchema = () => {
-    // This matches the schema defined in migrate_db.php for the "Fresh Install" path
     let sql = `
 CREATE TABLE IF NOT EXISTS users (
     id VARCHAR(255) PRIMARY KEY,
@@ -543,29 +520,25 @@ CREATE TABLE IF NOT EXISTS analytics_visits (
     date DATE PRIMARY KEY,
     count INT DEFAULT 0
 );
-
 -- SEED DATA --
 `;
 
-    // 1. Seed Topics
     if (SYLLABUS_DATA.length > 0) {
         sql += `INSERT IGNORE INTO topics (id, name, chapter, subject) VALUES \n`;
         const values = SYLLABUS_DATA.map(t => `('${esc(t.id)}', '${esc(t.name)}', '${esc(t.chapter)}', '${esc(t.subject)}')`).join(',\n');
         sql += values + ';\n';
     }
 
-    // 2. Seed Questions
     const questions = generateInitialQuestionBank();
     if (questions.length > 0) {
         sql += `INSERT IGNORE INTO questions (id, subject_id, topic_id, text, options_json, correct_idx, difficulty, source, year) VALUES \n`;
         const values = questions.map(q => {
-            const opts = JSON.stringify(q.options).replace(/'/g, "''"); // Escape single quotes inside JSON string
+            const opts = JSON.stringify(q.options).replace(/'/g, "''");
             return `('${esc(q.id)}', '${esc(q.subjectId)}', '${esc(q.topicId)}', '${esc(q.text)}', '${opts}', ${q.correctOptionIndex}, '${esc(q.difficulty)}', '${esc(q.source)}', ${q.year || 0})`;
         }).join(',\n');
         sql += values + ';\n';
     }
 
-    // 3. Seed Tests
     if (MOCK_TESTS_DATA.length > 0) {
         sql += `INSERT IGNORE INTO tests (id, title, duration, category, difficulty, exam_type, questions_json) VALUES \n`;
         const values = MOCK_TESTS_DATA.map(t => {
@@ -575,7 +548,6 @@ CREATE TABLE IF NOT EXISTS analytics_visits (
         sql += values + ';\n';
     }
 
-    // 4. Seed Chapter Notes
     const noteEntries = Object.entries(DEFAULT_CHAPTER_NOTES);
     if (noteEntries.length > 0) {
         sql += `INSERT IGNORE INTO chapter_notes (topic_id, content_json, updated_at) VALUES \n`;
@@ -586,7 +558,6 @@ CREATE TABLE IF NOT EXISTS analytics_visits (
         sql += values + ';\n';
     }
 
-    // 5. Seed Flashcards & Hacks
     sql += `
     INSERT IGNORE INTO content (type, title, content_json) VALUES 
     ('flashcard', 'Newton Law', '{"id":1,"front":"Newton Law","back":"F=ma","type":"flashcard"}'),

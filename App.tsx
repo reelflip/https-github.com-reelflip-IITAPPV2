@@ -39,51 +39,54 @@ import { AITutorChat } from './components/AITutorChat';
 import { User, UserProgress, TestAttempt, Screen, Goal, MistakeLog, Flashcard, MemoryHack, BlogPost, VideoLesson, Question, Test, TimetableConfig, Topic, ContactMessage, BacklogItem, ChapterNote, SocialConfig } from './lib/types';
 import { SYLLABUS_DATA } from './lib/syllabusData';
 import { MOCK_TESTS_DATA } from './lib/mockTestsData';
-import { LogOut, Cloud, CloudOff, RefreshCw, WifiOff, AlertOctagon } from 'lucide-react';
+import { LogOut, Cloud, CloudOff, RefreshCw, WifiOff, AlertOctagon, Trash2 } from 'lucide-react';
 
 // --- Error Boundary for Robustness ---
 interface ErrorBoundaryProps { 
-  // Fix: Made children optional to avoid TypeScript error on line 214 where JSX children are provided implicitly
   children?: ReactNode; 
   resetAction: () => void; 
 }
 interface ErrorBoundaryState { hasError: boolean; }
 
-// Fix: Explicitly use React.Component to ensure that 'state', 'props', and 'setState' are properly inherited and recognized
-class AppErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+// Fixed: Using the named import Component directly to fix property inheritance errors in TS
+class AppErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   constructor(props: ErrorBoundaryProps) { 
     super(props); 
-    // Fix line 48: Initialize state inherited from React.Component
     this.state = { hasError: false }; 
   }
+  static getDerivedStateFromError() { return { hasError: true }; }
+  componentDidCatch(error: Error, info: ErrorInfo) { console.error("Render Crash Catch:", error, info); }
   
-  static getDerivedStateFromError() { 
-    return { hasError: true }; 
+  handleHardReset = () => {
+    localStorage.removeItem('iitjee_last_screen');
+    window.location.href = '/';
   }
-  
-  componentDidCatch(error: Error, info: ErrorInfo) { 
-    console.error("Render Crash Catch:", error, info); 
-  }
-  
+
   render() {
-    // Fix line 52: Access state property inherited from React.Component
     if (this.state.hasError) {
       return (
         <div className="flex flex-col items-center justify-center min-h-[400px] p-8 bg-red-50 rounded-2xl border border-red-100 text-center animate-in fade-in">
-          <AlertOctagon className="w-12 h-12 text-red-500 mb-4" />
-          <h2 className="text-xl font-bold text-red-900">Something went wrong</h2>
-          <p className="text-red-700 mt-2 text-sm max-w-sm">This screen encountered a critical rendering error. Don't worry, your data is safe.</p>
-          <button 
-            // Fix line 59: Access setState and props inherited from React.Component
-            onClick={() => { this.setState({ hasError: false }); this.props.resetAction(); }}
-            className="mt-6 bg-red-600 text-white px-6 py-2 rounded-xl font-bold hover:bg-red-700 transition-all shadow-lg"
-          >
-            Reset to Dashboard
-          </button>
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-6"><AlertOctagon className="text-red-500" size={32} /></div>
+          <h2 className="text-xl font-black text-red-900 uppercase tracking-tight">Component Failure</h2>
+          <p className="text-red-700 mt-2 text-sm max-w-sm font-medium">The system crashed while rendering this screen. This is usually caused by a database mismatch or a missing API file.</p>
+          
+          <div className="flex gap-4 mt-8">
+              <button 
+                onClick={() => { this.setState({ hasError: false }); this.props.resetAction(); }}
+                className="bg-red-600 text-white px-6 py-2 rounded-xl font-bold hover:bg-red-700 transition-all shadow-lg active:scale-95"
+              >
+                Go Home
+              </button>
+              <button 
+                onClick={this.handleHardReset}
+                className="bg-white border border-red-200 text-red-500 px-6 py-2 rounded-xl font-bold hover:bg-red-50 transition-all flex items-center gap-2"
+              >
+                <Trash2 size={16}/> Clear & Restart
+              </button>
+          </div>
         </div>
       );
     }
-    // Fix line 67: Access props property inherited from React.Component
     return this.props.children;
   }
 }
@@ -113,10 +116,16 @@ const SyncIndicator = ({ status, onRetry }: { status: 'SYNCED' | 'SAVING' | 'ERR
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
+  
+  // CRITICAL FIX: Safe Boot logic
   const [currentScreen, setCurrentScreen] = useState<Screen>(() => {
-    const saved = localStorage.getItem('iitjee_last_screen');
-    const validScreens: Screen[] = ['dashboard', 'syllabus', 'tests', 'ai-tutor', 'focus', 'analytics', 'timetable', 'revision', 'mistakes', 'flashcards', 'backlogs', 'hacks', 'wellness', 'profile', 'psychometric', 'overview', 'users', 'videos', 'content', 'diagnostics', 'system', 'deployment', 'tests_admin', 'content_admin', 'video_admin', 'admin_analytics', 'syllabus_admin', 'inbox', 'blog_admin', 'family', 'public-blog', 'about', 'blog', 'exams', 'privacy', 'contact', 'features'];
-    return (saved && validScreens.includes(saved as Screen)) ? (saved as Screen) : 'dashboard';
+    try {
+        const saved = localStorage.getItem('iitjee_last_screen');
+        const validScreens: Screen[] = ['dashboard', 'syllabus', 'tests', 'ai-tutor', 'focus', 'analytics', 'timetable', 'revision', 'mistakes', 'flashcards', 'backlogs', 'hacks', 'wellness', 'profile', 'psychometric', 'overview', 'users', 'videos', 'content', 'diagnostics', 'system', 'deployment', 'tests_admin', 'content_admin', 'video_admin', 'admin_analytics', 'syllabus_admin', 'inbox', 'blog_admin', 'family', 'public-blog', 'about', 'blog', 'exams', 'privacy', 'contact', 'features'];
+        // NEVER allow initial boot into 'inbox' if a previous crash occurred there
+        if (saved === 'inbox') return 'overview'; 
+        return (saved && validScreens.includes(saved as Screen)) ? (saved as Screen) : 'dashboard';
+    } catch (e) { return 'dashboard'; }
   });
 
   const [enableGoogleLogin] = useState(false);
@@ -269,6 +278,7 @@ export default function App() {
                   {currentScreen === 'analytics' && <AnalyticsScreen user={user} progress={progress} testAttempts={testAttempts} />}
                   {currentScreen === 'timetable' && <TimetableScreen user={user} savedConfig={timetableData?.config} savedSlots={timetableData?.slots} progress={progress} onSave={(cfg, slots) => setTimetableData({config: cfg, slots})} />}
                   {currentScreen === 'revision' && <RevisionScreen progress={progress} handleRevisionComplete={(id) => {}} />}
+                  {currentScreen === 'exams' && <ExamGuideScreen />}
                   {currentScreen === 'mistakes' && <MistakesScreen mistakes={mistakes} addMistake={(m) => setMistakes([...mistakes, {...m, id: Date.now().toString(), date: new Date().toISOString()}])} />}
                   {currentScreen === 'flashcards' && <FlashcardScreen flashcards={flashcards} />}
                   {currentScreen === 'backlogs' && <BacklogScreen backlogs={backlogs} onAddBacklog={(b) => setBacklogs([...backlogs, {...b, id: Date.now().toString(), status: 'PENDING'}])} onToggleBacklog={(id) => setBacklogs(backlogs.map(x => x.id === id ? {...x, status: x.status === 'PENDING' ? 'COMPLETED' : 'PENDING'} : x))} onDeleteBacklog={(id) => setBacklogs(backlogs.filter(x => x.id !== id))} />}
