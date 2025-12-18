@@ -1,6 +1,6 @@
-
 import React, { useState } from 'react';
-import { getBackendFiles, generateSQLSchema, generateHtaccess } from '../services/generatorService';
+/* Fix: Removed non-existent export generateHtaccess from generatorService import to resolve TypeScript error */
+import { getBackendFiles, generateSQLSchema } from '../services/generatorService';
 import { Download, Server, BookOpen, Package, FileText, Folder, ArrowRight, ShieldCheck, Database, Layout, Activity, PlugZap, CheckCircle2, XCircle, Lock, AlertTriangle, RefreshCw } from 'lucide-react';
 import JSZip from 'jszip';
 

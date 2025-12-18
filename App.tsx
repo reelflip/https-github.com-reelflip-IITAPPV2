@@ -1,4 +1,3 @@
-
 import React, { Component, useState, useEffect, useCallback, ErrorInfo, ReactNode, Suspense, lazy } from 'react';
 import { Navigation, MobileNavigation } from './components/Navigation';
 import { AITutorChat } from './components/AITutorChat';
@@ -54,9 +53,7 @@ interface ErrorBoundaryState {
   hasError: boolean;
 }
 
-// Fix: Explicitly typed ErrorBoundary to ensure props and state are correctly inherited to resolve Error in file App.tsx on line 81
 class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  // Fix: Declare props and state members to guarantee their visibility to the TS compiler
   public props: ErrorBoundaryProps;
   public state: ErrorBoundaryState = { hasError: false };
 
@@ -119,10 +116,6 @@ const App: React.FC = () => {
   const [videoMap, setVideoMap] = useState<Record<string, VideoLesson>>({});
   const [linkedData, setLinkedData] = useState<{ progress: Record<string, UserProgress>, tests: TestAttempt[], studentName: string, psychReport?: PsychometricReport } | undefined>();
 
-  /**
-   * PURGE ALL USER DATA
-   * Ensures that when switching accounts, previous state is wiped clean.
-   */
   const clearState = useCallback(() => {
     setProgress({});
     setTestAttempts([]);
@@ -155,27 +148,50 @@ const App: React.FC = () => {
     localStorage.setItem('last_screen', currentScreen);
   }, [currentScreen]);
 
+  const mapProgress = (p: any): UserProgress => ({
+    topicId: p.topicId || p.topic_id,
+    status: p.status,
+    lastRevised: p.lastRevised || p.last_revised,
+    revisionLevel: (p.revisionLevel !== undefined ? p.revisionLevel : p.revision_level) || 0,
+    nextRevisionDate: p.nextRevisionDate || p.next_revision_date,
+    solvedQuestions: p.solvedQuestions || (p.solved_questions_json ? JSON.parse(p.solved_questions_json) : [])
+  });
+
+  const mapAttempt = (a: any): TestAttempt => ({
+    id: a.id,
+    date: a.date,
+    title: a.title || 'Mock Test',
+    // Fix: Replaced invalid (int) and (float) type casts with Number() to resolve TypeScript errors
+    score: Number(a.score),
+    totalMarks: Number(a.totalMarks || a.total_marks),
+    accuracy: Number(a.accuracy),
+    accuracy_percent: Number(a.accuracy_percent || a.accuracy),
+    testId: a.testId || a.test_id,
+    totalQuestions: Number(a.totalQuestions || a.total_questions),
+    correctCount: Number(a.correctCount || a.correct_count),
+    incorrectCount: Number(a.incorrectCount || a.incorrect_count),
+    unattemptedCount: Number(a.unattemptedCount || a.unattempted_count),
+    topicId: a.topicId || a.topic_id,
+    difficulty: a.difficulty,
+    detailedResults: a.detailedResults || (a.detailed_results ? JSON.parse(a.detailed_results) : [])
+  });
+
   const loadDashboard = useCallback(async (userId: string) => {
     try {
         const res = await fetch(`/api/get_dashboard.php?user_id=${userId}`);
         if (res.ok) {
             const data = await res.json();
-            
-            // Clear current state before merging new data to prevent leaks/ghosting
             clearState();
 
             if (data.progress) {
                 const progMap: Record<string, UserProgress> = {};
                 data.progress.forEach((p: any) => {
-                    progMap[p.topic_id] = {
-                        topicId: p.topic_id, status: p.status, lastRevised: p.last_revised,
-                        revisionLevel: (p.revision_level || 0), nextRevisionDate: p.next_revision_date,
-                        solvedQuestions: p.solved_questions_json ? JSON.parse(p.solved_questions_json) : []
-                    } as any;
+                    const mapped = mapProgress(p);
+                    progMap[mapped.topicId] = mapped;
                 });
                 setProgress(progMap);
             }
-            if (data.attempts) setTestAttempts(data.attempts);
+            if (data.attempts) setTestAttempts(data.attempts.map(mapAttempt));
             if (data.goals) setGoals(data.goals.map((g: any) => ({ ...g, completed: g.completed == 1 })));
             if (data.mistakes) setMistakes(data.mistakes);
             if (data.backlogs) setBacklogs(data.backlogs);
@@ -184,7 +200,6 @@ const App: React.FC = () => {
                 const updatedUser = { ...data.userProfileSync, notifications: data.notifications };
                 setUser(updatedUser);
 
-                // For parents: load student data if linked
                 if (updatedUser.role === 'PARENT' && updatedUser.linkedStudentId) {
                     const sRes = await fetch(`/api/get_dashboard.php?user_id=${updatedUser.linkedStudentId}`);
                     const psychRes = await fetch(`/api/get_psychometric.php?user_id=${updatedUser.linkedStudentId}`);
@@ -193,11 +208,8 @@ const App: React.FC = () => {
                         const sData = await sRes.json();
                         const sProgMap: Record<string, UserProgress> = {};
                         sData.progress?.forEach((p: any) => {
-                           sProgMap[p.topic_id] = {
-                                topicId: p.topic_id, status: p.status, lastRevised: p.last_revised,
-                                revisionLevel: p.revision_level, nextRevisionDate: p.next_revision_date,
-                                solvedQuestions: p.solved_questions_json ? JSON.parse(p.solved_questions_json) : []
-                            } as any;
+                           const mapped = mapProgress(p);
+                           sProgMap[mapped.topicId] = mapped;
                         });
                         
                         let psychReport;
@@ -208,7 +220,7 @@ const App: React.FC = () => {
 
                         setLinkedData({
                             progress: sProgMap,
-                            tests: sData.attempts || [],
+                            tests: (sData.attempts || []).map(mapAttempt),
                             studentName: sData.userProfileSync?.name || 'Student',
                             psychReport
                         });
@@ -245,7 +257,6 @@ const App: React.FC = () => {
   }, []);
 
   const handleLogin = (u: User) => {
-    // Purge any existing state before setting the new user
     clearState();
     setUser(u);
     const isAdmin = u.role === 'ADMIN' || u.role === 'ADMIN_EXECUTIVE';
@@ -257,8 +268,6 @@ const App: React.FC = () => {
     clearState();
     setScreen('dashboard');
     localStorage.clear();
-    // Use window.location.reload() to force a clean slate if state pollution persists
-    // window.location.reload(); 
   };
 
   const handleAcceptRequest = async (notificationId: string) => {
@@ -270,7 +279,6 @@ const App: React.FC = () => {
             body: JSON.stringify({ notification_id: notificationId, action: 'ACCEPT' })
         });
         if (res.ok) {
-            // Reload user to get updated linking
             loadDashboard(user.id);
             alert("Request Accepted! Account is now linked.");
         }

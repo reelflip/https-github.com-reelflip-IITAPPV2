@@ -1,4 +1,3 @@
-
 import { PsychometricQuestion, PsychometricReport } from './types';
 
 export const PSYCHOMETRIC_DIMENSIONS = [
@@ -112,93 +111,127 @@ export const generatePsychometricReport = (responses: Record<number, number>): P
     else if (dimensionScores["Preparation Strategy"] < 40 && dimensionScores["Conceptual Understanding"] > 60) profileType = "Unstructured Learner";
     else if (dimensionScores["Exam Temperament"] < 40 && overallScore > 60) profileType = "Exam Phobic";
 
-    // 3. Generate Insights, Action Plan & Parent Tips
+    // 3. Generate Detailed Analysis Sections
     const insights: { dimension: string; status: 'GOOD' | 'AVERAGE' | 'POOR'; text: string }[] = [];
     const actionPlan: string[] = [];
     const parentTips: string[] = [];
     let detailedAnalysis = "";
 
-    // --- LOGIC ENGINE ---
-    
-    // Stress
-    const stressScore = dimensionScores["Academic Stress & Burnout"];
-    if (stressScore < 50) {
-        insights.push({ dimension: "Stress", status: "POOR", text: "High burnout risk detected. Your mental fatigue is likely hindering your retention." });
-        actionPlan.push("Mandatory 1-hour 'No-Study' zone daily.");
-        actionPlan.push("Practice 4-7-8 breathing before every study session.");
-        
-        parentTips.push("Stress & Burnout: Your child is showing high stress levels. Avoid discussing test scores immediately after an exam. Create a 'no-study' emotional safety zone at home.");
-        
-        detailedAnalysis += `### 🧠 Mental State Alert\nYour stress management score is critically low (${stressScore}%). This suggests you are operating in a state of chronic 'Fight or Flight'.\n\n`;
-    } else if (stressScore > 80) {
-        insights.push({ dimension: "Stress", status: "GOOD", text: "Excellent mental resilience. You are well-equipped to handle exam pressure." });
-        
-        parentTips.push("Stress & Burnout: Your child has high mental resilience. Encourage this, but ensure they don't become complacent or mask their fatigue.");
-        
-        detailedAnalysis += `### 🧠 Mental Fortitude\nYou have a psychological advantage. Your stress score (${stressScore}%) indicates high resilience.\n\n`;
+    // Mapping Dimension status for rendering
+    const getStatus = (score: number): 'GOOD' | 'AVERAGE' | 'POOR' => {
+        if (score >= 70) return 'GOOD';
+        if (score >= 45) return 'AVERAGE';
+        return 'POOR';
+    };
+
+    // --- DETAILED BREAKDOWN ENGINE ---
+
+    // A. Stress & Burnout
+    const stress = dimensionScores["Academic Stress & Burnout"];
+    detailedAnalysis += `### 🧘 Academic Stress & Burnout (${stress}%) \n`;
+    if (stress < 50) {
+        detailedAnalysis += `Your burnout levels are high. This indicates a 'Survival Mode' mindset where cognitive resources are redirected to anxiety management rather than learning. You likely experience "brain fog" during long study hours.\n\n`;
+        insights.push({ dimension: "Stress", status: "POOR", text: "Cognitive overload detected. High risk of long-term fatigue." });
+        actionPlan.push("Limit study sessions to 50 mins with mandatory 10-min active breaks (walk, stretch).");
+        parentTips.push("Stress Relief: Encourage breaks without judgment. Your child needs emotional safety right now.");
+    } else if (stress > 75) {
+        detailedAnalysis += `Excellent emotional regulation. You maintain a growth mindset even under pressure, allowing your prefrontal cortex to remain engaged for complex problem solving.\n\n`;
+        insights.push({ dimension: "Stress", status: "GOOD", text: "Resilient mindset. High capacity for intense exam pressure." });
     } else {
-        parentTips.push("Stress & Burnout: Stress levels are moderate. Ensure they take one full break day every two weeks to recharge.");
+        detailedAnalysis += `Moderate stress levels. You are coping, but certain heavy topics trigger anxiety that impacts your focus efficiency.\n\n`;
     }
 
-    // Concepts vs Strategy
-    const conceptScore = dimensionScores["Conceptual Understanding"];
-    const stratScore = dimensionScores["Preparation Strategy"];
-    if (conceptScore > 70 && stratScore < 50) {
-        insights.push({ dimension: "Efficiency", status: "AVERAGE", text: "Knowledge-Strategy Gap: You know the concepts but lack a scoring strategy." });
-        actionPlan.push("Shift ratio to 70% Problem Solving / 30% Theory.");
-        
-        parentTips.push("Study Support: Your child knows the concepts but struggles with strategy. Change the conversation from 'How many hours did you study?' to 'How many questions did you solve today?'.");
-        
-        detailedAnalysis += `### 📉 The Efficiency Trap\nYou scored high on Concepts (${conceptScore}%) but low on Strategy (${stratScore}%). This is a classic trap: "The Professor Syndrome".\n\n`;
-    }
-
-    // Problem Solving
-    const solveScore = dimensionScores["Problem-Solving Habits"];
-    if (solveScore < 50) {
-        insights.push({ dimension: "Practice", status: "POOR", text: "Passive Learning Detected. You are likely reading solutions instead of solving problems." });
-        actionPlan.push("The '5-Minute Rule': Struggle with a problem for 5 mins before checking solutions.");
-        detailedAnalysis += `### ✍️ Active Recall Deficit\nYour problem-solving score (${solveScore}%) suggests you are falling into the 'Illusion of Competence'.\n\n`;
-    }
-
-    // Sleep & Health
-    const healthScore = dimensionScores["Health & Lifestyle"];
-    if (healthScore < 50) {
-        actionPlan.push("Fix your sleep cycle. Memory consolidation happens during REM sleep.");
-        parentTips.push("Health & Focus: Lack of sleep is a physical bottleneck. Enforce a 'digital sunset' where phones are removed 1 hour before bed to improve sleep quality.");
-        detailedAnalysis += `### 💤 Physical Baseline\nYou cannot drive a Ferrari on flat tires. Your health score (${healthScore}%) is low. Lack of sleep prevents long-term memory formation.\n\n`;
+    // B. Conceptual Understanding
+    const concepts = dimensionScores["Conceptual Understanding"];
+    detailedAnalysis += `### 🧪 Conceptual Understanding (${concepts}%) \n`;
+    if (concepts < 55) {
+        detailedAnalysis += `Your scores suggest a tendency towards 'Surface Learning'. You may be focusing too much on formulas without understanding their derivation, making it difficult to solve 'out-of-box' JEE Advanced problems.\n\n`;
+        insights.push({ dimension: "Concepts", status: "POOR", text: "Surface-level learning detected. Need deeper 'Why' analysis." });
+        actionPlan.push("Dedicate 2 days a week exclusively to derivation and fundamental NCERT theory.");
+    } else if (concepts > 80) {
+        detailedAnalysis += `Exceptional conceptual clarity. You don't just solve problems; you understand the underlying physics/logic. This is your strongest asset for JEE Advanced.\n\n`;
+        insights.push({ dimension: "Concepts", status: "GOOD", text: "Strong conceptual foundation. Ideal for Advanced-level complexity." });
     } else {
-        parentTips.push("Health & Focus: Good physical habits detected. Maintain this rhythm by ensuring healthy snacks are available during study breaks.");
+        detailedAnalysis += `Solid understanding but prone to 'Formula Substitution' errors in complex scenarios. Deepen your understanding of boundary conditions in Physics/Math.\n\n`;
     }
 
-    // External Pressure
-    const pressureScore = dimensionScores["External Pressure"];
-    if (pressureScore < 40) {
-        insights.push({ dimension: "Environment", status: "POOR", text: "High external pressure is affecting your confidence." });
-        parentTips.push("Motivation & Mindset: CRITICAL. Your child feels weighed down by expectations. Avoid comparisons with peers/relatives. Celebrate small 'process wins' (e.g., finishing a chapter) rather than just results.");
-        detailedAnalysis += `### 🏋️ Weight of Expectations\nYou are carrying a heavy load of external expectations (${pressureScore}%). This fear of disappointment is likely causing 'Performance Anxiety'.\n\n`;
+    // C. Problem Solving
+    const solving = dimensionScores["Problem-Solving Habits"];
+    detailedAnalysis += `### ✍️ Problem-Solving Habits (${solving}%) \n`;
+    if (solving < 50) {
+        detailedAnalysis += `You may be falling into the 'Solution Trap'—checking answers too quickly. This prevents the development of the 'Struggle Muscle' required for the 3-hour exam grind.\n\n`;
+        insights.push({ dimension: "Practice", status: "POOR", text: "Solution-dependency detected. Hindering creative problem solving." });
+        actionPlan.push("The 15-Minute Struggle: Do not look at a solution for 15 mins, no matter how stuck you are.");
     } else {
-        parentTips.push("Motivation & Mindset: Your child feels supported. Continue validating their effort, not just their rank.");
+        detailedAnalysis += `Good grit in solving. You likely analyze your mistakes, which is a high-yield habit for improving rank consistency.\n\n`;
     }
 
-    // Exam Temperament
-    const examScore = dimensionScores["Exam Temperament"];
-    if (examScore < 50) {
-        insights.push({ dimension: "Exam Hall", status: "POOR", text: "You tend to panic or blank out during tests." });
-        actionPlan.push("Simulate exam noise at home.");
-        parentTips.push("Study Support: Help simulate exam conditions at home. Ensure the house is quiet during their mock test slot (e.g., 9 AM - 12 PM) to build exam temperament.");
-        detailedAnalysis += `### 🎭 Exam Day Execution\nYour preparation means nothing if you cannot execute on D-Day. Your low temperament score (${examScore}%) needs desensitization training.\n\n`;
+    // D. Time Management
+    const tm = dimensionScores["Time Management"];
+    detailedAnalysis += `### ⏱️ Time Management (${tm}%) \n`;
+    if (tm < 45) {
+        detailedAnalysis += `Procrastination or lack of structured schedule is a bottleneck. You likely lose time in 'Passive Studying' (reading without active participation).\n\n`;
+        insights.push({ dimension: "Efficiency", status: "POOR", text: "Time-leakage detected. Low output relative to hours invested." });
+        actionPlan.push("Use the Focus Zone timer for every single study block. No exceptions.");
+        parentTips.push("Habit Building: Help set a fixed wake/sleep time. Consistency is more important than intensity right now.");
+    } else {
+        detailedAnalysis += `Efficient use of time. You successfully balance school, coaching, and self-study, though there is always room for revision optimization.\n\n`;
     }
 
-    // Defaults
-    if (actionPlan.length === 0) actionPlan.push("Maintain your current consistency but increase mock test frequency.");
-    
-    if (parentTips.length < 3) {
-        parentTips.push("Focus & Habits: Help them build a routine by aligning meal times with their study breaks.");
+    // E. Exam Temperament
+    const temperament = dimensionScores["Exam Temperament"];
+    detailedAnalysis += `### 🎭 Exam Temperament (${temperament}%) \n`;
+    if (temperament < 50) {
+        detailedAnalysis += `The 'Mock Test Gap': You know the concepts in practice but panic during the actual test. High incidence of silly mistakes (calculation/bubbling errors).\n\n`;
+        insights.push({ dimension: "Temperament", status: "POOR", text: "Exam-hall anxiety is significantly dragging down your potential score." });
+        actionPlan.push("Take one 3-hour timed mock test every Sunday in a completely quiet environment.");
+    } else {
+        detailedAnalysis += `Cool-headed during tests. You have a solid strategy for subject-ordering and can identify 'traps' set by examiners.\n\n`;
     }
 
-    const summary = `Based on the assessment, you are performing at a ${overallScore}% readiness level. Your key strength lies in ${Object.entries(dimensionScores).reduce((a, b) => a[1] > b[1] ? a : b)[0]}, while you need to critically focus on ${Object.entries(dimensionScores).reduce((a, b) => a[1] < b[1] ? a : b)[0]}.`;
+    // F. Mindset & Motivation
+    const mindset = dimensionScores["Motivation & Mindset"];
+    detailedAnalysis += `### 🚀 Mindset & Motivation (${mindset}%) \n`;
+    if (mindset < 50) {
+        detailedAnalysis += `Your motivation seems 'External' (driven by fear or parents) rather than 'Internal'. This makes your energy levels unstable across the long JEE marathon.\n\n`;
+        parentTips.push("Mindset: Validate effort, not results. Your child needs to feel that their worth isn't tied to their rank.");
+    } else {
+        detailedAnalysis += `High internal drive. You enjoy the challenge of difficult problems, which is the mark of a successful engineer.\n\n`;
+    }
 
-    if (!detailedAnalysis) detailedAnalysis = `### 🌟 Balanced Profile\nYour profile is balanced. To jump to the next percentile, focus on marginal gains in your weakest area.\n\n`;
+    // G. External Pressure
+    const pressure = dimensionScores["External Pressure"];
+    detailedAnalysis += `### 🏋️ External Pressure (${pressure}%) \n`;
+    if (pressure < 40) {
+        detailedAnalysis += `You feel a heavy burden of expectation. This creates 'Fear of Failure' which paralyzes your decision-making in difficult questions.\n\n`;
+        insights.push({ dimension: "Environment", status: "POOR", text: "Expectation-burden detected. Impacting risk-taking in exams." });
+    } else {
+        detailedAnalysis += `Supportive environment. You feel your family and mentors are 'with you' rather than 'watching you'.\n\n`;
+    }
+
+    // H. Health & Lifestyle
+    const health = dimensionScores["Health & Lifestyle"];
+    detailedAnalysis += `### 🥗 Health & Lifestyle (${health}%) \n`;
+    if (health < 50) {
+        detailedAnalysis += `Physical bottlenecks detected. Poor sleep or nutrition is reducing your focus duration. Long-term memory consolidation happens during sleep; you are losing learning every time you pull an all-nighter.\n\n`;
+        actionPlan.push("Strict 7-hour sleep window. Sleep is part of your study plan, not an alternative.");
+    } else {
+        detailedAnalysis += `Excellent physical maintenance. Your brain is well-fueled for high-intensity cognitive work.\n\n`;
+    }
+
+    // I. Strategy
+    const strategy = dimensionScores["Preparation Strategy"];
+    detailedAnalysis += `### 🗺️ Preparation Strategy (${strategy}%) \n`;
+    if (strategy < 50) {
+        detailedAnalysis += `Unstructured approach. You are likely jumping between books or focusing too much on easy chapters. Lack of periodic revision is your biggest risk.\n\n`;
+        insights.push({ dimension: "Strategy", status: "POOR", text: "Fragmented study pattern. High chance of forgetting old topics." });
+        actionPlan.push("Use the 'Revision' tab daily. Do not ignore topics flagged as 'REVISE'.");
+    } else {
+        detailedAnalysis += `Highly systematic. You use short notes, PYQs, and revision cycles effectively. You are preparing 'smart', not just 'hard'.\n\n`;
+    }
+
+    // Default summaries
+    const summary = `Overall Readiness: ${overallScore}%. You are a **${profileType}**. Your core strength is **${Object.entries(dimensionScores).reduce((a, b) => a[1] > b[1] ? a : b)[0]}**, while your primary growth opportunity lies in **${Object.entries(dimensionScores).reduce((a, b) => a[1] < b[1] ? a : b)[0]}**.`;
 
     return {
         date: new Date().toISOString(),
@@ -207,8 +240,8 @@ export const generatePsychometricReport = (responses: Record<number, number>): P
         profileType,
         summary,
         insights,
-        actionPlan: actionPlan.slice(0, 5),
+        actionPlan: actionPlan.slice(0, 6),
         detailedAnalysis,
-        parentTips: parentTips.slice(0, 5) // Ensure we send the tailored tips
+        parentTips: parentTips.slice(0, 5)
     };
 };
