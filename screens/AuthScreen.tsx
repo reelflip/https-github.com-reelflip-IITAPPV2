@@ -1,42 +1,18 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User, Role, SocialConfig } from '../lib/types';
-import { COACHING_INSTITUTES, TARGET_YEARS, TARGET_EXAMS } from '../lib/constants';
 import { 
   TrendingUp,
   User as UserIcon, 
-  Building, 
-  Calendar, 
   Mail, 
-  ArrowRight,
   Shield,
   Lock,
-  AlertCircle,
   CheckCircle2,
   Users,
-  Target,
-  Key,
-  Search,
-  ArrowLeft,
   Book,
   PenTool,
   Calculator,
-  Atom,
-  Sigma,
-  Pi,
-  Compass,
-  Ruler,
-  Triangle,
-  FlaskConical,
-  Microscope,
-  GraduationCap,
-  Binary,
-  FunctionSquare,
-  Divide,
-  ChevronDown,
   Loader2,
-  WifiOff,
-  Settings,
-  UserCheck
+  WifiOff
 } from 'lucide-react';
 
 interface AuthScreenProps {
@@ -60,65 +36,38 @@ const EducationSketchBackground = () => (
     </div>
 );
 
-export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate, enableGoogleLogin, socialConfig }) => {
+export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
   const [view, setView] = useState<AuthView>('LOGIN');
-  const [role, setRole] = useState<Role>('STUDENT');
+  const [role] = useState<Role>('STUDENT');
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [googleClientId, setGoogleClientId] = useState<string | null>(null);
   const showDemo = window.IITJEE_CONFIG?.enableDemoLogin ?? false;
 
-  const googleBtnRef = useRef<HTMLDivElement>(null);
-  const [showRoleModal, setShowRoleModal] = useState(false);
-  const [pendingGoogleToken, setPendingGoogleToken] = useState<string | null>(null);
-
   const [formData, setFormData] = useState({
-    name: '', email: '', password: '', confirmPassword: '',
-    institute: '', targetYear: '2025', targetExam: 'JEE Main & Advanced',
-    dob: '', gender: '', securityQuestion: 'What is the name of your first pet?', securityAnswer: ''
+    name: '', email: '', password: ''
   });
 
-  const handleDemoLogin = (role: Role) => {
+  const handleDemoLogin = (selectedRole: Role) => {
       const demoUser: User = {
-          id: `demo_${role.toLowerCase()}`,
-          name: `Demo ${role.charAt(0) + role.slice(1).toLowerCase()}`,
-          email: `${role.toLowerCase()}@demo.local`,
+          id: `demo_${selectedRole.toLowerCase()}`,
+          name: `Demo ${selectedRole.charAt(0) + selectedRole.slice(1).toLowerCase()}`,
+          email: `${selectedRole.toLowerCase()}@demo.local`,
           targetExam: 'JEE Main & Advanced',
-          role: role,
+          role: selectedRole,
           isVerified: true
       };
       onLogin(demoUser);
   };
 
-  useEffect(() => {
-      const fetchClientId = async () => {
-          try {
-              const res = await fetch('/api/manage_settings.php?key=google_client_id');
-              if(res.ok) {
-                  const data = await res.json();
-                  if(data && data.value && data.value.length > 5) setGoogleClientId(data.value);
-              }
-          } catch(e) {}
-      };
-      if(enableGoogleLogin) fetchClientId();
-  }, [enableGoogleLogin]);
-
-  const handleAuth = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
+  const handleAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
     setError(''); setSuccessMessage(''); setIsLoading(true);
     
-    if (view === 'REGISTER' && formData.password !== formData.confirmPassword) {
-        setError("Passwords do not match."); setIsLoading(false); return;
-    }
-
     try {
         const endpoint = view === 'REGISTER' ? '/api/register.php' : '/api/login.php';
         const payload = view === 'REGISTER' ? {
-            name: formData.name, email: formData.email, password: formData.password, role: role,
-            institute: formData.institute, targetYear: parseInt(formData.targetYear.toString()) || 2025,
-            targetExam: formData.targetExam, dob: formData.dob, gender: formData.gender,
-            securityQuestion: formData.securityQuestion, securityAnswer: formData.securityAnswer
+            name: formData.name, email: formData.email, password: formData.password, role: role
         } : {
             email: formData.email,
             password: formData.password
@@ -131,9 +80,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate, ena
         });
 
         const data = await response.json();
-        if (!response.ok || data.status === 'error' || data.error) {
-            throw new Error(data.message || data.error || 'Authentication failed.');
-        }
+        if (!response.ok) throw new Error(data.message || 'Authentication failed.');
 
         if (view === 'REGISTER') {
             setView('LOGIN');
@@ -166,10 +113,10 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate, ena
             </h1>
         </div>
 
-        <div className="px-8 pb-10 flex-1 overflow-y-auto max-h-[75vh] custom-scrollbar">
+        <div className="px-8 pb-10 flex-1 overflow-y-auto max-h-[75vh]">
             <div className="flex justify-between items-baseline mb-6 mt-4">
                 <h2 className="text-xl font-bold text-slate-800">{view === 'REGISTER' ? 'Create Account' : 'Welcome Back'}</h2>
-                <button type="button" onClick={() => { setView(view === 'LOGIN' ? 'REGISTER' : 'LOGIN'); setError(''); }} className="text-sm font-medium text-blue-600 hover:text-blue-800 transition-colors">
+                <button type="button" onClick={() => { setView(view === 'LOGIN' ? 'REGISTER' : 'LOGIN'); setError(''); }} className="text-sm font-medium text-blue-600 hover:text-blue-800">
                     {view === 'REGISTER' ? 'Back to Login' : 'Create Account'}
                 </button>
             </div>
@@ -228,7 +175,6 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate, ena
             </div>
         </div>
       </div>
-      
       <div className="mt-8 text-center relative z-10 pb-4">
           <div className="mt-2 text-[10px] font-mono text-slate-300 tracking-widest">STABLE RELEASE • v12.22</div>
       </div>

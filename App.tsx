@@ -16,7 +16,6 @@ import { HacksScreen } from './screens/HacksScreen';
 import { PublicBlogScreen } from './screens/PublicBlogScreen';
 import { ParentFamilyScreen } from './screens/ParentFamilyScreen';
 import { ProfileScreen } from './screens/ProfileScreen';
-import { VideoManagerScreen } from './screens/VideoManagerScreen';
 import { AdminTestManagerScreen } from './screens/AdminTestManagerScreen';
 import { AdminUserManagementScreen } from './screens/AdminUserManagementScreen';
 import { AdminSyllabusScreen } from './screens/AdminSyllabusScreen';
@@ -36,25 +35,39 @@ import { BacklogScreen } from './screens/BacklogScreen';
 import { PsychometricScreen } from './screens/PsychometricScreen';
 import { PublicLayout } from './components/PublicLayout';
 import { AITutorChat } from './components/AITutorChat';
-import { User, UserProgress, TestAttempt, Screen, Goal, MistakeLog, Flashcard, MemoryHack, BlogPost, VideoLesson, Question, Test, TimetableConfig, Topic, ContactMessage, BacklogItem, ChapterNote, SocialConfig } from './lib/types';
+import { User, UserProgress, TestAttempt, Screen, Goal, MistakeLog, Flashcard, MemoryHack, BlogPost, VideoLesson, Question, Test, TimetableConfig, Topic, BacklogItem, ChapterNote } from './lib/types';
 import { SYLLABUS_DATA } from './lib/syllabusData';
 import { MOCK_TESTS_DATA } from './lib/mockTestsData';
-import { LogOut, Cloud, CloudOff, RefreshCw, WifiOff, AlertOctagon, Trash2 } from 'lucide-react';
+import { LogOut, Cloud, CloudOff, RefreshCw, AlertOctagon, Trash2 } from 'lucide-react';
 
 interface ErrorBoundaryProps { children?: ReactNode; resetAction: () => void; }
 interface ErrorBoundaryState { hasError: boolean; }
 
-/* Fix: Changed React.Component to Component to resolve Property 'setState' and 'props' not found errors in strict TypeScript environments */
-class AppErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+// Fix: Explicitly use React.Component and provide types in generic arguments to resolve Property 'setState' and 'props' not existing on AppErrorBoundary
+class AppErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
   public state: ErrorBoundaryState = { hasError: false };
 
   constructor(props: ErrorBoundaryProps) { 
     super(props); 
   }
 
-  static getDerivedStateFromError() { return { hasError: true }; }
+  static getDerivedStateFromError() { 
+    return { hasError: true }; 
+  }
 
-  handleHardReset = () => { localStorage.removeItem('iitjee_last_screen'); window.location.href = '/'; }
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error("Component Failure caught by ErrorBoundary:", error, errorInfo);
+  }
+
+  handleReset = () => {
+    this.setState({ hasError: false });
+    this.props.resetAction();
+  };
+
+  handleHardReset = () => { 
+    localStorage.removeItem('iitjee_last_screen'); 
+    window.location.href = '/'; 
+  };
 
   render() {
     if (this.state.hasError) {
@@ -63,14 +76,12 @@ class AppErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState>
           <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-6"><AlertOctagon className="text-red-500" size={32} /></div>
           <h2 className="text-xl font-black text-red-900 uppercase tracking-tight">Component Failure</h2>
           <div className="flex gap-4 mt-8">
-              {/* Fix: setState and props now correctly resolved via Component inheritance */}
-              <button onClick={() => { this.setState({ hasError: false }); this.props.resetAction(); }} className="bg-red-600 text-white px-6 py-2 rounded-xl font-bold hover:bg-red-700 transition-all">Go Home</button>
+              <button onClick={this.handleReset} className="bg-red-600 text-white px-6 py-2 rounded-xl font-bold hover:bg-red-700 transition-all">Go Home</button>
               <button onClick={this.handleHardReset} className="bg-white border border-red-200 text-red-500 px-6 py-2 rounded-xl font-bold">Clear & Restart</button>
           </div>
         </div>
       );
     }
-    /* Fix: props correctly identified on type AppErrorBoundary */
     return this.props.children;
   }
 }
@@ -127,7 +138,7 @@ export default function App() {
               setVideoMap(vData);
           }
       }
-    } catch (e) { console.error("Global resource fetch failed", e); }
+    } catch (e) { console.error("Resource fetch error", e); }
   }, []);
 
   const fetchRemoteData = useCallback(async (userId: string) => {
@@ -246,7 +257,6 @@ export default function App() {
         <div className="hidden md:block absolute top-6 right-8 z-50">
             <SyncIndicator status={syncStatus} onRetry={() => fetchRemoteData(user.id)} />
         </div>
-
         <div className="max-w-6xl mx-auto">
           <AppErrorBoundary resetAction={() => setCurrentScreen('dashboard')}>
             {user.role === 'PARENT' ? (
@@ -265,9 +275,6 @@ export default function App() {
                   {currentScreen === 'inbox' && <AdminInboxScreen />}
                   {currentScreen === 'syllabus_admin' && <AdminSyllabusScreen syllabus={syllabus} onAddTopic={(t) => setSyllabus([...syllabus, {...t, id: Date.now().toString()}])} onDeleteTopic={(id) => setSyllabus(syllabus.filter(s => s.id !== id))} chapterNotes={chapterNotes} videoMap={videoMap} />}
                   {currentScreen === 'tests' && <AdminTestManagerScreen questionBank={questionBank} tests={adminTests} syllabus={syllabus} onAddQuestion={(q) => setQuestionBank([...questionBank, q])} onCreateTest={(t) => setAdminTests([...adminTests, t])} onDeleteQuestion={(id) => setQuestionBank(questionBank.filter(q => q.id !== id))} onDeleteTest={(id) => setAdminTests(adminTests.filter(t => t.id !== id))} />}
-                  {currentScreen === 'content' && <ContentManagerScreen flashcards={flashcards} hacks={hacks} blogs={blogs} onAddFlashcard={(f) => setFlashcards([...flashcards, {...f, id: Date.now()}])} onAddHack={(h) => setHacks([...hacks, {...h, id: Date.now()}])} onAddBlog={(b) => setBlogs([...blogs, {...b, id: Date.now(), date: new Date().toISOString()}])} onDelete={()=>{}} />}
-                  {currentScreen === 'blog_admin' && <AdminBlogScreen blogs={blogs} onAddBlog={(b) => setBlogs([...blogs, b])} onUpdateBlog={(b) => setBlogs(blogs.map(x => x.id === b.id ? b : x))} onDeleteBlog={(id) => setBlogs(blogs.filter(b => b.id !== id))} />}
-                  {currentScreen === 'analytics' && <AdminAnalyticsScreen />}
                   {currentScreen === 'diagnostics' && <DiagnosticsScreen />}
                   {currentScreen === 'system' && <AdminSystemScreen />}
                   {currentScreen === 'deployment' && <DeploymentScreen />}
