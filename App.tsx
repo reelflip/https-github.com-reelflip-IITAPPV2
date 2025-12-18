@@ -53,12 +53,15 @@ interface ErrorBoundaryState {
   hasError: boolean;
 }
 
-// Fix: Change ErrorBoundary to extend React.Component explicitly to ensure props is correctly recognized as a member to resolve Error in file App.tsx on line 81
+// Fix: Explicitly typed ErrorBoundary to ensure props and state are correctly inherited to resolve Error in file App.tsx on line 81
 class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  // Fix: Declare props and state members to guarantee their visibility to the TS compiler
+  public props: ErrorBoundaryProps;
   public state: ErrorBoundaryState = { hasError: false };
 
   constructor(props: ErrorBoundaryProps) {
     super(props);
+    this.props = props;
   }
 
   static getDerivedStateFromError(_error: Error) { return { hasError: true }; }
@@ -115,6 +118,20 @@ const App: React.FC = () => {
   const [videoMap, setVideoMap] = useState<Record<string, VideoLesson>>({});
   const [linkedData, setLinkedData] = useState<{ progress: Record<string, UserProgress>, tests: TestAttempt[], studentName: string, psychReport?: PsychometricReport } | undefined>();
 
+  /**
+   * PURGE ALL USER DATA
+   * Ensures that when switching accounts, previous state is wiped clean.
+   */
+  const clearState = useCallback(() => {
+    setProgress({});
+    setTestAttempts([]);
+    setGoals([]);
+    setMistakes([]);
+    setBacklogs([]);
+    setTimetable({});
+    setLinkedData(undefined);
+  }, []);
+
   useEffect(() => {
     if (user) {
         const isAdmin = user.role === 'ADMIN' || user.role === 'ADMIN_EXECUTIVE';
@@ -142,6 +159,10 @@ const App: React.FC = () => {
         const res = await fetch(`/api/get_dashboard.php?user_id=${userId}`);
         if (res.ok) {
             const data = await res.json();
+            
+            // Clear current state before merging new data to prevent leaks/ghosting
+            clearState();
+
             if (data.progress) {
                 const progMap: Record<string, UserProgress> = {};
                 data.progress.forEach((p: any) => {
@@ -195,7 +216,7 @@ const App: React.FC = () => {
             }
         }
     } catch (e) { console.error(e); }
-  }, []);
+  }, [clearState]);
 
   useEffect(() => {
     if (user) {
@@ -223,6 +244,8 @@ const App: React.FC = () => {
   }, []);
 
   const handleLogin = (u: User) => {
+    // Purge any existing state before setting the new user
+    clearState();
     setUser(u);
     const isAdmin = u.role === 'ADMIN' || u.role === 'ADMIN_EXECUTIVE';
     setScreen(isAdmin ? 'overview' : 'dashboard');
@@ -230,8 +253,11 @@ const App: React.FC = () => {
 
   const handleLogout = () => {
     setUser(null);
+    clearState();
     setScreen('dashboard');
     localStorage.clear();
+    // Use window.location.reload() to force a clean slate if state pollution persists
+    // window.location.reload(); 
   };
 
   const handleAcceptRequest = async (notificationId: string) => {
@@ -350,7 +376,7 @@ const App: React.FC = () => {
       case 'overview':
         return isAdminRole 
           ? <AdminDashboardScreen user={user} onNavigate={setScreen} messageCount={0} />
-          : <DashboardScreen user={user} progress={linkedData?.progress || progress} testAttempts={linkedData?.tests || testAttempts} goals={goals} toggleGoal={toggleGoal} addGoal={addGoal} setScreen={setScreen} viewingStudentName={linkedData?.studentName} linkedPsychReport={linkedData?.psychReport} />;
+          : <DashboardScreen user={user} progress={linkedData?.progress || progress} testAttempts={linkedData?.tests || testAttempts} goals={goals} toggleGoal={goal => toggleGoal(goal)} addGoal={addGoal} setScreen={setScreen} viewingStudentName={linkedData?.studentName} linkedPsychReport={linkedData?.psychReport} />;
       case 'syllabus':
         return <SyllabusScreen user={user} subjects={SYLLABUS_DATA} progress={linkedData?.progress || progress} onUpdateProgress={updateProgress} chapterNotes={chapterNotes} videoMap={videoMap} questionBank={questionBank} viewingStudentName={linkedData?.studentName} readOnly={user.role === 'PARENT'} addTestAttempt={handleAddTestAttempt} testAttempts={linkedData?.tests || testAttempts} />;
       case 'tests':
@@ -398,7 +424,7 @@ const App: React.FC = () => {
       case 'ai-tutor':
         return <AITutorChat isFullScreen={true} />;
       default:
-        return isAdminRole ? <AdminDashboardScreen user={user} onNavigate={setScreen} /> : <DashboardScreen user={user} progress={progress} testAttempts={testAttempts} goals={goals} toggleGoal={toggleGoal} addGoal={addGoal} setScreen={setScreen} />;
+        return isAdminRole ? <AdminDashboardScreen user={user} onNavigate={setScreen} /> : <DashboardScreen user={user} progress={progress} testAttempts={testAttempts} goals={goals} toggleGoal={goal => toggleGoal(goal)} addGoal={addGoal} setScreen={setScreen} />;
     }
   };
 

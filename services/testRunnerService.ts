@@ -1,4 +1,3 @@
-
 import { User, TestAttempt, Role, Screen } from '../lib/types';
 
 export interface TestResult {

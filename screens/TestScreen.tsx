@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { TestAttempt, Test, QuestionResult, User, Question } from '../lib/types';
 import { Clock, Check, FileText, PlayCircle, RotateCcw, Target, AlertTriangle, ChevronLeft, ChevronRight, Send, Loader2, Trophy, X, AlertCircle } from 'lucide-react';
@@ -76,7 +75,7 @@ export const TestScreen: React.FC<Props> = ({ user, addTestAttempt, history, ava
         setIsSubmitting(false);
         setRunningTest(null);
         setActiveTab('history');
-        alert(`Test Submitted Successfully!\nScore: ${score}/${totalMarks}\nAccuracy: ${accuracy}%`);
+        alert(`Mock Test Submitted!\nScore: ${score}/${totalMarks}\nAccuracy: ${accuracy}%`);
     } catch (e) {
         alert("Submission failed. Please check your internet connection.");
         setIsSubmitting(false);
@@ -137,8 +136,8 @@ export const TestScreen: React.FC<Props> = ({ user, addTestAttempt, history, ava
           return (
               <div className="fixed inset-0 z-50 bg-white flex flex-col items-center justify-center p-8">
                   <AlertCircle className="w-16 h-16 text-red-500 mb-4" />
-                  <h2 className="text-2xl font-bold text-slate-800">Test Engine Error</h2>
-                  <p className="text-slate-500 mt-2">No questions found for this test configuration.</p>
+                  <h2 className="text-2xl font-bold text-slate-800">Engine Initialization Error</h2>
+                  <p className="text-slate-500 mt-2">No valid questions found for this test.</p>
                   <button onClick={handleExit} className="mt-8 px-8 py-3 bg-slate-900 text-white rounded-xl font-bold">Back to Menu</button>
               </div>
           );
@@ -160,7 +159,7 @@ export const TestScreen: React.FC<Props> = ({ user, addTestAttempt, history, ava
                           <h2 className="text-lg font-bold truncate max-w-xs md:max-w-md">{runningTest.title}</h2>
                           <div className="flex gap-3 text-[10px] font-bold text-slate-400 uppercase">
                               <span>{questions.length} Questions</span>
-                              <span>JEE Pattern</span>
+                              <span>JEE Standard</span>
                           </div>
                       </div>
                   </div>
@@ -175,7 +174,7 @@ export const TestScreen: React.FC<Props> = ({ user, addTestAttempt, history, ava
               <div className="bg-white border-b border-slate-200 px-6 py-2 flex items-center justify-between">
                   <div className="flex gap-2">
                      <span className="text-xs font-bold text-slate-400 uppercase tracking-widest mr-4 hidden md:block">Navigation:</span>
-                     <span className="bg-blue-50 text-blue-600 px-3 py-1 rounded-lg text-[10px] font-black uppercase">Standard Mock</span>
+                     <span className="bg-blue-50 text-blue-600 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest">Active Test Engine</span>
                   </div>
                   <div className="text-xs font-bold text-slate-500">
                       Progress: {currentQuestionIdx + 1} / {questions.length}
@@ -230,7 +229,7 @@ export const TestScreen: React.FC<Props> = ({ user, addTestAttempt, history, ava
                       </div>
                   </div>
 
-                  {/* Right: Question Navigator Sidebar (Hidden on mobile) */}
+                  {/* Right: Question Navigator Sidebar */}
                   <div className="hidden md:flex w-80 bg-white border-l border-slate-200 p-6 flex-col overflow-y-auto">
                       <h3 className="font-black text-slate-400 text-[10px] uppercase tracking-widest mb-6">Question Palette</h3>
                       <div className="grid grid-cols-4 gap-3">
@@ -251,12 +250,12 @@ export const TestScreen: React.FC<Props> = ({ user, addTestAttempt, history, ava
 
                       <div className="mt-auto space-y-4 pt-8">
                           <div className="p-4 bg-slate-50 rounded-xl space-y-2 border border-slate-100">
-                             <div className="flex justify-between text-[10px] font-bold text-slate-400 uppercase">
-                                 <span>Attempted</span>
+                             <div className="flex justify-between text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                 <span>Answered</span>
                                  <span className="text-emerald-600">{Object.keys(userAnswers).length}</span>
                              </div>
-                             <div className="flex justify-between text-[10px] font-bold text-slate-400 uppercase">
-                                 <span>Remaining</span>
+                             <div className="flex justify-between text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                 <span>Pending</span>
                                  <span className="text-slate-600">{questions.length - Object.keys(userAnswers).length}</span>
                              </div>
                           </div>
@@ -267,7 +266,7 @@ export const TestScreen: React.FC<Props> = ({ user, addTestAttempt, history, ava
                           >
                              {isSubmitting ? <Loader2 className="animate-spin" /> : <Send size={18} />} Finish Test
                           </button>
-                          <button onClick={handleExit} className="w-full text-slate-400 hover:text-red-500 text-xs font-bold uppercase transition-colors">Discard & Exit</button>
+                          <button onClick={handleExit} className="w-full text-slate-400 hover:text-red-500 text-[10px] font-black uppercase tracking-widest transition-colors">Discard & Exit</button>
                       </div>
                   </div>
               </div>
@@ -304,15 +303,15 @@ export const TestScreen: React.FC<Props> = ({ user, addTestAttempt, history, ava
     <div className="space-y-6 animate-in fade-in">
         <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-8 text-white shadow-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
-                <h1 className="text-3xl font-bold">{isParent ? 'Student Scorecards' : 'Test Center'}</h1>
+                <h1 className="text-3xl font-bold">{isParent ? 'Student Performance' : 'Mock Test Center'}</h1>
                 <p className="text-blue-100 mt-1 opacity-90">
-                    {isParent ? "Viewing verified performance history of your child." : "Challenge yourself with mock exams and track your improvement."}
+                    {isParent ? "Viewing performance history of your child." : "Challenge yourself with exam-pattern mock tests."}
                 </p>
             </div>
             {!isParent && (
                 <div className="flex bg-white/20 p-1 rounded-xl backdrop-blur-sm border border-white/10 shrink-0">
-                    <button onClick={() => setActiveTab('practice')} className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'practice' ? 'bg-white text-blue-700 shadow-lg' : 'text-white hover:bg-white/10'}`}>Practice</button>
-                    <button onClick={() => setActiveTab('history')} className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'history' ? 'bg-white text-blue-700 shadow-lg' : 'text-white hover:bg-white/10'}`}>History</button>
+                    <button onClick={() => setActiveTab('practice')} className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'practice' ? 'bg-white text-blue-700 shadow-lg' : 'text-white hover:bg-white/10'}`}>Assessments</button>
+                    <button onClick={() => setActiveTab('history')} className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'history' ? 'bg-white text-blue-700 shadow-lg' : 'text-white hover:bg-white/10'}`}>Result History</button>
                 </div>
             )}
         </div>
@@ -322,8 +321,8 @@ export const TestScreen: React.FC<Props> = ({ user, addTestAttempt, history, ava
                 {availableTests.length === 0 ? (
                     <div className="col-span-full py-20 text-center bg-white rounded-3xl border border-dashed text-slate-400">
                         <FileText className="w-12 h-12 mx-auto mb-4 opacity-20" />
-                        <p className="font-bold uppercase tracking-widest text-xs">No Mock Tests Available</p>
-                        <p className="mt-2">Check back later or take chapter tests in the Syllabus tab.</p>
+                        <p className="font-bold uppercase tracking-widest text-xs">No Mock Tests Assigned</p>
+                        <p className="mt-2">Check the Syllabus tab for chapter-wise assessments.</p>
                     </div>
                 ) : (
                     availableTests.map(test => (
@@ -358,16 +357,16 @@ export const TestScreen: React.FC<Props> = ({ user, addTestAttempt, history, ava
                 <div className="p-6 border-b border-slate-200 bg-slate-50/50 flex justify-between items-center">
                     <h3 className="font-black text-slate-800 text-sm uppercase tracking-widest flex items-center gap-2">
                         <Trophy className="w-5 h-5 text-amber-500" />
-                        {isParent ? "Student Performance History" : "Past Attempts"}
+                        Performance Records
                     </h3>
-                    <span className="text-[10px] font-black bg-white border px-3 py-1 rounded-full text-slate-400">TOTAL: {history.length}</span>
+                    <span className="text-[10px] font-black bg-white border px-3 py-1 rounded-full text-slate-400">COUNT: {history.length}</span>
                 </div>
                 <div className="divide-y divide-slate-100">
                     {history.length === 0 ? (
                         <div className="p-20 text-center text-slate-400">
                             <FileText className="w-16 h-16 mx-auto mb-4 opacity-10" />
-                            <p className="font-bold text-slate-600">No test records found.</p>
-                            <p className="text-xs max-w-xs mx-auto mt-2">{isParent ? "Your child hasn't taken any mock tests or chapter tests yet." : "You haven't completed any assessments. Time to take your first test!"}</p>
+                            <p className="font-bold text-slate-600 text-lg">No assessment history found.</p>
+                            <p className="text-sm max-w-xs mx-auto mt-2">Take your first test in the 'Practice' tab to see your progress here.</p>
                         </div>
                     ) : (
                         history.map(attempt => (
@@ -381,7 +380,7 @@ export const TestScreen: React.FC<Props> = ({ user, addTestAttempt, history, ava
                                         <p className="text-[10px] text-slate-400 font-bold uppercase mt-1 flex items-center gap-2">
                                             <span>{new Date(attempt.date).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}</span>
                                             <span className="w-1 h-1 rounded-full bg-slate-300"></span>
-                                            <span className="text-blue-600">{attempt.timeTakenSeconds ? `${Math.floor(attempt.timeTakenSeconds / 60)}m ${attempt.timeTakenSeconds % 60}s` : 'JEE Standard'}</span>
+                                            <span className="text-blue-600">{attempt.timeTakenSeconds ? `${Math.floor(attempt.timeTakenSeconds / 60)}m ${attempt.timeTakenSeconds % 60}s` : 'Standard Duration'}</span>
                                         </p>
                                     </div>
                                 </div>

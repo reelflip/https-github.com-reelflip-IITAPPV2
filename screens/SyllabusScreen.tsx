@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { UserProgress, TopicStatus, Topic, User, VideoLesson, ChapterNote, Question, TestAttempt } from '../lib/types';
 import { BookReader } from '../components/BookReader';
@@ -51,6 +50,11 @@ export const SyllabusScreen: React.FC<SyllabusTrackerProps> = ({
   const [activeTopic, setActiveTopic] = useState<Topic | null>(null);
   const [activeNote, setActiveNote] = useState<{title: string, pages: string[]} | null>(null);
 
+  // States to persist test choices during the session to prevent reset
+  const [testAnswers, setTestAnswers] = useState<Record<string, Record<string, number>>>({});
+  const [testResultsVisible, setTestResultsVisible] = useState<Record<string, Record<string, boolean>>>({});
+  const [testTimers, setTestTimers] = useState<Record<string, number>>({});
+
   const structuredSubjects = useMemo(() => {
       const grouped: Record<string, Record<string, Topic[]>> = {
           'Physics': {}, 'Chemistry': {}, 'Maths': {}
@@ -102,32 +106,34 @@ export const SyllabusScreen: React.FC<SyllabusTrackerProps> = ({
     };
   }
 
-  const TopicDetailView = ({ topic, onClose }: { topic: Topic, onClose: () => void }) => {
+  // Define Topic Detail logic as a separate function, but call it as a render method
+  // to avoid re-mounting which causes answer loss.
+  const renderTopicDetail = (topic: Topic) => {
+      // Local state for the UI tabs
       const [activeTab, setActiveTab] = useState<'NOTES' | 'VIDEOS' | 'PRACTICE' | 'TEST'>('PRACTICE');
       const [isSubmitting, setIsSubmitting] = useState(false);
-      const [timeElapsed, setTimeElapsed] = useState(0);
       
       const topicData = getTopicProgress(topic.id);
-      const topicQuestions = useMemo(() => questionBank.filter(q => q.topicId === topic.id), [topic.id, questionBank]);
+      const topicQuestions = questionBank.filter(q => q.topicId === topic.id);
       const videoLesson = videoMap[topic.id];
       const chapterNote = chapterNotes[topic.id];
 
-      const [selectedAnswers, setSelectedAnswers] = useState<Record<string, number>>({});
-      const [showResults, setShowResults] = useState<Record<string, boolean>>({});
-
-      // Auto-timer for formal test
-      useEffect(() => {
-          let interval: any;
-          if (activeTab === 'TEST') {
-              interval = setInterval(() => setTimeElapsed(prev => prev + 1), 1000);
-          }
-          return () => clearInterval(interval);
-      }, [activeTab]);
+      // Persistence logic for this specific topic's test
+      const currentAnswers = testAnswers[topic.id] || {};
+      const currentResultsVisible = testResultsVisible[topic.id] || {};
+      const currentTime = testTimers[topic.id] || 0;
 
       const handleCheckAnswer = (qId: string, optionIdx: number, correctIdx: number) => {
-          if (showResults[qId] || readOnly) return;
-          setSelectedAnswers(prev => ({ ...prev, [qId]: optionIdx }));
-          setShowResults(prev => ({ ...prev, [qId]: true }));
+          if (currentResultsVisible[qId] || readOnly) return;
+          
+          setTestAnswers(prev => ({
+              ...prev,
+              [topic.id]: { ...prev[topic.id], [qId]: optionIdx }
+          }));
+          setTestResultsVisible(prev => ({
+              ...prev,
+              [topic.id]: { ...prev[topic.id], [qId]: true }
+          }));
           
           if (optionIdx === correctIdx) {
               const currentSolved = topicData.solvedQuestions || [];
@@ -135,20 +141,21 @@ export const SyllabusScreen: React.FC<SyllabusTrackerProps> = ({
                   onUpdateProgress(topic.id, { solvedQuestions: [...currentSolved, qId] });
               }
           }
-      }
+      };
 
-      const handleSubmitTest = async () => {
-          if (Object.keys(selectedAnswers).length === 0) {
-              if(!confirm("You haven't answered any questions. Are you sure you want to submit?")) return;
+      const handleSubmitChapterTest = async () => {
+          if (Object.keys(currentAnswers).length === 0) {
+              alert("Please answer at least one question before submitting.");
+              return;
           }
-          
+
           setIsSubmitting(true);
           const results = topicQuestions.map(q => ({
               questionId: q.id,
               subjectId: q.subjectId,
               topicId: q.topicId,
-              status: selectedAnswers[q.id] === undefined ? 'UNATTEMPTED' : (selectedAnswers[q.id] === q.correctOptionIndex ? 'CORRECT' : 'INCORRECT'),
-              selectedOptionIndex: selectedAnswers[q.id]
+              status: currentAnswers[q.id] === undefined ? 'UNATTEMPTED' : (currentAnswers[q.id] === q.correctOptionIndex ? 'CORRECT' : 'INCORRECT'),
+              selectedOptionIndex: currentAnswers[q.id]
           }));
 
           const correctCount = results.filter(r => r.status === 'CORRECT').length;
@@ -172,36 +179,22 @@ export const SyllabusScreen: React.FC<SyllabusTrackerProps> = ({
               unattemptedCount,
               detailedResults: results as any,
               topicId: topic.id,
-              timeTakenSeconds: timeElapsed
+              timeTakenSeconds: currentTime
           };
 
           if (addTestAttempt) {
-              try {
-                  await addTestAttempt(attempt);
-                  // Also mark as completed if score is good (>50%)
-                  if (score > (totalMarks / 2)) {
-                      onUpdateProgress(topic.id, { status: 'COMPLETED' });
-                  }
-                  alert(`Test Submitted Successfully! Score: ${score}/${totalMarks}`);
-                  onClose();
-              } catch (e) {
-                  alert("Error saving test result. Please check your connection.");
-              }
+              await addTestAttempt(attempt);
+              alert(`Chapter Test Submitted!\nScore: ${score}/${totalMarks}\nResult saved to history.`);
+              setActiveTopic(null); // Close view
           }
           setIsSubmitting(false);
-      };
-
-      const formatTime = (seconds: number) => {
-          const m = Math.floor(seconds / 60);
-          const s = seconds % 60;
-          return `${m}:${s.toString().padStart(2, '0')}`;
       };
 
       return (
           <div className="fixed inset-0 z-50 bg-slate-50 flex flex-col animate-in slide-in-from-right-4 duration-300">
               <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shadow-sm shrink-0">
                   <div className="flex items-center gap-4">
-                      <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-500">
+                      <button onClick={() => setActiveTopic(null)} className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-500">
                           <ArrowLeft className="w-6 h-6" />
                       </button>
                       <div>
@@ -217,7 +210,9 @@ export const SyllabusScreen: React.FC<SyllabusTrackerProps> = ({
                   {activeTab === 'TEST' && (
                       <div className="flex items-center gap-4 px-4 py-2 bg-slate-900 text-white rounded-xl">
                           <Clock className="w-4 h-4 text-blue-400" />
-                          <span className="font-mono font-bold">{formatTime(timeElapsed)}</span>
+                          <span className="font-mono font-bold">
+                              {Math.floor(currentTime / 60)}:{(currentTime % 60).toString().padStart(2, '0')}
+                          </span>
                       </div>
                   )}
 
@@ -259,48 +254,37 @@ export const SyllabusScreen: React.FC<SyllabusTrackerProps> = ({
                           <div className="space-y-6">
                                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
                                   <div>
-                                      <h3 className="font-bold text-slate-800">{activeTab === 'TEST' ? 'Timed Assessment' : 'Chapter Question Bank'}</h3>
+                                      <h3 className="font-bold text-slate-800">{activeTab === 'TEST' ? 'Formal Assessment' : 'Practice Bank'}</h3>
                                       <p className="text-xs text-slate-500 mt-1">
                                           {activeTab === 'TEST' 
-                                            ? "Formal attempt. Results will be saved to your scorecard and visible to parents." 
-                                            : `Review ${topicQuestions.length} practice problems at your own pace.`}
+                                            ? "Timed attempt. Your results will be saved permanently to your scorecard." 
+                                            : `Explore ${topicQuestions.length} practice problems.`}
                                       </p>
                                   </div>
-                                  {activeTab === 'PRACTICE' && (
-                                      <div className="text-right">
-                                          <span className="text-2xl font-black text-blue-600">{Math.round(((topicData.solvedQuestions?.length || 0) / (topicQuestions.length || 1)) * 100)}%</span>
-                                          <p className="text-[10px] font-bold text-slate-400 uppercase">Mastery</p>
-                                      </div>
-                                  )}
                                </div>
 
                                <div className="space-y-6 pb-24">
                                    {topicQuestions.length === 0 ? (
                                        <div className="p-12 text-center text-slate-400 bg-white rounded-2xl border border-dashed">
-                                           No questions available for this topic yet.
+                                           No questions available for this topic.
                                        </div>
                                    ) : (
                                        topicQuestions.map((q, idx) => (
-                                           <div key={q.id} className={`bg-white p-6 rounded-2xl border transition-all ${selectedAnswers[q.id] !== undefined ? 'border-blue-200' : 'border-slate-200 shadow-sm'}`}>
+                                           <div key={q.id} className={`bg-white p-6 rounded-2xl border transition-all ${currentAnswers[q.id] !== undefined ? 'border-blue-200' : 'border-slate-200 shadow-sm'}`}>
                                                <div className="flex justify-between items-start mb-4">
                                                    <span className="text-[10px] font-black bg-slate-100 text-slate-500 px-2 py-1 rounded">QUESTION {idx + 1}</span>
-                                                   <span className={`text-[10px] font-bold px-2 py-1 rounded uppercase ${
-                                                       q.difficulty === 'HARD' ? 'bg-red-50 text-red-600' : 
-                                                       q.difficulty === 'MEDIUM' ? 'bg-amber-50 text-amber-600' : 'bg-green-50 text-green-600'
-                                                   }`}>{q.difficulty}</span>
                                                </div>
-                                               <p className="text-slate-800 font-medium leading-relaxed mb-4">{q.text}</p>
+                                               <p className="text-slate-800 font-medium mb-4">{q.text}</p>
                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                                    {q.options.map((opt, oIdx) => {
-                                                       const isSelected = selectedAnswers[q.id] === oIdx;
+                                                       const isSelected = currentAnswers[q.id] === oIdx;
                                                        const isCorrect = oIdx === q.correctOptionIndex;
-                                                       const revealed = showResults[q.id] || (activeTab === 'TEST' && isSubmitting);
+                                                       const revealed = activeTab === 'PRACTICE' && currentResultsVisible[q.id];
                                                        
-                                                       let btnStyle = "bg-slate-50 border-slate-100 text-slate-600 hover:bg-slate-100";
-                                                       if (activeTab === 'PRACTICE' && revealed) {
-                                                           if (isCorrect) btnStyle = "bg-green-100 border-green-500 text-green-800 ring-2 ring-green-500/20";
+                                                       let btnStyle = "bg-slate-50 border-slate-100 text-slate-600";
+                                                       if (revealed) {
+                                                           if (isCorrect) btnStyle = "bg-green-100 border-green-500 text-green-800 font-bold";
                                                            else if (isSelected) btnStyle = "bg-red-100 border-red-500 text-red-800";
-                                                           else btnStyle = "bg-slate-50 border-slate-100 text-slate-400 opacity-50";
                                                        } else if (isSelected) {
                                                            btnStyle = "bg-blue-600 border-blue-600 text-white shadow-lg";
                                                        }
@@ -310,41 +294,28 @@ export const SyllabusScreen: React.FC<SyllabusTrackerProps> = ({
                                                                 key={oIdx}
                                                                 onClick={() => {
                                                                     if (activeTab === 'PRACTICE') handleCheckAnswer(q.id, oIdx, q.correctOptionIndex);
-                                                                    else setSelectedAnswers(prev => ({ ...prev, [q.id]: oIdx }));
+                                                                    else {
+                                                                        setTestAnswers(prev => ({
+                                                                            ...prev,
+                                                                            [topic.id]: { ...prev[topic.id], [q.id]: oIdx }
+                                                                        }));
+                                                                    }
                                                                 }}
-                                                                className={`p-4 rounded-xl border text-left text-sm font-medium transition-all ${btnStyle}`}
+                                                                className={`p-4 rounded-xl border text-left text-sm transition-all ${btnStyle}`}
                                                            >
                                                                <span className="mr-2 font-bold uppercase">{String.fromCharCode(65 + oIdx)}.</span> {opt}
                                                            </button>
                                                        );
                                                    })}
                                                </div>
-                                               {activeTab === 'PRACTICE' && showResults[q.id] && (
-                                                   <div className={`mt-4 p-4 rounded-xl text-sm font-bold flex items-center gap-2 animate-in fade-in slide-in-from-top-2 ${
-                                                       selectedAnswers[q.id] === q.correctOptionIndex ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
-                                                   }`}>
-                                                       {selectedAnswers[q.id] === q.correctOptionIndex ? (
-                                                           <><CheckCircle2 className="w-4 h-4" /> Correct!</>
-                                                       ) : (
-                                                           /* Fix: Added AlertTriangle to imports and used here to resolve Error in file screens/SyllabusScreen.tsx on line 320 */
-                                                           <><AlertTriangle className="w-4 h-4" /> The right answer is {String.fromCharCode(65 + q.correctOptionIndex)}.</>
-                                                       )}
-                                                   </div>
-                                               )}
                                            </div>
                                        ))
                                    )}
                                    
                                    {activeTab === 'TEST' && topicQuestions.length > 0 && (
-                                       <div className="flex justify-center pt-8 pb-12 gap-4">
+                                       <div className="flex justify-center pt-8 pb-12">
                                            <button 
-                                                onClick={onClose}
-                                                className="bg-white border border-slate-200 text-slate-500 px-8 py-4 rounded-2xl font-black text-lg hover:bg-slate-50 transition-all shadow-sm active:scale-95"
-                                           >
-                                               Discard
-                                           </button>
-                                           <button 
-                                                onClick={handleSubmitTest}
+                                                onClick={handleSubmitChapterTest}
                                                 disabled={isSubmitting}
                                                 className="bg-slate-900 text-white px-12 py-4 rounded-2xl font-black text-lg hover:bg-blue-600 transition-all shadow-xl flex items-center gap-3 active:scale-95 disabled:opacity-50"
                                            >
@@ -363,10 +334,9 @@ export const SyllabusScreen: React.FC<SyllabusTrackerProps> = ({
                                   <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm text-center">
                                       <StickyNote className="w-12 h-12 text-blue-500 mx-auto mb-4" />
                                       <h3 className="text-xl font-bold text-slate-800 mb-2">Detailed Chapter Notes</h3>
-                                      <p className="text-slate-500 text-sm mb-6">Expert-curated theory, formulas, and diagrams for {topic.name}.</p>
                                       <button 
                                           onClick={() => setActiveNote({ title: topic.name, pages: chapterNote.pages })}
-                                          className="bg-blue-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 flex items-center justify-center mx-auto gap-2"
+                                          className="bg-blue-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-blue-700 transition-all flex items-center justify-center mx-auto gap-2"
                                       >
                                           <BookOpen className="w-5 h-5" /> Open Reader Mode
                                       </button>
@@ -374,6 +344,7 @@ export const SyllabusScreen: React.FC<SyllabusTrackerProps> = ({
                               ) : (
                                   <div className="p-12 text-center text-slate-400 bg-white rounded-2xl border border-dashed">
                                       Notes for this topic are currently being prepared.
+                                      {(user.role === 'ADMIN' || user.role === 'ADMIN_EXECUTIVE') && <p className="mt-2 text-xs text-blue-500">Go to Syllabus Admin to add notes.</p>}
                                   </div>
                               )}
                           </div>
@@ -391,14 +362,6 @@ export const SyllabusScreen: React.FC<SyllabusTrackerProps> = ({
                                               title={topic.name}
                                           ></iframe>
                                       </div>
-                                      <div className="bg-white p-6 rounded-2xl border border-slate-200">
-                                          <h3 className="font-bold text-slate-800 flex items-center gap-2">
-                                              <Youtube className="w-5 h-5 text-red-600" /> Video Explanation
-                                          </h3>
-                                          <p className="text-sm text-slate-600 mt-2 leading-relaxed">
-                                              {videoLesson.description || "Comprehensive lecture covering the core concepts of this topic."}
-                                          </p>
-                                      </div>
                                   </div>
                               ) : (
                                   <div className="p-12 text-center text-slate-400 bg-white rounded-2xl border border-dashed">
@@ -410,12 +373,26 @@ export const SyllabusScreen: React.FC<SyllabusTrackerProps> = ({
                   </div>
               </div>
           </div>
-      )
-  }
+      );
+  };
+
+  // Timer loop for whatever test is currently active
+  useEffect(() => {
+      let interval: any;
+      if (activeTopic) {
+          interval = setInterval(() => {
+              setTestTimers(prev => ({
+                  ...prev,
+                  [activeTopic.id]: (prev[activeTopic.id] || 0) + 1
+              }));
+          }, 1000);
+      }
+      return () => clearInterval(interval);
+  }, [activeTopic]);
 
   return (
     <div className="space-y-8 font-inter animate-in fade-in slide-in-from-bottom-4 relative">
-      {activeTopic && <TopicDetailView topic={activeTopic} onClose={() => setActiveTopic(null)} />}
+      {activeTopic && renderTopicDetail(activeTopic)}
       {activeNote && <BookReader title={activeNote.title} pages={activeNote.pages} onClose={() => setActiveNote(null)} />}
 
       <div className="bg-gradient-to-r from-blue-600 to-cyan-600 rounded-2xl p-8 text-white shadow-xl relative overflow-hidden">
