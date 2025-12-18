@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, Component, ErrorInfo, ReactNode } from 'react';
 import { Navigation, MobileNavigation } from './components/Navigation';
 import { AuthScreen } from './screens/AuthScreen';
 import { DashboardScreen } from './screens/DashboardScreen';
@@ -39,7 +39,54 @@ import { AITutorChat } from './components/AITutorChat';
 import { User, UserProgress, TestAttempt, Screen, Goal, MistakeLog, Flashcard, MemoryHack, BlogPost, VideoLesson, Question, Test, TimetableConfig, Topic, ContactMessage, BacklogItem, ChapterNote, SocialConfig } from './lib/types';
 import { SYLLABUS_DATA } from './lib/syllabusData';
 import { MOCK_TESTS_DATA } from './lib/mockTestsData';
-import { LogOut, Cloud, CloudOff, RefreshCw, WifiOff } from 'lucide-react';
+import { LogOut, Cloud, CloudOff, RefreshCw, WifiOff, AlertOctagon } from 'lucide-react';
+
+// --- Error Boundary for Robustness ---
+interface ErrorBoundaryProps { 
+  // Fix: Made children optional to avoid TypeScript error on line 214 where JSX children are provided implicitly
+  children?: ReactNode; 
+  resetAction: () => void; 
+}
+interface ErrorBoundaryState { hasError: boolean; }
+
+// Fix: Explicitly use React.Component to ensure that 'state', 'props', and 'setState' are properly inherited and recognized
+class AppErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) { 
+    super(props); 
+    // Fix line 48: Initialize state inherited from React.Component
+    this.state = { hasError: false }; 
+  }
+  
+  static getDerivedStateFromError() { 
+    return { hasError: true }; 
+  }
+  
+  componentDidCatch(error: Error, info: ErrorInfo) { 
+    console.error("Render Crash Catch:", error, info); 
+  }
+  
+  render() {
+    // Fix line 52: Access state property inherited from React.Component
+    if (this.state.hasError) {
+      return (
+        <div className="flex flex-col items-center justify-center min-h-[400px] p-8 bg-red-50 rounded-2xl border border-red-100 text-center animate-in fade-in">
+          <AlertOctagon className="w-12 h-12 text-red-500 mb-4" />
+          <h2 className="text-xl font-bold text-red-900">Something went wrong</h2>
+          <p className="text-red-700 mt-2 text-sm max-w-sm">This screen encountered a critical rendering error. Don't worry, your data is safe.</p>
+          <button 
+            // Fix line 59: Access setState and props inherited from React.Component
+            onClick={() => { this.setState({ hasError: false }); this.props.resetAction(); }}
+            className="mt-6 bg-red-600 text-white px-6 py-2 rounded-xl font-bold hover:bg-red-700 transition-all shadow-lg"
+          >
+            Reset to Dashboard
+          </button>
+        </div>
+      );
+    }
+    // Fix line 67: Access props property inherited from React.Component
+    return this.props.children;
+  }
+}
 
 const SyncIndicator = ({ status, onRetry }: { status: 'SYNCED' | 'SAVING' | 'ERROR' | 'OFFLINE', onRetry: () => void }) => {
     if (status === 'SYNCED') return (
@@ -66,19 +113,14 @@ const SyncIndicator = ({ status, onRetry }: { status: 'SYNCED' | 'SAVING' | 'ERR
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
-  
-  // CRITICAL FIX: Validate screen before setting initial state to prevent persistent crash loops
   const [currentScreen, setCurrentScreen] = useState<Screen>(() => {
     const saved = localStorage.getItem('iitjee_last_screen');
-    // Ensure the saved screen is valid, or fallback to dashboard
     const validScreens: Screen[] = ['dashboard', 'syllabus', 'tests', 'ai-tutor', 'focus', 'analytics', 'timetable', 'revision', 'mistakes', 'flashcards', 'backlogs', 'hacks', 'wellness', 'profile', 'psychometric', 'overview', 'users', 'videos', 'content', 'diagnostics', 'system', 'deployment', 'tests_admin', 'content_admin', 'video_admin', 'admin_analytics', 'syllabus_admin', 'inbox', 'blog_admin', 'family', 'public-blog', 'about', 'blog', 'exams', 'privacy', 'contact', 'features'];
     return (saved && validScreens.includes(saved as Screen)) ? (saved as Screen) : 'dashboard';
   });
 
   const [enableGoogleLogin] = useState(false);
   const [socialConfig] = useState<SocialConfig>({ enabled: false });
-  
-  // Data State
   const [progress, setProgress] = useState<Record<string, UserProgress>>({});
   const [testAttempts, setTestAttempts] = useState<TestAttempt[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
@@ -87,12 +129,8 @@ export default function App() {
   const [timetableData, setTimetableData] = useState<{config: TimetableConfig, slots: any[]} | null>(null);
   const [syllabus, setSyllabus] = useState<Topic[]>(SYLLABUS_DATA);
   const [linkedStudentData, setLinkedStudentData] = useState<{ progress: Record<string, UserProgress>; tests: TestAttempt[]; studentName: string; } | undefined>(undefined);
-  
-  // Sync State
   const [syncStatus, setSyncStatus] = useState<'SYNCED' | 'SAVING' | 'ERROR' | 'OFFLINE'>('SYNCED');
   const [isOfflineMode, setIsOfflineMode] = useState(false);
-
-  // Content state
   const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
   const [hacks, setHacks] = useState<MemoryHack[]>([]);
   const [blogs, setBlogs] = useState<BlogPost[]>([]);
@@ -101,47 +139,19 @@ export default function App() {
   const [questionBank, setQuestionBank] = useState<Question[]>([]);
   const [adminTests, setAdminTests] = useState<Test[]>(MOCK_TESTS_DATA);
 
-  // Central API Handler
-  const apiCall = useCallback(async (endpoint: string, method: string, body?: any) => {
-      if (isOfflineMode) return { status: 'success', offline: true };
-      if (!user) return;
-      setSyncStatus('SAVING');
-      try {
-          const res = await fetch(endpoint, {
-              method,
-              headers: { 'Content-Type': 'application/json' },
-              body: body ? JSON.stringify(body) : undefined
-          });
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          const data = await res.json();
-          setSyncStatus('SYNCED');
-          return data;
-      } catch (error) {
-          setSyncStatus('OFFLINE');
-          return { status: 'error', offline: true };
-      }
-  }, [user, isOfflineMode]);
-
   const fetchRemoteData = async (userId: string) => {
       setSyncStatus('SAVING'); 
       try {
           const res = await fetch(`/api/get_dashboard.php?user_id=${userId}`);
           if (!res.ok) throw new Error("Fetch failed");
           const data = await res.json();
-
-          if (data.userProfileSync) {
-              setUser(prev => prev ? ({ ...prev, ...data.userProfileSync, notifications: data.notifications || [] }) : prev);
-          }
-
+          if (data.userProfileSync) setUser(prev => prev ? ({ ...prev, ...data.userProfileSync, notifications: data.notifications || [] }) : prev);
           if (Array.isArray(data.progress)) {
               const progMap: Record<string, UserProgress> = {};
               data.progress.forEach((p: any) => {
                   progMap[p.topic_id] = {
-                      topicId: p.topic_id,
-                      status: p.status,
-                      lastRevised: p.last_revised,
-                      revisionLevel: Number(p.revision_level),
-                      nextRevisionDate: p.next_revision_date,
+                      topicId: p.topic_id, status: p.status, lastRevised: p.last_revised,
+                      revisionLevel: Number(p.revision_level), nextRevisionDate: p.next_revision_date,
                       solvedQuestions: p.solved_questions_json ? JSON.parse(p.solved_questions_json) : []
                   };
               });
@@ -152,20 +162,15 @@ export default function App() {
           if (data.mistakes) setMistakes(data.mistakes);
           if (data.backlogs) setBacklogs(data.backlogs);
           if (data.timetable) setTimetableData({ config: data.timetable.config, slots: data.timetable.slots });
-          
           setSyncStatus('SYNCED');
           setIsOfflineMode(false);
-      } catch (e) { 
-          setSyncStatus('OFFLINE');
-      }
+      } catch (e) { setSyncStatus('OFFLINE'); }
   };
 
   useEffect(() => {
     if (user) {
         localStorage.setItem('iitjee_last_screen', currentScreen);
-        if (user.role === 'PARENT' && user.linkedStudentId) {
-            loadLinkedStudent(user.linkedStudentId);
-        }
+        if (user.role === 'PARENT' && user.linkedStudentId) loadLinkedStudent(user.linkedStudentId);
     }
   }, [currentScreen, user?.linkedStudentId, user?.role]);
 
@@ -178,47 +183,20 @@ export default function App() {
               if(Array.isArray(data.progress)) {
                   data.progress.forEach((p: any) => {
                       progMap[p.topic_id] = {
-                          topicId: p.topic_id,
-                          status: p.status,
-                          lastRevised: p.last_revised,
-                          revisionLevel: Number(p.revision_level),
-                          nextRevisionDate: p.next_revision_date || null,
+                          topicId: p.topic_id, status: p.status, lastRevised: p.last_revised,
+                          revisionLevel: Number(p.revision_level), nextRevisionDate: p.next_revision_date || null,
                           solvedQuestions: p.solved_questions_json ? JSON.parse(p.solved_questions_json) : []
                       };
                   });
               }
-              setLinkedStudentData({
-                  progress: progMap,
-                  tests: data.attempts || [],
-                  studentName: data.userProfileSync ? data.userProfileSync.name : 'Student'
-              });
+              setLinkedStudentData({ progress: progMap, tests: data.attempts || [], studentName: data.userProfileSync?.name || 'Student' });
           }
       } catch(e) { console.error(e); }
   };
 
-  const handleLogin = (userData: User) => {
-    setUser(userData);
-    fetchRemoteData(userData.id);
-  };
-
-  const handleLogout = () => { setUser(null); setLinkedStudentData(undefined); setCurrentScreen('dashboard'); };
+  const handleLogin = (userData: User) => { setUser(userData); fetchRemoteData(userData.id); };
+  const handleLogout = () => { setUser(null); setLinkedStudentData(undefined); setCurrentScreen('dashboard'); localStorage.removeItem('iitjee_last_screen'); };
   
-  const acceptRequest = async (notifId: string) => {
-      if(!user) return;
-      const notif = user.notifications?.find(n => n.id === notifId);
-      if(!notif) return;
-      try {
-          const res = await fetch('/api/respond_request.php', {
-              method: 'POST',
-              headers: {'Content-Type': 'application/json'},
-              body: JSON.stringify({ accept: true, student_id: user.id, parent_id: notif.fromId, notification_id: notifId })
-          });
-          if(res.ok) {
-              await fetchRemoteData(user.id);
-          }
-      } catch(e) { console.error(e); }
-  };
-
   if (!user) return (
       <PublicLayout onNavigate={(p: any) => setCurrentScreen(p)} currentScreen={currentScreen}>
           {['about', 'features', 'exams', 'blog', 'privacy', 'contact'].includes(currentScreen) ? (
@@ -253,52 +231,53 @@ export default function App() {
         </div>
 
         <div className="max-w-6xl mx-auto">
-          {user.role === 'PARENT' ? (
-             <>
-                {currentScreen === 'dashboard' && <DashboardScreen user={user} viewingStudentName={linkedStudentData?.studentName} progress={linkedStudentData?.progress || {}} testAttempts={linkedStudentData?.tests || []} goals={[]} addGoal={()=>{}} toggleGoal={()=>{}} setScreen={setCurrentScreen} />}
-                {currentScreen === 'family' && <ParentFamilyScreen user={user} onSendRequest={async (id) => {
-                    const res = await fetch('/api/send_request.php', { method: 'POST', body: JSON.stringify({ action: 'send', student_identifier: id, parent_id: user.id, parent_name: user.name }) });
-                    return await res.json();
-                }} linkedData={linkedStudentData} />}
-                {currentScreen === 'analytics' && <AnalyticsScreen user={user} viewingStudentName={linkedStudentData?.studentName} progress={linkedStudentData?.progress || {}} testAttempts={linkedStudentData?.tests || []} />}
-                {currentScreen === 'tests' && <TestScreen user={user} history={linkedStudentData?.tests || []} addTestAttempt={()=>{}} availableTests={adminTests} />}
-                {currentScreen === 'syllabus' && <SyllabusScreen user={user} viewingStudentName={linkedStudentData?.studentName} subjects={syllabus} progress={linkedStudentData?.progress || {}} onUpdateProgress={()=>{}} readOnly={true} summaryOnly={true} />}
-                {currentScreen === 'profile' && <ProfileScreen user={user} onAcceptRequest={()=>{}} onUpdateUser={(u) => setUser({...user, ...u})} linkedStudentName={linkedStudentData?.studentName} />} 
-             </>
-          ) : user.role === 'ADMIN' ? (
-              <>
-                {currentScreen === 'overview' && <AdminDashboardScreen user={user} onNavigate={setCurrentScreen} />}
-                {currentScreen === 'users' && <AdminUserManagementScreen />}
-                {currentScreen === 'inbox' && <AdminInboxScreen />}
-                {currentScreen === 'syllabus_admin' && <AdminSyllabusScreen syllabus={syllabus} onAddTopic={(t) => setSyllabus([...syllabus, {...t, id: Date.now().toString()}])} onDeleteTopic={(id) => setSyllabus(syllabus.filter(s => s.id !== id))} chapterNotes={chapterNotes} videoMap={videoMap} />}
-                {currentScreen === 'tests' && <AdminTestManagerScreen questionBank={questionBank} tests={adminTests} syllabus={syllabus} onAddQuestion={(q) => setQuestionBank([...questionBank, q])} onCreateTest={(t) => setAdminTests([...adminTests, t])} onDeleteQuestion={(id) => setQuestionBank(questionBank.filter(q => q.id !== id))} onDeleteTest={(id) => setAdminTests(adminTests.filter(t => t.id !== id))} />}
-                {currentScreen === 'content' && <ContentManagerScreen flashcards={flashcards} hacks={hacks} blogs={blogs} onAddFlashcard={(f) => setFlashcards([...flashcards, {...f, id: Date.now()}])} onAddHack={(h) => setHacks([...hacks, {...h, id: Date.now()}])} onAddBlog={(b) => setBlogs([...blogs, {...b, id: Date.now(), date: new Date().toISOString()}])} onDelete={()=>{}} />}
-                {currentScreen === 'blog_admin' && <AdminBlogScreen blogs={blogs} onAddBlog={(b) => setBlogs([...blogs, b])} onUpdateBlog={(b) => setBlogs(blogs.map(x => x.id === b.id ? b : x))} onDeleteBlog={(id) => setBlogs(blogs.filter(b => b.id !== id))} />}
-                {currentScreen === 'analytics' && <AdminAnalyticsScreen />}
-                {currentScreen === 'diagnostics' && <DiagnosticsScreen />}
-                {currentScreen === 'system' && <AdminSystemScreen />}
-                {currentScreen === 'deployment' && <DeploymentScreen />}
-              </>
-          ) : (
-              <>
-                {currentScreen === 'dashboard' && <DashboardScreen user={user} progress={progress} testAttempts={testAttempts} goals={goals} addGoal={(t) => setGoals([...goals, {id: Date.now().toString(), text: t, completed: false}])} toggleGoal={(id) => setGoals(goals.map(g => g.id === id ? {...g, completed: !g.completed} : g))} setScreen={setCurrentScreen} />}
-                {currentScreen === 'syllabus' && <SyllabusScreen user={user} subjects={syllabus} progress={progress} onUpdateProgress={(tid, upd) => setProgress({...progress, [tid]: {...(progress[tid] || {}), ...upd}})} videoMap={videoMap} chapterNotes={chapterNotes} questionBank={questionBank} testAttempts={testAttempts} />}
-                {currentScreen === 'ai-tutor' && <AITutorChat isFullScreen={true} />}
-                {currentScreen === 'tests' && <TestScreen user={user} history={testAttempts} addTestAttempt={(a) => setTestAttempts([...testAttempts, a])} availableTests={adminTests} />}
-                {currentScreen === 'psychometric' && <PsychometricScreen user={user} />}
-                {currentScreen === 'focus' && <FocusScreen />}
-                {currentScreen === 'analytics' && <AnalyticsScreen user={user} progress={progress} testAttempts={testAttempts} />}
-                {currentScreen === 'timetable' && <TimetableScreen user={user} savedConfig={timetableData?.config} savedSlots={timetableData?.slots} progress={progress} onSave={(cfg, slots) => setTimetableData({config: cfg, slots})} />}
-                {currentScreen === 'revision' && <RevisionScreen progress={progress} handleRevisionComplete={(id) => {}} />}
-                {currentScreen === 'exams' && <ExamGuideScreen />}
-                {currentScreen === 'mistakes' && <MistakesScreen mistakes={mistakes} addMistake={(m) => setMistakes([...mistakes, {...m, id: Date.now().toString(), date: new Date().toISOString()}])} />}
-                {currentScreen === 'flashcards' && <FlashcardScreen flashcards={flashcards} />}
-                {currentScreen === 'backlogs' && <BacklogScreen backlogs={backlogs} onAddBacklog={(b) => setBacklogs([...backlogs, {...b, id: Date.now().toString(), status: 'PENDING'}])} onToggleBacklog={(id) => setBacklogs(backlogs.map(x => x.id === id ? {...x, status: x.status === 'PENDING' ? 'COMPLETED' : 'PENDING'} : x))} onDeleteBacklog={(id) => setBacklogs(backlogs.filter(x => x.id !== id))} />}
-                {currentScreen === 'hacks' && <HacksScreen hacks={hacks} />}
-                {currentScreen === 'wellness' && <WellnessScreen />}
-                {currentScreen === 'profile' && <ProfileScreen user={user} onAcceptRequest={acceptRequest} onUpdateUser={(u) => setUser({...user, ...u})} />}
-              </>
-          )}
+          <AppErrorBoundary resetAction={() => setCurrentScreen('dashboard')}>
+            {user.role === 'PARENT' ? (
+               <>
+                  {currentScreen === 'dashboard' && <DashboardScreen user={user} viewingStudentName={linkedStudentData?.studentName} progress={linkedStudentData?.progress || {}} testAttempts={linkedStudentData?.tests || []} goals={[]} addGoal={()=>{}} toggleGoal={()=>{}} setScreen={setCurrentScreen} />}
+                  {currentScreen === 'family' && <ParentFamilyScreen user={user} onSendRequest={async (id) => {
+                      const res = await fetch('/api/send_request.php', { method: 'POST', body: JSON.stringify({ action: 'send', student_identifier: id, parent_id: user.id, parent_name: user.name }) });
+                      return await res.json();
+                  }} linkedData={linkedStudentData} />}
+                  {currentScreen === 'analytics' && <AnalyticsScreen user={user} viewingStudentName={linkedStudentData?.studentName} progress={linkedStudentData?.progress || {}} testAttempts={linkedStudentData?.tests || []} />}
+                  {currentScreen === 'tests' && <TestScreen user={user} history={linkedStudentData?.tests || []} addTestAttempt={()=>{}} availableTests={adminTests} />}
+                  {currentScreen === 'syllabus' && <SyllabusScreen user={user} viewingStudentName={linkedStudentData?.studentName} subjects={syllabus} progress={linkedStudentData?.progress || {}} onUpdateProgress={()=>{}} readOnly={true} summaryOnly={true} />}
+                  {currentScreen === 'profile' && <ProfileScreen user={user} onAcceptRequest={()=>{}} onUpdateUser={(u) => setUser({...user, ...u})} linkedStudentName={linkedStudentData?.studentName} />} 
+               </>
+            ) : user.role === 'ADMIN' ? (
+                <>
+                  {currentScreen === 'overview' && <AdminDashboardScreen user={user} onNavigate={setCurrentScreen} />}
+                  {currentScreen === 'users' && <AdminUserManagementScreen />}
+                  {currentScreen === 'inbox' && <AdminInboxScreen />}
+                  {currentScreen === 'syllabus_admin' && <AdminSyllabusScreen syllabus={syllabus} onAddTopic={(t) => setSyllabus([...syllabus, {...t, id: Date.now().toString()}])} onDeleteTopic={(id) => setSyllabus(syllabus.filter(s => s.id !== id))} chapterNotes={chapterNotes} videoMap={videoMap} />}
+                  {currentScreen === 'tests' && <AdminTestManagerScreen questionBank={questionBank} tests={adminTests} syllabus={syllabus} onAddQuestion={(q) => setQuestionBank([...questionBank, q])} onCreateTest={(t) => setAdminTests([...adminTests, t])} onDeleteQuestion={(id) => setQuestionBank(questionBank.filter(q => q.id !== id))} onDeleteTest={(id) => setAdminTests(adminTests.filter(t => t.id !== id))} />}
+                  {currentScreen === 'content' && <ContentManagerScreen flashcards={flashcards} hacks={hacks} blogs={blogs} onAddFlashcard={(f) => setFlashcards([...flashcards, {...f, id: Date.now()}])} onAddHack={(h) => setHacks([...hacks, {...h, id: Date.now()}])} onAddBlog={(b) => setBlogs([...blogs, {...b, id: Date.now(), date: new Date().toISOString()}])} onDelete={()=>{}} />}
+                  {currentScreen === 'blog_admin' && <AdminBlogScreen blogs={blogs} onAddBlog={(b) => setBlogs([...blogs, b])} onUpdateBlog={(b) => setBlogs(blogs.map(x => x.id === b.id ? b : x))} onDeleteBlog={(id) => setBlogs(blogs.filter(b => b.id !== id))} />}
+                  {currentScreen === 'analytics' && <AdminAnalyticsScreen />}
+                  {currentScreen === 'diagnostics' && <DiagnosticsScreen />}
+                  {currentScreen === 'system' && <AdminSystemScreen />}
+                  {currentScreen === 'deployment' && <DeploymentScreen />}
+                </>
+            ) : (
+                <>
+                  {currentScreen === 'dashboard' && <DashboardScreen user={user} progress={progress} testAttempts={testAttempts} goals={goals} addGoal={(t) => setGoals([...goals, {id: Date.now().toString(), text: t, completed: false}])} toggleGoal={(id) => setGoals(goals.map(g => g.id === id ? {...g, completed: !g.completed} : g))} setScreen={setCurrentScreen} />}
+                  {currentScreen === 'syllabus' && <SyllabusScreen user={user} subjects={syllabus} progress={progress} onUpdateProgress={(tid, upd) => setProgress({...progress, [tid]: {...(progress[tid] || {}), ...upd}})} videoMap={videoMap} chapterNotes={chapterNotes} questionBank={questionBank} testAttempts={testAttempts} />}
+                  {currentScreen === 'ai-tutor' && <AITutorChat isFullScreen={true} />}
+                  {currentScreen === 'tests' && <TestScreen user={user} history={testAttempts} addTestAttempt={(a) => setTestAttempts([...testAttempts, a])} availableTests={adminTests} />}
+                  {currentScreen === 'psychometric' && <PsychometricScreen user={user} />}
+                  {currentScreen === 'focus' && <FocusScreen />}
+                  {currentScreen === 'analytics' && <AnalyticsScreen user={user} progress={progress} testAttempts={testAttempts} />}
+                  {currentScreen === 'timetable' && <TimetableScreen user={user} savedConfig={timetableData?.config} savedSlots={timetableData?.slots} progress={progress} onSave={(cfg, slots) => setTimetableData({config: cfg, slots})} />}
+                  {currentScreen === 'revision' && <RevisionScreen progress={progress} handleRevisionComplete={(id) => {}} />}
+                  {currentScreen === 'mistakes' && <MistakesScreen mistakes={mistakes} addMistake={(m) => setMistakes([...mistakes, {...m, id: Date.now().toString(), date: new Date().toISOString()}])} />}
+                  {currentScreen === 'flashcards' && <FlashcardScreen flashcards={flashcards} />}
+                  {currentScreen === 'backlogs' && <BacklogScreen backlogs={backlogs} onAddBacklog={(b) => setBacklogs([...backlogs, {...b, id: Date.now().toString(), status: 'PENDING'}])} onToggleBacklog={(id) => setBacklogs(backlogs.map(x => x.id === id ? {...x, status: x.status === 'PENDING' ? 'COMPLETED' : 'PENDING'} : x))} onDeleteBacklog={(id) => setBacklogs(backlogs.filter(x => x.id !== id))} />}
+                  {currentScreen === 'hacks' && <HacksScreen hacks={hacks} />}
+                  {currentScreen === 'wellness' && <WellnessScreen />}
+                  {currentScreen === 'profile' && <ProfileScreen user={user} onAcceptRequest={()=>{}} onUpdateUser={(u) => setUser({...user, ...u})} />}
+                </>
+            )}
+          </AppErrorBoundary>
         </div>
       </main>
       <MobileNavigation currentScreen={currentScreen} setScreen={setCurrentScreen} logout={handleLogout} user={user} />
