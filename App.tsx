@@ -43,7 +43,7 @@ import { LogOut, Cloud, CloudOff, RefreshCw, WifiOff, AlertOctagon, Trash2 } fro
 interface ErrorBoundaryProps { children?: ReactNode; resetAction: () => void; }
 interface ErrorBoundaryState { hasError: boolean; }
 
-// Fix: Inherit from 'Component' named import to resolve 'setState' and 'props' not found errors in this environment
+// Fix: Inherit from imported 'Component' directly to ensure proper type resolution of 'setState' and 'props' in this environment
 class AppErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   public state: ErrorBoundaryState = { hasError: false };
 
@@ -61,9 +61,9 @@ class AppErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState>
   }
 
   handleReset = () => {
-    // Fix: setState is now correctly inherited from the Component class
+    // Fix: Using setState inherited from the Component base class to resolve 'Property setState does not exist' error
     this.setState({ hasError: false });
-    // Fix: props is now correctly inherited from the Component class
+    // Fix: Accessing props inherited from the Component base class to resolve 'Property props does not exist' error
     this.props.resetAction();
   }
 
@@ -85,7 +85,7 @@ class AppErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState>
         </div>
       );
     }
-    // Fix: props is now correctly inherited from the Component class
+    // Fix: Accessing children from props inherited from the Component base class to resolve 'Property props does not exist' error
     return this.props.children;
   }
 }
