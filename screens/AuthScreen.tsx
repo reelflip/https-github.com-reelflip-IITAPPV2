@@ -16,7 +16,8 @@ import {
   GraduationCap,
   Building,
   Target,
-  Key
+  Key,
+  ArrowRight
 } from 'lucide-react';
 
 interface AuthScreenProps {
@@ -120,11 +121,9 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate }) =
     e.preventDefault();
     setError(''); setSuccessMessage('');
     
-    if (view === 'REGISTER') {
-        if (formData.password !== formData.confirmPassword) {
-            setError("Passwords do not match.");
-            return;
-        }
+    if (view === 'REGISTER' && formData.password !== formData.confirmPassword) {
+        setError("Passwords do not match.");
+        return;
     }
 
     setIsLoading(true);
@@ -218,106 +217,102 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate }) =
 
                 <form onSubmit={handleAuth} className="space-y-6">
                     {view === 'REGISTER' && (
-                        <>
-                            <div className="space-y-4 animate-in slide-in-from-top-2">
-                                {role === 'STUDENT' && (
-                                    <>
+                        <div className="space-y-4 animate-in slide-in-from-top-2">
+                            {role === 'STUDENT' && (
+                                <>
+                                    <div>
+                                        <FormLabel>Institute</FormLabel>
+                                        <div className="relative">
+                                            <Building className="absolute left-3 top-3 text-slate-300" size={18} />
+                                            <select 
+                                                className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm appearance-none focus:ring-2 focus:ring-blue-100 outline-none"
+                                                value={formData.institute}
+                                                onChange={e => setFormData({...formData, institute: e.target.value})}
+                                                required
+                                            >
+                                                <option value="">Select Institute</option>
+                                                {COACHING_INSTITUTES.map(inst => <option key={inst} value={inst}>{inst}</option>)}
+                                            </select>
+                                            <ChevronDown className="absolute right-3 top-3.5 text-slate-400 pointer-events-none" size={14} />
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-4">
                                         <div>
-                                            <FormLabel>Institute</FormLabel>
+                                            <FormLabel>Target Exam</FormLabel>
                                             <div className="relative">
-                                                <Building className="absolute left-3 top-3 text-slate-300" size={18} />
+                                                <Target className="absolute left-3 top-3 text-slate-300" size={18} />
                                                 <select 
                                                     className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm appearance-none focus:ring-2 focus:ring-blue-100 outline-none"
-                                                    value={formData.institute}
-                                                    onChange={e => setFormData({...formData, institute: e.target.value})}
-                                                    required
+                                                    value={formData.targetExam}
+                                                    onChange={e => setFormData({...formData, targetExam: e.target.value})}
                                                 >
-                                                    <option value="">Select Institute</option>
-                                                    {COACHING_INSTITUTES.map(inst => <option key={inst} value={inst}>{inst}</option>)}
+                                                    {TARGET_EXAMS.map(exam => <option key={exam} value={exam}>{exam}</option>)}
                                                 </select>
                                                 <ChevronDown className="absolute right-3 top-3.5 text-slate-400 pointer-events-none" size={14} />
                                             </div>
                                         </div>
-
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div>
-                                                <FormLabel>Target Exam</FormLabel>
-                                                <div className="relative">
-                                                    <Target className="absolute left-3 top-3 text-slate-300" size={18} />
-                                                    <select 
-                                                        className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm appearance-none focus:ring-2 focus:ring-blue-100 outline-none"
-                                                        value={formData.targetExam}
-                                                        onChange={e => setFormData({...formData, targetExam: e.target.value})}
-                                                    >
-                                                        {TARGET_EXAMS.map(exam => <option key={exam} value={exam}>{exam}</option>)}
-                                                    </select>
-                                                    <ChevronDown className="absolute right-3 top-3.5 text-slate-400 pointer-events-none" size={14} />
-                                                </div>
-                                            </div>
-                                            <div>
-                                                <FormLabel>Year</FormLabel>
-                                                <div className="relative">
-                                                    <Calendar className="absolute left-3 top-3 text-slate-300" size={18} />
-                                                    <select 
-                                                        className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm appearance-none focus:ring-2 focus:ring-blue-100 outline-none"
-                                                        value={formData.targetYear}
-                                                        onChange={e => setFormData({...formData, targetYear: parseInt(e.target.value)})}
-                                                    >
-                                                        {TARGET_YEARS.map(year => <option key={year} value={year}>{year}</option>)}
-                                                    </select>
-                                                    <ChevronDown className="absolute right-3 top-3.5 text-slate-400 pointer-events-none" size={14} />
-                                                </div>
+                                        <div>
+                                            <FormLabel>Year</FormLabel>
+                                            <div className="relative">
+                                                <Calendar className="absolute left-3 top-3 text-slate-300" size={18} />
+                                                <select 
+                                                    className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm appearance-none focus:ring-2 focus:ring-blue-100 outline-none"
+                                                    value={formData.targetYear}
+                                                    onChange={e => setFormData({...formData, targetYear: parseInt(e.target.value)})}
+                                                >
+                                                    {TARGET_YEARS.map(year => <option key={year} value={year}>{year}</option>)}
+                                                </select>
+                                                <ChevronDown className="absolute right-3 top-3.5 text-slate-400 pointer-events-none" size={14} />
                                             </div>
                                         </div>
-
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div>
-                                                <FormLabel optional>DOB</FormLabel>
-                                                <div className="relative">
-                                                    <input 
-                                                        type="date"
-                                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-100 outline-none"
-                                                        value={formData.dob}
-                                                        onChange={e => setFormData({...formData, dob: e.target.value})}
-                                                    />
-                                                </div>
-                                            </div>
-                                            <div>
-                                                <FormLabel optional>Gender</FormLabel>
-                                                <div className="relative">
-                                                    <select 
-                                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm appearance-none focus:ring-2 focus:ring-blue-100 outline-none"
-                                                        value={formData.gender}
-                                                        onChange={e => setFormData({...formData, gender: e.target.value})}
-                                                    >
-                                                        <option value="">Select</option>
-                                                        <option value="MALE">Male</option>
-                                                        <option value="FEMALE">Female</option>
-                                                        <option value="OTHER">Other</option>
-                                                    </select>
-                                                    <ChevronDown className="absolute right-3 top-3.5 text-slate-400 pointer-events-none" size={14} />
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </>
-                                )}
-
-                                <div>
-                                    <FormLabel>{role === 'PARENT' ? 'Parent Full Name' : 'Student Full Name'}</FormLabel>
-                                    <div className="relative">
-                                        <UserIcon className="absolute left-3 top-3 text-slate-300" size={18} />
-                                        <input 
-                                            type="text"
-                                            placeholder={role === 'PARENT' ? "e.g. Rajesh Kumar" : "e.g. Aryan Sharma"}
-                                            className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-100 outline-none"
-                                            value={formData.name}
-                                            onChange={e => setFormData({...formData, name: e.target.value})}
-                                            required
-                                        />
                                     </div>
+
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <FormLabel optional>DOB</FormLabel>
+                                            <input 
+                                                type="date"
+                                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-100 outline-none"
+                                                value={formData.dob}
+                                                onChange={e => setFormData({...formData, dob: e.target.value})}
+                                            />
+                                        </div>
+                                        <div>
+                                            <FormLabel optional>Gender</FormLabel>
+                                            <div className="relative">
+                                                <select 
+                                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm appearance-none focus:ring-2 focus:ring-blue-100 outline-none"
+                                                    value={formData.gender}
+                                                    onChange={e => setFormData({...formData, gender: e.target.value as any})}
+                                                >
+                                                    <option value="">Select</option>
+                                                    <option value="MALE">Male</option>
+                                                    <option value="FEMALE">Female</option>
+                                                    <option value="OTHER">Other</option>
+                                                </select>
+                                                <ChevronDown className="absolute right-3 top-3.5 text-slate-400 pointer-events-none" size={14} />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+
+                            <div>
+                                <FormLabel>{role === 'PARENT' ? 'Parent Full Name' : 'Student Full Name'}</FormLabel>
+                                <div className="relative">
+                                    <UserIcon className="absolute left-3 top-3 text-slate-300" size={18} />
+                                    <input 
+                                        type="text"
+                                        placeholder={role === 'PARENT' ? "Parent Full Name" : "Student Full Name"}
+                                        className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-100 outline-none"
+                                        value={formData.name}
+                                        onChange={e => setFormData({...formData, name: e.target.value})}
+                                        required
+                                    />
                                 </div>
                             </div>
-                        </>
+                        </div>
                     )}
 
                     <div className="space-y-4">
@@ -327,7 +322,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate }) =
                                 <Mail className="absolute left-3 top-3 text-slate-300" size={18} />
                                 <input 
                                     type="email"
-                                    placeholder="user@example.com"
+                                    placeholder="student@example.com"
                                     className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-100 outline-none"
                                     value={formData.email}
                                     onChange={e => setFormData({...formData, email: e.target.value})}
@@ -413,7 +408,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate }) =
                         {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
                             <>
                                 {view === 'REGISTER' ? 'Create Account' : 'Sign In'}
-                                <ArrowRightIcon size={18} />
+                                <ArrowRight size={18} />
                             </>
                         )}
                     </button>
@@ -468,7 +463,3 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate }) =
     </div>
   );
 };
-
-const ArrowRightIcon = ({ size }: { size: number }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
-);

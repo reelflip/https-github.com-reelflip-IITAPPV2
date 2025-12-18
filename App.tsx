@@ -53,8 +53,8 @@ interface ErrorBoundaryState {
   hasError: boolean;
 }
 
-// Fix: Explicitly use React.Component and ensure generic parameters for props and state are correctly passed to resolve the 'props' property missing error.
-class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+// Fix: Use imported Component directly and ensure proper generic types to resolve 'props' visibility error
+class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   public state: ErrorBoundaryState = { hasError: false };
 
   static getDerivedStateFromError(_error: Error) { return { hasError: true }; }
@@ -74,7 +74,6 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
         </div>
       );
     }
-    // Fix: access this.props which is now correctly defined through React.Component inheritance.
     return this.props.children;
   }
 }
@@ -199,6 +198,24 @@ const App: React.FC = () => {
     localStorage.clear();
   };
 
+  const handleAcceptRequest = async (notificationId: string) => {
+    if (!user) return;
+    try {
+        const res = await fetch('/api/respond_request.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ notification_id: notificationId, action: 'ACCEPT' })
+        });
+        if (res.ok) {
+            // Reload user to get updated linking
+            loadDashboard(user.id);
+            alert("Request Accepted! Account is now linked.");
+        }
+    } catch (e) {
+        alert("Failed to respond to request.");
+    }
+  };
+
   const updateProgress = async (topicId: string, updates: Partial<UserProgress>) => {
     const current = progress[topicId] || { topicId, status: 'NOT_STARTED', lastRevised: null, revisionLevel: 0, nextRevisionDate: null, solvedQuestions: [] };
     const updated = { ...current, ...updates };
@@ -240,6 +257,20 @@ const App: React.FC = () => {
     setGoals([...goals, newGoal]);
     if (user) {
         try { await fetch('/api/manage_goals.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...newGoal, user_id: user.id }) }); } catch(e) {}
+    }
+  };
+
+  const handleSendRequest = async (studentId: string) => {
+    if (!user) return { success: false, message: 'Not logged in' };
+    try {
+        const res = await fetch('/api/send_request.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ from_id: user.id, from_name: user.name, to_id: studentId })
+        });
+        return await res.json();
+    } catch (e) {
+        return { success: false, message: 'Connection Error' };
     }
   };
 
@@ -294,11 +325,11 @@ const App: React.FC = () => {
       case 'wellness':
         return <WellnessScreen />;
       case 'profile':
-        return <ProfileScreen user={user} onAcceptRequest={() => {}} onUpdateUser={(upd) => setUser({ ...user, ...upd })} />;
+        return <ProfileScreen user={user} onAcceptRequest={handleAcceptRequest} onUpdateUser={(upd) => setUser({ ...user, ...upd })} />;
       case 'psychometric':
         return <PsychometricScreen user={user} />;
       case 'family':
-        return <ParentFamilyScreen user={user} onSendRequest={async (id) => ({ success: true, message: 'Request sent' })} linkedData={linkedData} />;
+        return <ParentFamilyScreen user={user} onSendRequest={handleSendRequest} linkedData={linkedData} />;
       case 'users':
         return <AdminUserManagementScreen />;
       case 'inbox':
