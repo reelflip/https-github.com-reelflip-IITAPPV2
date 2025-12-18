@@ -90,11 +90,24 @@ $data = json_decode(file_get_contents('php://input'));
 if(!empty($data->email) && !empty($data->password)) {
     try {
         $id = str_pad(mt_rand(100000, 999999), 6, '0', STR_PAD_LEFT);
-        $sql = "INSERT INTO users (id, name, email, password_hash, role) VALUES (?, ?, ?, ?, ?)";
+        $sql = "INSERT INTO users (id, name, email, password_hash, role, institute, target_exam, target_year, dob, gender, security_question, security_answer) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         $stmt = $conn->prepare($sql);
-        $stmt->execute([$id, $data->name, $data->email, $data->password, $data->role]);
+        $stmt->execute([
+            $id, 
+            $data->name, 
+            $data->email, 
+            $data->password, 
+            $data->role,
+            $data->institute ?? null,
+            $data->targetExam ?? null,
+            $data->targetYear ?? 2025,
+            $data->dob ?? null,
+            $data->gender ?? null,
+            $data->securityQuestion ?? null,
+            $data->securityAnswer ?? null
+        ]);
         echo json_encode(["status" => "success", "user" => ["id" => $id, "name" => $data->name, "role" => $data->role, "email" => $data->email]]);
-    } catch(Exception $e) { http_response_code(500); echo json_encode(["error" => "Email might already exist."]); }
+    } catch(Exception $e) { http_response_code(500); echo json_encode(["error" => "Registration failed. Email may exist."]); }
 }
 ?>`
     },
@@ -566,7 +579,7 @@ try {
         folder: 'deployment/api',
         content: `${phpHeader}
 $schema = [
-    'users' => "(id VARCHAR(255) PRIMARY KEY, name VARCHAR(255), email VARCHAR(255) UNIQUE, password_hash VARCHAR(255), role VARCHAR(50) DEFAULT 'STUDENT', target_exam VARCHAR(100), target_year INT, institute VARCHAR(255), gender VARCHAR(50), dob DATE, is_verified TINYINT(1) DEFAULT 1, google_id VARCHAR(255), parent_id VARCHAR(255), linked_student_id VARCHAR(255), school VARCHAR(255), phone VARCHAR(50), avatar_url VARCHAR(500), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
+    'users' => "(id VARCHAR(255) PRIMARY KEY, name VARCHAR(255), email VARCHAR(255) UNIQUE, password_hash VARCHAR(255), role VARCHAR(50) DEFAULT 'STUDENT', target_exam VARCHAR(100), target_year INT, institute VARCHAR(255), gender VARCHAR(50), dob DATE, is_verified TINYINT(1) DEFAULT 1, google_id VARCHAR(255), parent_id VARCHAR(255), linked_student_id VARCHAR(255), school VARCHAR(255), phone VARCHAR(50), avatar_url VARCHAR(500), security_question TEXT, security_answer TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
     'test_attempts' => "(id VARCHAR(255) PRIMARY KEY, user_id VARCHAR(255), test_id VARCHAR(255), score INT, total_marks INT, accuracy FLOAT, detailed_results LONGTEXT, topic_id VARCHAR(255), difficulty VARCHAR(50), total_questions INT DEFAULT 0, correct_count INT DEFAULT 0, incorrect_count INT DEFAULT 0, unattempted_count INT DEFAULT 0, date TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
     'user_progress' => "(id INT AUTO_INCREMENT PRIMARY KEY, user_id VARCHAR(255), topic_id VARCHAR(255), status VARCHAR(50), last_revised DATETIME, revision_level INT, next_revision_date DATETIME, solved_questions_json LONGTEXT, UNIQUE KEY (user_id, topic_id))",
     'timetable' => "(user_id VARCHAR(255) PRIMARY KEY, config_json LONGTEXT, slots_json LONGTEXT, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
@@ -589,6 +602,10 @@ try {
     foreach ($schema as $table => $def) {
         $conn->exec("CREATE TABLE IF NOT EXISTS $table $def");
     }
+    // Update users table with missing security columns if needed
+    try { $conn->exec("ALTER TABLE users ADD COLUMN IF NOT EXISTS security_question TEXT"); } catch(Exception $e){}
+    try { $conn->exec("ALTER TABLE users ADD COLUMN IF NOT EXISTS security_answer TEXT"); } catch(Exception $e){}
+    
     echo json_encode(["status" => "success", "message" => "Schema synchronized."]);
 } catch(Exception $e) { http_response_code(500); echo json_encode(["status" => "error", "message" => $e->getMessage()]); }
 ?>`
@@ -688,7 +705,7 @@ export const generateSQLSchema = () => {
     sql += `SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO"; START TRANSACTION; SET time_zone = "+00:00";\n\n`;
     
     const tables = [
-        `CREATE TABLE users (id VARCHAR(255) PRIMARY KEY, name VARCHAR(255), email VARCHAR(255) UNIQUE, password_hash VARCHAR(255), role VARCHAR(50) DEFAULT 'STUDENT', target_exam VARCHAR(100), target_year INT, institute VARCHAR(255), gender VARCHAR(50), dob DATE, is_verified TINYINT(1) DEFAULT 1, google_id VARCHAR(255), parent_id VARCHAR(255), linked_student_id VARCHAR(255), school VARCHAR(255), phone VARCHAR(50), avatar_url VARCHAR(500), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
+        `CREATE TABLE users (id VARCHAR(255) PRIMARY KEY, name VARCHAR(255), email VARCHAR(255) UNIQUE, password_hash VARCHAR(255), role VARCHAR(50) DEFAULT 'STUDENT', target_exam VARCHAR(100), target_year INT, institute VARCHAR(255), gender VARCHAR(50), dob DATE, is_verified TINYINT(1) DEFAULT 1, google_id VARCHAR(255), parent_id VARCHAR(255), linked_student_id VARCHAR(255), school VARCHAR(255), phone VARCHAR(50), avatar_url VARCHAR(500), security_question TEXT, security_answer TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
         `CREATE TABLE test_attempts (id VARCHAR(255) PRIMARY KEY, user_id VARCHAR(255), test_id VARCHAR(255), score INT, total_marks INT, accuracy FLOAT, detailed_results LONGTEXT, topic_id VARCHAR(255), difficulty VARCHAR(50), total_questions INT DEFAULT 0, correct_count INT DEFAULT 0, incorrect_count INT DEFAULT 0, unattempted_count INT DEFAULT 0, date TIMESTAMP DEFAULT CURRENT_TIMESTAMP, INDEX(user_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
         `CREATE TABLE user_progress (id INT AUTO_INCREMENT PRIMARY KEY, user_id VARCHAR(255), topic_id VARCHAR(255), status VARCHAR(50), last_revised DATETIME, revision_level INT, next_revision_date DATETIME, solved_questions_json LONGTEXT, UNIQUE KEY (user_id, topic_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
         `CREATE TABLE timetable (user_id VARCHAR(255) PRIMARY KEY, config_json LONGTEXT, slots_json LONGTEXT, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,

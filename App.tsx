@@ -53,18 +53,15 @@ interface ErrorBoundaryState {
   hasError: boolean;
 }
 
-// Fix: Using React.Component explicitly to ensure TypeScript correctly recognizes this.props and this.state.
-class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  // Fix: Removed redundant constructor and initialized state directly for better type inference.
+// Fix: Changed inheritance to use the directly imported Component type to ensure 'this.props' is correctly identified by TypeScript.
+class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   public state: ErrorBoundaryState = { hasError: false };
 
-  // Fix: Added error parameter to static getDerivedStateFromError to correctly implement the error boundary.
   static getDerivedStateFromError(_error: Error) { return { hasError: true }; }
   
   componentDidCatch(error: Error, errorInfo: ErrorInfo) { console.error("App Crash:", error, errorInfo); }
   
   render() {
-    // Fix: access property via this.state correctly now that inheritance is resolved.
     if (this.state.hasError) {
       return (
         <div className="min-h-screen flex flex-col items-center justify-center p-4 text-center bg-slate-50">
@@ -77,7 +74,6 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
         </div>
       );
     }
-    // Fix: Property 'props' is now correctly inherited from Component when extending it using the React.Component syntax.
     return this.props.children;
   }
 }
@@ -331,11 +327,11 @@ const App: React.FC = () => {
         <Navigation currentScreen={currentScreen} setScreen={setScreen} logout={handleLogout} user={user} />
         <main className="flex-1 md:ml-64 p-4 md:p-8 pb-24 md:pb-8 max-w-[1600px] mx-auto w-full">
           <Suspense fallback={<LoadingView />}>
-            {renderContent()}
+            {user && renderContent()}
           </Suspense>
         </main>
-        <MobileNavigation currentScreen={currentScreen} setScreen={setScreen} logout={handleLogout} user={user} />
-        {user.role === 'STUDENT' && currentScreen !== 'ai-tutor' && <AITutorChat />}
+        <MobileNavigation currentScreen={currentScreen} setScreen={setScreen} logout={handleLogout} user={user!} />
+        {user && user.role === 'STUDENT' && currentScreen !== 'ai-tutor' && <AITutorChat />}
       </div>
     </ErrorBoundary>
   );
