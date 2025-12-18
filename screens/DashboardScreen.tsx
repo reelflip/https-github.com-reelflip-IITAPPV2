@@ -1,8 +1,7 @@
-
 import React, { useState } from 'react';
-import { User, UserProgress, TestAttempt, Goal } from '../lib/types';
+import { User, UserProgress, TestAttempt, Goal, PsychometricReport } from '../lib/types';
 import { SYLLABUS_DATA } from '../lib/syllabusData';
-import { Users, Search, ArrowRight, Target, Trophy, Clock, AlertCircle } from 'lucide-react';
+import { Users, Search, ArrowRight, Target, Trophy, Clock, AlertCircle, Brain, Sparkles, Heart, Zap, Lightbulb } from 'lucide-react';
 
 interface Props {
   user: User;
@@ -13,9 +12,10 @@ interface Props {
   toggleGoal: (id: string) => void;
   addGoal: (text: string) => void;
   setScreen: (screen: any) => void;
+  linkedPsychReport?: PsychometricReport;
 }
 
-export const DashboardScreen: React.FC<Props> = ({ user, viewingStudentName, progress, testAttempts, goals, toggleGoal, addGoal, setScreen }) => {
+export const DashboardScreen: React.FC<Props> = ({ user, viewingStudentName, progress, testAttempts, goals, toggleGoal, addGoal, setScreen, linkedPsychReport }) => {
   const [newGoalText, setNewGoalText] = useState('');
 
   const totalTopics = SYLLABUS_DATA.length;
@@ -35,6 +35,14 @@ export const DashboardScreen: React.FC<Props> = ({ user, viewingStudentName, pro
       addGoal(newGoalText);
       setNewGoalText('');
     }
+  };
+
+  const getParentTipIcon = (tip: string) => {
+    if (tip.includes("Stress") || tip.includes("Burnout")) return <Heart className="w-5 h-5 text-rose-500" />;
+    if (tip.includes("Study Support") || tip.includes("Strategy")) return <Brain className="w-5 h-5 text-blue-500" />;
+    if (tip.includes("Focus") || tip.includes("Habits")) return <Zap className="w-5 h-5 text-amber-500" />;
+    if (tip.includes("Motivation") || tip.includes("Mindset")) return <Sparkles className="w-5 h-5 text-purple-500" />;
+    return <Lightbulb className="w-5 h-5 text-slate-500" />;
   };
 
   // --- Parent Unconnected View ---
@@ -175,8 +183,96 @@ export const DashboardScreen: React.FC<Props> = ({ user, viewingStudentName, pro
         </div>
       </div>
 
-      {/* Goals Section or Connection Helper */}
-      {!viewingStudentName ? (
+      {/* --- NEW PARENT DEDICATED PSYCHOMETRIC SECTION --- */}
+      {user.role === 'PARENT' && viewingStudentName && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Summary Card */}
+            <div className="lg:col-span-1 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between h-full">
+                <div>
+                    <div className="flex items-center gap-2 text-violet-600 mb-4">
+                        <Brain className="w-5 h-5" />
+                        <h3 className="font-bold text-sm uppercase tracking-wider">Psychological Readiness</h3>
+                    </div>
+                    
+                    {linkedPsychReport ? (
+                        <div className="space-y-4">
+                            <div className="flex items-end gap-3">
+                                <span className="text-5xl font-black text-slate-800">{linkedPsychReport.overallScore}%</span>
+                                <span className="text-xs font-bold text-slate-400 uppercase mb-2">Overall Score</span>
+                            </div>
+                            <div>
+                                <span className="text-xs font-bold text-slate-500 uppercase block mb-1">Assessment Profile</span>
+                                <div className="inline-block px-3 py-1 bg-violet-50 text-violet-700 text-sm font-bold rounded-lg border border-violet-100">
+                                    {linkedPsychReport.profileType}
+                                </div>
+                            </div>
+                            <p className="text-sm text-slate-600 leading-relaxed line-clamp-3">
+                                {linkedPsychReport.summary}
+                            </p>
+                        </div>
+                    ) : (
+                        <div className="py-8 text-center">
+                            <div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                                <Clock className="w-6 h-6 text-slate-300" />
+                            </div>
+                            <p className="text-sm text-slate-500 font-medium">Waiting for student to complete assessment.</p>
+                        </div>
+                    )}
+                </div>
+                
+                <button 
+                    onClick={() => setScreen('family')}
+                    className="w-full mt-6 py-2.5 bg-slate-50 text-slate-600 hover:text-blue-600 hover:bg-blue-50 border border-slate-200 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2"
+                >
+                    View Full Report <ArrowRight className="w-4 h-4" />
+                </button>
+            </div>
+
+            {/* Actionable Suggestions for Parents */}
+            <div className="lg:col-span-2 bg-gradient-to-br from-indigo-900 to-slate-900 rounded-2xl p-6 text-white shadow-xl relative overflow-hidden">
+                <div className="relative z-10">
+                    <div className="flex items-center gap-2 mb-4">
+                        <Sparkles className="w-5 h-5 text-amber-400" />
+                        <h3 className="font-bold text-sm uppercase tracking-wider text-indigo-100">Actionable Guidance for Parents</h3>
+                    </div>
+
+                    {linkedPsychReport && linkedPsychReport.parentTips ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {linkedPsychReport.parentTips.slice(0, 4).map((tip, idx) => {
+                                const parts = tip.split(':');
+                                const title = parts.length > 1 ? parts[0] : 'General';
+                                const content = parts.length > 1 ? parts.slice(1).join(':') : parts[0];
+                                
+                                return (
+                                    <div key={idx} className="bg-white/10 backdrop-blur-sm p-4 rounded-xl border border-white/10 hover:bg-white/15 transition-all">
+                                        <div className="flex gap-3">
+                                            <div className="shrink-0 mt-0.5">
+                                                {getParentTipIcon(tip)}
+                                            </div>
+                                            <div>
+                                                <h4 className="text-[10px] font-black uppercase text-amber-400 tracking-widest mb-1">{title}</h4>
+                                                <p className="text-xs text-indigo-50 leading-relaxed font-medium">{content}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    ) : (
+                        <div className="h-48 flex items-center justify-center border-2 border-dashed border-white/10 rounded-2xl">
+                            <p className="text-indigo-300 text-sm italic">Guidance insights will appear once the student completes their assessment.</p>
+                        </div>
+                    )}
+                </div>
+                
+                {/* Decorative background brain */}
+                <Brain className="absolute -bottom-10 -right-10 w-48 h-48 text-white opacity-[0.03] pointer-events-none" />
+            </div>
+        </div>
+      )}
+
+      {/* Student View Only Goals Section */}
+      {user.role === 'STUDENT' && !viewingStudentName && (
           <div className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm">
             <div className="flex justify-between items-center mb-4">
                <div className="flex items-center gap-2">
@@ -223,19 +319,6 @@ export const DashboardScreen: React.FC<Props> = ({ user, viewingStudentName, pro
                   +
                </button>
             </form>
-          </div>
-      ) : (
-          <div className="bg-blue-900 rounded-xl p-6 text-white shadow-lg flex items-center justify-between">
-              <div>
-                  <h3 className="text-lg font-bold mb-1">Student Performance Insights</h3>
-                  <p className="text-blue-200 text-sm">Review subject-wise readiness and psychometric analysis.</p>
-              </div>
-              <button 
-                  onClick={() => setScreen('family')}
-                  className="bg-white text-blue-900 px-6 py-2.5 rounded-lg font-bold text-sm hover:bg-blue-50 transition-colors"
-              >
-                  Analyze Readiness
-              </button>
           </div>
       )}
 

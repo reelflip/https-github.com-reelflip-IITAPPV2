@@ -5,7 +5,7 @@ import { PublicLayout } from './components/PublicLayout';
 import { 
   User, UserProgress, TestAttempt, Goal, MistakeLog, BacklogItem, 
   Flashcard, MemoryHack, BlogPost, Screen, Test, Question, 
-  Topic, TimetableConfig, ChapterNote, VideoLesson 
+  Topic, TimetableConfig, ChapterNote, VideoLesson, PsychometricReport 
 } from './lib/types';
 import { SYLLABUS_DATA } from './lib/syllabusData';
 import { calculateNextRevision } from './lib/utils';
@@ -53,8 +53,8 @@ interface ErrorBoundaryState {
   hasError: boolean;
 }
 
-// Fix: Explicitly use React.Component and ensure generic typing to resolve 'props' visibility error
-class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+// Fix: Correctly extending the Component class imported from 'react' to ensure 'this.props' and 'this.state' are properly typed
+class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   public state: ErrorBoundaryState = { hasError: false };
 
   static getDerivedStateFromError(_error: Error) { return { hasError: true }; }
@@ -74,7 +74,6 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
         </div>
       );
     }
-    // Fix: Access to this.props is now resolved by correct class extension
     return this.props.children;
   }
 }
@@ -110,7 +109,7 @@ const App: React.FC = () => {
   const [tests, setTests] = useState<Test[]>(MOCK_TESTS_DATA);
   const [chapterNotes, setChapterNotes] = useState<Record<string, ChapterNote>>({});
   const [videoMap, setVideoMap] = useState<Record<string, VideoLesson>>({});
-  const [linkedData, setLinkedData] = useState<{ progress: Record<string, UserProgress>, tests: TestAttempt[], studentName: string } | undefined>();
+  const [linkedData, setLinkedData] = useState<{ progress: Record<string, UserProgress>, tests: TestAttempt[], studentName: string, psychReport?: PsychometricReport } | undefined>();
 
   useEffect(() => {
     if (user) {
@@ -156,7 +155,39 @@ const App: React.FC = () => {
             if (data.backlogs) setBacklogs(data.backlogs);
             if (data.timetable) setTimetable(data.timetable);
             if (data.notifications && data.userProfileSync) {
-                setUser({ ...data.userProfileSync, notifications: data.notifications });
+                const updatedUser = { ...data.userProfileSync, notifications: data.notifications };
+                setUser(updatedUser);
+
+                // For parents: load student data if linked
+                if (updatedUser.role === 'PARENT' && updatedUser.linkedStudentId) {
+                    const sRes = await fetch(`/api/get_dashboard.php?user_id=${updatedUser.linkedStudentId}`);
+                    const psychRes = await fetch(`/api/get_psychometric.php?user_id=${updatedUser.linkedStudentId}`);
+                    
+                    if (sRes.ok) {
+                        const sData = await sRes.json();
+                        const sProgMap: Record<string, UserProgress> = {};
+                        sData.progress?.forEach((p: any) => {
+                           sProgMap[p.topic_id] = {
+                                topicId: p.topic_id, status: p.status, lastRevised: p.last_revised,
+                                revision_level: p.revision_level, next_revision_date: p.next_revision_date,
+                                solved_questions_json: p.solved_questions_json ? JSON.parse(p.solved_questions_json) : []
+                            } as any;
+                        });
+                        
+                        let psychReport;
+                        if (psychRes.ok) {
+                            const pData = await psychRes.json();
+                            psychReport = pData.report;
+                        }
+
+                        setLinkedData({
+                            progress: sProgMap,
+                            tests: sData.attempts || [],
+                            studentName: sData.userProfileSync?.name || 'Student',
+                            psychReport
+                        });
+                    }
+                }
             }
         }
     } catch (e) { console.error(e); }
@@ -302,15 +333,15 @@ const App: React.FC = () => {
       case 'overview':
         return isAdminRole 
           ? <AdminDashboardScreen user={user} onNavigate={setScreen} messageCount={0} />
-          : <DashboardScreen user={user} progress={progress} testAttempts={testAttempts} goals={goals} toggleGoal={toggleGoal} addGoal={addGoal} setScreen={setScreen} />;
+          : <DashboardScreen user={user} progress={linkedData?.progress || progress} testAttempts={linkedData?.tests || testAttempts} goals={goals} toggleGoal={toggleGoal} addGoal={addGoal} setScreen={setScreen} viewingStudentName={linkedData?.studentName} linkedPsychReport={linkedData?.psychReport} />;
       case 'syllabus':
-        return <SyllabusScreen user={user} subjects={SYLLABUS_DATA} progress={progress} onUpdateProgress={updateProgress} chapterNotes={chapterNotes} videoMap={videoMap} questionBank={questionBank} />;
+        return <SyllabusScreen user={user} subjects={SYLLABUS_DATA} progress={linkedData?.progress || progress} onUpdateProgress={updateProgress} chapterNotes={chapterNotes} videoMap={videoMap} questionBank={questionBank} viewingStudentName={linkedData?.studentName} readOnly={user.role === 'PARENT'} />;
       case 'tests':
         return isAdminRole
           ? <AdminTestManagerScreen questionBank={questionBank} tests={tests} syllabus={SYLLABUS_DATA} onAddQuestion={(q) => setQuestionBank([...questionBank, q])} onCreateTest={(t) => setTests([...tests, t])} onDeleteQuestion={(id) => setQuestionBank(questionBank.filter(q => q.id !== id))} onDeleteTest={(id) => setTests(tests.filter(t => t.id !== id))} />
-          : <TestScreen user={user} addTestAttempt={(a) => setTestAttempts([...testAttempts, a])} history={testAttempts} availableTests={tests} />;
+          : <TestScreen user={user} addTestAttempt={(a) => setTestAttempts([...testAttempts, a])} history={linkedData?.tests || testAttempts} availableTests={tests} />;
       case 'analytics':
-        return isAdminRole ? <AdminAnalyticsScreen /> : <AnalyticsScreen user={user} progress={progress} testAttempts={testAttempts} />;
+        return isAdminRole ? <AdminAnalyticsScreen /> : <AnalyticsScreen user={user} progress={linkedData?.progress || progress} testAttempts={linkedData?.tests || testAttempts} viewingStudentName={linkedData?.studentName} />;
       case 'timetable':
         return <TimetableScreen user={user} savedConfig={timetable.config} savedSlots={timetable.slots} onSave={(c, s) => setTimetable({ config: c, slots: s })} />;
       case 'revision':
@@ -326,7 +357,7 @@ const App: React.FC = () => {
       case 'wellness':
         return <WellnessScreen />;
       case 'profile':
-        return <ProfileScreen user={user} onAcceptRequest={handleAcceptRequest} onUpdateUser={(upd) => setUser({ ...user, ...upd })} />;
+        return <ProfileScreen user={user} onAcceptRequest={handleAcceptRequest} onUpdateUser={(upd) => setUser({ ...user, ...upd })} linkedStudentName={linkedData?.studentName} />;
       case 'psychometric':
         return <PsychometricScreen user={user} />;
       case 'family':
