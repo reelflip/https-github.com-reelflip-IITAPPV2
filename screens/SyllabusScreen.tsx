@@ -41,6 +41,258 @@ const statusLabels: Record<TopicStatus, string> = {
   'BACKLOG': 'Backlog',
 };
 
+// Standalone component to resolve React Error #310 (Hook Violation)
+const TopicDetailView: React.FC<{
+  topic: Topic;
+  onClose: () => void;
+  topicData: UserProgress;
+  topicQuestions: Question[];
+  videoLesson?: VideoLesson;
+  chapterNote?: ChapterNote;
+  readOnly: boolean;
+  onUpdateProgress: (topicId: string, updates: Partial<UserProgress>) => void;
+  addTestAttempt?: (attempt: TestAttempt) => void;
+  currentAnswers: Record<string, number>;
+  currentResultsVisible: Record<string, boolean>;
+  currentTime: number;
+  onAnswerQuestion: (qId: string, optionIdx: number, correctIdx: number) => void;
+  onUpdateTestAnswer: (qId: string, optionIdx: number) => void;
+  onOpenNoteReader: (title: string, pages: string[]) => void;
+}> = ({ 
+  topic, onClose, topicData, topicQuestions, videoLesson, chapterNote, 
+  readOnly, onUpdateProgress, addTestAttempt, currentAnswers, 
+  currentResultsVisible, currentTime, onAnswerQuestion, onUpdateTestAnswer, onOpenNoteReader 
+}) => {
+  const [activeTab, setActiveTab] = useState<'NOTES' | 'VIDEOS' | 'PRACTICE' | 'TEST'>('PRACTICE');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmitChapterTest = async () => {
+    if (Object.keys(currentAnswers).length === 0) {
+        alert("Please answer at least one question before submitting.");
+        return;
+    }
+
+    setIsSubmitting(true);
+    const results = topicQuestions.map(q => ({
+        questionId: q.id,
+        subjectId: q.subjectId,
+        topicId: q.topicId,
+        status: currentAnswers[q.id] === undefined ? 'UNATTEMPTED' : (currentAnswers[q.id] === q.correctOptionIndex ? 'CORRECT' : 'INCORRECT'),
+        selectedOptionIndex: currentAnswers[q.id]
+    }));
+
+    const correctCount = results.filter(r => r.status === 'CORRECT').length;
+    const incorrectCount = results.filter(r => r.status === 'INCORRECT').length;
+    const unattemptedCount = results.filter(r => r.status === 'UNATTEMPTED').length;
+    const score = (correctCount * 4) - (incorrectCount * 1);
+    const totalMarks = topicQuestions.length * 4;
+
+    const attempt: TestAttempt = {
+        id: `ct_${Date.now()}`,
+        date: new Date().toISOString(),
+        title: `${topic.name} - Chapter Test`,
+        score,
+        totalMarks,
+        accuracy: Math.round((correctCount / (correctCount + incorrectCount || 1)) * 100),
+        accuracy_percent: Math.round((correctCount / (correctCount + incorrectCount || 1)) * 100),
+        testId: `ct_${topic.id}`,
+        totalQuestions: topicQuestions.length,
+        correctCount,
+        incorrectCount,
+        unattemptedCount,
+        detailedResults: results as any,
+        topicId: topic.id,
+        timeTakenSeconds: currentTime
+    };
+
+    if (addTestAttempt) {
+        await addTestAttempt(attempt);
+        alert(`Chapter Test Submitted!\nScore: ${score}/${totalMarks}\nResult saved to history.`);
+        onClose();
+    }
+    setIsSubmitting(false);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-slate-50 flex flex-col animate-in slide-in-from-right-4 duration-300">
+        <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shadow-sm shrink-0">
+            <div className="flex items-center gap-4">
+                <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-500">
+                    <ArrowLeft className="w-6 h-6" />
+                </button>
+                <div>
+                    <div className="flex items-center text-[10px] font-bold text-slate-400 uppercase tracking-widest gap-2">
+                        <span>{topic.subject}</span>
+                        <ChevronRight className="w-3 h-3" />
+                        <span>{topic.chapter}</span>
+                    </div>
+                    <h2 className="text-xl font-black text-slate-900 leading-tight">{topic.name}</h2>
+                </div>
+            </div>
+            
+            {activeTab === 'TEST' && (
+                <div className="flex items-center gap-4 px-4 py-2 bg-slate-900 text-white rounded-xl">
+                    <Clock className="w-4 h-4 text-blue-400" />
+                    <span className="font-mono font-bold">
+                        {Math.floor(currentTime / 60)}:{(currentTime % 60).toString().padStart(2, '0')}
+                    </span>
+                </div>
+            )}
+
+            {!readOnly && activeTab !== 'TEST' && (
+                <div className="flex items-center gap-3">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider hidden md:block">Update Status</span>
+                  <select 
+                      value={topicData.status}
+                      onChange={(e) => onUpdateProgress(topic.id, { status: e.target.value as TopicStatus })}
+                      className={`px-4 py-2 rounded-xl text-xs font-bold border outline-none transition-all ${statusColors[topicData.status || 'NOT_STARTED']}`}
+                  >
+                      {Object.entries(statusLabels).map(([val, label]) => (
+                          <option key={val} value={val} className="bg-white text-slate-800">{label}</option>
+                      ))}
+                  </select>
+                </div>
+            )}
+        </div>
+
+        <div className="bg-white border-b border-slate-100 flex justify-center px-4">
+            <div className="flex gap-4 md:gap-8 overflow-x-auto no-scrollbar">
+              {['PRACTICE', 'TEST', 'NOTES', 'VIDEOS'].map((tab) => (
+                  <button 
+                      key={tab}
+                      onClick={() => setActiveTab(tab as any)}
+                      className={`py-4 text-xs font-black uppercase tracking-widest border-b-2 transition-all whitespace-nowrap ${
+                          activeTab === tab ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600'
+                      }`}
+                  >
+                      {tab === 'TEST' ? '🔥 Chapter Test' : tab}
+                  </button>
+              ))}
+            </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto">
+            <div className="max-w-4xl mx-auto p-4 md:p-8 space-y-8">
+                {(activeTab === 'PRACTICE' || activeTab === 'TEST') && (
+                    <div className="space-y-6">
+                         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                            <div>
+                                <h3 className="font-bold text-slate-800">{activeTab === 'TEST' ? 'Formal Assessment' : 'Practice Bank'}</h3>
+                                <p className="text-xs text-slate-500 mt-1">
+                                    {activeTab === 'TEST' 
+                                      ? "Timed attempt. Your results will be saved permanently to your scorecard." 
+                                      : `Explore ${topicQuestions.length} practice problems.`}
+                                </p>
+                            </div>
+                         </div>
+
+                         <div className="space-y-6 pb-24">
+                             {topicQuestions.length === 0 ? (
+                                 <div className="p-12 text-center text-slate-400 bg-white rounded-2xl border border-dashed">
+                                     No questions available for this topic.
+                                 </div>
+                             ) : (
+                                 topicQuestions.map((q, idx) => (
+                                     <div key={q.id} className={`bg-white p-6 rounded-2xl border transition-all ${currentAnswers[q.id] !== undefined ? 'border-blue-200' : 'border-slate-200 shadow-sm'}`}>
+                                         <div className="flex justify-between items-start mb-4">
+                                             <span className="text-[10px] font-black bg-slate-100 text-slate-500 px-2 py-1 rounded">QUESTION {idx + 1}</span>
+                                         </div>
+                                         <p className="text-slate-800 font-medium mb-4">{q.text}</p>
+                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                             {q.options.map((opt, oIdx) => {
+                                                 const isSelected = currentAnswers[q.id] === oIdx;
+                                                 const isCorrect = oIdx === q.correctOptionIndex;
+                                                 const revealed = activeTab === 'PRACTICE' && currentResultsVisible[q.id];
+                                                 
+                                                 let btnStyle = "bg-slate-50 border-slate-100 text-slate-600";
+                                                 if (revealed) {
+                                                     if (isCorrect) btnStyle = "bg-green-100 border-green-500 text-green-800 font-bold";
+                                                     else if (isSelected) btnStyle = "bg-red-100 border-red-500 text-red-800";
+                                                 } else if (isSelected) {
+                                                     btnStyle = "bg-blue-600 border-blue-600 text-white shadow-lg";
+                                                 }
+
+                                                 return (
+                                                     <button 
+                                                          key={oIdx}
+                                                          onClick={() => {
+                                                              if (activeTab === 'PRACTICE') onAnswerQuestion(q.id, oIdx, q.correctOptionIndex);
+                                                              else onUpdateTestAnswer(q.id, oIdx);
+                                                          }}
+                                                          className={`p-4 rounded-xl border text-left text-sm transition-all ${btnStyle}`}
+                                                     >
+                                                         <span className="mr-2 font-bold uppercase">{String.fromCharCode(65 + oIdx)}.</span> {opt}
+                                                     </button>
+                                                 );
+                                             })}
+                                         </div>
+                                     </div>
+                                 ))
+                             )}
+                             
+                             {activeTab === 'TEST' && topicQuestions.length > 0 && (
+                                 <div className="flex justify-center pt-8 pb-12">
+                                     <button 
+                                          onClick={handleSubmitChapterTest}
+                                          disabled={isSubmitting}
+                                          className="bg-slate-900 text-white px-12 py-4 rounded-2xl font-black text-lg hover:bg-blue-600 transition-all shadow-xl flex items-center gap-3 active:scale-95 disabled:opacity-50"
+                                     >
+                                         {isSubmitting ? <Loader2 className="animate-spin" /> : <Send />}
+                                         Submit Chapter Test
+                                     </button>
+                                 </div>
+                             )}
+                         </div>
+                    </div>
+                )}
+
+                {activeTab === 'NOTES' && (
+                    <div className="space-y-6">
+                        {chapterNote ? (
+                            <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm text-center">
+                                <StickyNote className="w-12 h-12 text-blue-500 mx-auto mb-4" />
+                                <h3 className="text-xl font-bold text-slate-800 mb-2">Detailed Chapter Notes</h3>
+                                <button 
+                                    onClick={() => onOpenNoteReader(topic.name, chapterNote.pages)}
+                                    className="bg-blue-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-blue-700 transition-all flex items-center justify-center mx-auto gap-2"
+                                >
+                                    <BookOpen className="w-5 h-5" /> Open Reader Mode
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="p-12 text-center text-slate-400 bg-white rounded-2xl border border-dashed">
+                                Notes for this topic are currently being prepared.
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {activeTab === 'VIDEOS' && (
+                    <div className="space-y-6">
+                        {videoLesson ? (
+                            <div className="space-y-4">
+                                <div className="aspect-video w-full rounded-2xl overflow-hidden bg-slate-900 shadow-xl border border-slate-800">
+                                    <iframe 
+                                        src={videoLesson.videoUrl} 
+                                        className="w-full h-full"
+                                        allowFullScreen
+                                        title={topic.name}
+                                    ></iframe>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="p-12 text-center text-slate-400 bg-white rounded-2xl border border-dashed">
+                                Video lessons are coming soon.
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
+        </div>
+    </div>
+  );
+};
+
 export const SyllabusScreen: React.FC<SyllabusTrackerProps> = ({ 
   user, viewingStudentName, subjects, progress, onUpdateProgress, readOnly = false, summaryOnly = false,
   videoMap = {}, chapterNotes = {}, questionBank = [], addTestAttempt, testAttempts = []
@@ -50,7 +302,6 @@ export const SyllabusScreen: React.FC<SyllabusTrackerProps> = ({
   const [activeTopic, setActiveTopic] = useState<Topic | null>(null);
   const [activeNote, setActiveNote] = useState<{title: string, pages: string[]} | null>(null);
 
-  // States to persist test choices during the session to prevent reset
   const [testAnswers, setTestAnswers] = useState<Record<string, Record<string, number>>>({});
   const [testResultsVisible, setTestResultsVisible] = useState<Record<string, Record<string, boolean>>>({});
   const [testTimers, setTestTimers] = useState<Record<string, number>>({});
@@ -106,277 +357,34 @@ export const SyllabusScreen: React.FC<SyllabusTrackerProps> = ({
     };
   }
 
-  // Define Topic Detail logic as a separate function, but call it as a render method
-  // to avoid re-mounting which causes answer loss.
-  const renderTopicDetail = (topic: Topic) => {
-      // Local state for the UI tabs
-      const [activeTab, setActiveTab] = useState<'NOTES' | 'VIDEOS' | 'PRACTICE' | 'TEST'>('PRACTICE');
-      const [isSubmitting, setIsSubmitting] = useState(false);
-      
-      const topicData = getTopicProgress(topic.id);
-      const topicQuestions = questionBank.filter(q => q.topicId === topic.id);
-      const videoLesson = videoMap[topic.id];
-      const chapterNote = chapterNotes[topic.id];
-
-      // Persistence logic for this specific topic's test
-      const currentAnswers = testAnswers[topic.id] || {};
-      const currentResultsVisible = testResultsVisible[topic.id] || {};
-      const currentTime = testTimers[topic.id] || 0;
-
-      const handleCheckAnswer = (qId: string, optionIdx: number, correctIdx: number) => {
-          if (currentResultsVisible[qId] || readOnly) return;
-          
-          setTestAnswers(prev => ({
-              ...prev,
-              [topic.id]: { ...prev[topic.id], [qId]: optionIdx }
-          }));
-          setTestResultsVisible(prev => ({
-              ...prev,
-              [topic.id]: { ...prev[topic.id], [qId]: true }
-          }));
-          
-          if (optionIdx === correctIdx) {
-              const currentSolved = topicData.solvedQuestions || [];
-              if (!currentSolved.includes(qId)) {
-                  onUpdateProgress(topic.id, { solvedQuestions: [...currentSolved, qId] });
-              }
-          }
-      };
-
-      const handleSubmitChapterTest = async () => {
-          if (Object.keys(currentAnswers).length === 0) {
-              alert("Please answer at least one question before submitting.");
-              return;
-          }
-
-          setIsSubmitting(true);
-          const results = topicQuestions.map(q => ({
-              questionId: q.id,
-              subjectId: q.subjectId,
-              topicId: q.topicId,
-              status: currentAnswers[q.id] === undefined ? 'UNATTEMPTED' : (currentAnswers[q.id] === q.correctOptionIndex ? 'CORRECT' : 'INCORRECT'),
-              selectedOptionIndex: currentAnswers[q.id]
-          }));
-
-          const correctCount = results.filter(r => r.status === 'CORRECT').length;
-          const incorrectCount = results.filter(r => r.status === 'INCORRECT').length;
-          const unattemptedCount = results.filter(r => r.status === 'UNATTEMPTED').length;
-          const score = (correctCount * 4) - (incorrectCount * 1);
-          const totalMarks = topicQuestions.length * 4;
-
-          const attempt: TestAttempt = {
-              id: `ct_${Date.now()}`,
-              date: new Date().toISOString(),
-              title: `${topic.name} - Chapter Test`,
-              score,
-              totalMarks,
-              accuracy: Math.round((correctCount / (correctCount + incorrectCount || 1)) * 100),
-              accuracy_percent: Math.round((correctCount / (correctCount + incorrectCount || 1)) * 100),
-              testId: `ct_${topic.id}`,
-              totalQuestions: topicQuestions.length,
-              correctCount,
-              incorrectCount,
-              unattemptedCount,
-              detailedResults: results as any,
-              topicId: topic.id,
-              timeTakenSeconds: currentTime
-          };
-
-          if (addTestAttempt) {
-              await addTestAttempt(attempt);
-              alert(`Chapter Test Submitted!\nScore: ${score}/${totalMarks}\nResult saved to history.`);
-              setActiveTopic(null); // Close view
-          }
-          setIsSubmitting(false);
-      };
-
-      return (
-          <div className="fixed inset-0 z-50 bg-slate-50 flex flex-col animate-in slide-in-from-right-4 duration-300">
-              <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shadow-sm shrink-0">
-                  <div className="flex items-center gap-4">
-                      <button onClick={() => setActiveTopic(null)} className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-500">
-                          <ArrowLeft className="w-6 h-6" />
-                      </button>
-                      <div>
-                          <div className="flex items-center text-[10px] font-bold text-slate-400 uppercase tracking-widest gap-2">
-                              <span>{topic.subject}</span>
-                              <ChevronRight className="w-3 h-3" />
-                              <span>{topic.chapter}</span>
-                          </div>
-                          <h2 className="text-xl font-black text-slate-900 leading-tight">{topic.name}</h2>
-                      </div>
-                  </div>
-                  
-                  {activeTab === 'TEST' && (
-                      <div className="flex items-center gap-4 px-4 py-2 bg-slate-900 text-white rounded-xl">
-                          <Clock className="w-4 h-4 text-blue-400" />
-                          <span className="font-mono font-bold">
-                              {Math.floor(currentTime / 60)}:{(currentTime % 60).toString().padStart(2, '0')}
-                          </span>
-                      </div>
-                  )}
-
-                  {!readOnly && activeTab !== 'TEST' && (
-                      <div className="flex items-center gap-3">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider hidden md:block">Update Status</span>
-                        <select 
-                            value={topicData.status}
-                            onChange={(e) => onUpdateProgress(topic.id, { status: e.target.value as TopicStatus })}
-                            className={`px-4 py-2 rounded-xl text-xs font-bold border outline-none transition-all ${statusColors[topicData.status || 'NOT_STARTED']}`}
-                        >
-                            {Object.entries(statusLabels).map(([val, label]) => (
-                                <option key={val} value={val} className="bg-white text-slate-800">{label}</option>
-                            ))}
-                        </select>
-                      </div>
-                  )}
-              </div>
-
-              <div className="bg-white border-b border-slate-100 flex justify-center px-4">
-                  <div className="flex gap-4 md:gap-8 overflow-x-auto no-scrollbar">
-                    {['PRACTICE', 'TEST', 'NOTES', 'VIDEOS'].map((tab) => (
-                        <button 
-                            key={tab}
-                            onClick={() => setActiveTab(tab as any)}
-                            className={`py-4 text-xs font-black uppercase tracking-widest border-b-2 transition-all whitespace-nowrap ${
-                                activeTab === tab ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600'
-                            }`}
-                        >
-                            {tab === 'TEST' ? '🔥 Chapter Test' : tab}
-                        </button>
-                    ))}
-                  </div>
-              </div>
-
-              <div className="flex-1 overflow-y-auto">
-                  <div className="max-w-4xl mx-auto p-4 md:p-8 space-y-8">
-                      {(activeTab === 'PRACTICE' || activeTab === 'TEST') && (
-                          <div className="space-y-6">
-                               <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
-                                  <div>
-                                      <h3 className="font-bold text-slate-800">{activeTab === 'TEST' ? 'Formal Assessment' : 'Practice Bank'}</h3>
-                                      <p className="text-xs text-slate-500 mt-1">
-                                          {activeTab === 'TEST' 
-                                            ? "Timed attempt. Your results will be saved permanently to your scorecard." 
-                                            : `Explore ${topicQuestions.length} practice problems.`}
-                                      </p>
-                                  </div>
-                               </div>
-
-                               <div className="space-y-6 pb-24">
-                                   {topicQuestions.length === 0 ? (
-                                       <div className="p-12 text-center text-slate-400 bg-white rounded-2xl border border-dashed">
-                                           No questions available for this topic.
-                                       </div>
-                                   ) : (
-                                       topicQuestions.map((q, idx) => (
-                                           <div key={q.id} className={`bg-white p-6 rounded-2xl border transition-all ${currentAnswers[q.id] !== undefined ? 'border-blue-200' : 'border-slate-200 shadow-sm'}`}>
-                                               <div className="flex justify-between items-start mb-4">
-                                                   <span className="text-[10px] font-black bg-slate-100 text-slate-500 px-2 py-1 rounded">QUESTION {idx + 1}</span>
-                                               </div>
-                                               <p className="text-slate-800 font-medium mb-4">{q.text}</p>
-                                               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                                   {q.options.map((opt, oIdx) => {
-                                                       const isSelected = currentAnswers[q.id] === oIdx;
-                                                       const isCorrect = oIdx === q.correctOptionIndex;
-                                                       const revealed = activeTab === 'PRACTICE' && currentResultsVisible[q.id];
-                                                       
-                                                       let btnStyle = "bg-slate-50 border-slate-100 text-slate-600";
-                                                       if (revealed) {
-                                                           if (isCorrect) btnStyle = "bg-green-100 border-green-500 text-green-800 font-bold";
-                                                           else if (isSelected) btnStyle = "bg-red-100 border-red-500 text-red-800";
-                                                       } else if (isSelected) {
-                                                           btnStyle = "bg-blue-600 border-blue-600 text-white shadow-lg";
-                                                       }
-
-                                                       return (
-                                                           <button 
-                                                                key={oIdx}
-                                                                onClick={() => {
-                                                                    if (activeTab === 'PRACTICE') handleCheckAnswer(q.id, oIdx, q.correctOptionIndex);
-                                                                    else {
-                                                                        setTestAnswers(prev => ({
-                                                                            ...prev,
-                                                                            [topic.id]: { ...prev[topic.id], [q.id]: oIdx }
-                                                                        }));
-                                                                    }
-                                                                }}
-                                                                className={`p-4 rounded-xl border text-left text-sm transition-all ${btnStyle}`}
-                                                           >
-                                                               <span className="mr-2 font-bold uppercase">{String.fromCharCode(65 + oIdx)}.</span> {opt}
-                                                           </button>
-                                                       );
-                                                   })}
-                                               </div>
-                                           </div>
-                                       ))
-                                   )}
-                                   
-                                   {activeTab === 'TEST' && topicQuestions.length > 0 && (
-                                       <div className="flex justify-center pt-8 pb-12">
-                                           <button 
-                                                onClick={handleSubmitChapterTest}
-                                                disabled={isSubmitting}
-                                                className="bg-slate-900 text-white px-12 py-4 rounded-2xl font-black text-lg hover:bg-blue-600 transition-all shadow-xl flex items-center gap-3 active:scale-95 disabled:opacity-50"
-                                           >
-                                               {isSubmitting ? <Loader2 className="animate-spin" /> : <Send />}
-                                               Submit Chapter Test
-                                           </button>
-                                       </div>
-                                   )}
-                               </div>
-                          </div>
-                      )}
-
-                      {activeTab === 'NOTES' && (
-                          <div className="space-y-6">
-                              {chapterNote ? (
-                                  <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm text-center">
-                                      <StickyNote className="w-12 h-12 text-blue-500 mx-auto mb-4" />
-                                      <h3 className="text-xl font-bold text-slate-800 mb-2">Detailed Chapter Notes</h3>
-                                      <button 
-                                          onClick={() => setActiveNote({ title: topic.name, pages: chapterNote.pages })}
-                                          className="bg-blue-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-blue-700 transition-all flex items-center justify-center mx-auto gap-2"
-                                      >
-                                          <BookOpen className="w-5 h-5" /> Open Reader Mode
-                                      </button>
-                                  </div>
-                              ) : (
-                                  <div className="p-12 text-center text-slate-400 bg-white rounded-2xl border border-dashed">
-                                      Notes for this topic are currently being prepared.
-                                      {(user.role === 'ADMIN' || user.role === 'ADMIN_EXECUTIVE') && <p className="mt-2 text-xs text-blue-500">Go to Syllabus Admin to add notes.</p>}
-                                  </div>
-                              )}
-                          </div>
-                      )}
-
-                      {activeTab === 'VIDEOS' && (
-                          <div className="space-y-6">
-                              {videoLesson ? (
-                                  <div className="space-y-4">
-                                      <div className="aspect-video w-full rounded-2xl overflow-hidden bg-slate-900 shadow-xl border border-slate-800">
-                                          <iframe 
-                                              src={videoLesson.videoUrl} 
-                                              className="w-full h-full"
-                                              allowFullScreen
-                                              title={topic.name}
-                                          ></iframe>
-                                      </div>
-                                  </div>
-                              ) : (
-                                  <div className="p-12 text-center text-slate-400 bg-white rounded-2xl border border-dashed">
-                                      Video lessons are coming soon.
-                                  </div>
-                              )}
-                          </div>
-                      )}
-                  </div>
-              </div>
-          </div>
-      );
+  const handleAnswerQuestion = (topicId: string, qId: string, optionIdx: number, correctIdx: number) => {
+    if (readOnly) return;
+    
+    setTestAnswers(prev => ({
+        ...prev,
+        [topicId]: { ...prev[topicId], [qId]: optionIdx }
+    }));
+    setTestResultsVisible(prev => ({
+        ...prev,
+        [topicId]: { ...prev[topicId], [qId]: true }
+    }));
+    
+    if (optionIdx === correctIdx) {
+        const topicData = getTopicProgress(topicId);
+        const currentSolved = topicData.solvedQuestions || [];
+        if (!currentSolved.includes(qId)) {
+            onUpdateProgress(topicId, { solvedQuestions: [...currentSolved, qId] });
+        }
+    }
   };
 
-  // Timer loop for whatever test is currently active
+  const handleUpdateTestAnswer = (topicId: string, qId: string, optionIdx: number) => {
+    setTestAnswers(prev => ({
+        ...prev,
+        [topicId]: { ...prev[topicId], [qId]: optionIdx }
+    }));
+  };
+
   useEffect(() => {
       let interval: any;
       if (activeTopic) {
@@ -392,7 +400,25 @@ export const SyllabusScreen: React.FC<SyllabusTrackerProps> = ({
 
   return (
     <div className="space-y-8 font-inter animate-in fade-in slide-in-from-bottom-4 relative">
-      {activeTopic && renderTopicDetail(activeTopic)}
+      {activeTopic && (
+          <TopicDetailView 
+            topic={activeTopic}
+            onClose={() => setActiveTopic(null)}
+            topicData={getTopicProgress(activeTopic.id)}
+            topicQuestions={questionBank.filter(q => q.topicId === activeTopic.id)}
+            videoLesson={videoMap[activeTopic.id]}
+            chapterNote={chapterNotes[activeTopic.id]}
+            readOnly={readOnly}
+            onUpdateProgress={onUpdateProgress}
+            addTestAttempt={addTestAttempt}
+            currentAnswers={testAnswers[activeTopic.id] || {}}
+            currentResultsVisible={testResultsVisible[activeTopic.id] || {}}
+            currentTime={testTimers[activeTopic.id] || 0}
+            onAnswerQuestion={(qId, opt, corr) => handleAnswerQuestion(activeTopic.id, qId, opt, corr)}
+            onUpdateTestAnswer={(qId, opt) => handleUpdateTestAnswer(activeTopic.id, qId, opt)}
+            onOpenNoteReader={(title, pages) => setActiveNote({ title, pages })}
+          />
+      )}
       {activeNote && <BookReader title={activeNote.title} pages={activeNote.pages} onClose={() => setActiveNote(null)} />}
 
       <div className="bg-gradient-to-r from-blue-600 to-cyan-600 rounded-2xl p-8 text-white shadow-xl relative overflow-hidden">
@@ -433,7 +459,8 @@ export const SyllabusScreen: React.FC<SyllabusTrackerProps> = ({
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {chapter.topics.map(topic => {
                       const topicData = getTopicProgress(topic.id);
-                      const qCount = (questionBank || []).filter(q => q.topicId === topic.id).length;
+                      const qBankFiltered = (questionBank || []);
+                      const qCount = qBankFiltered.filter(q => q.topicId === topic.id).length;
                       const solvedCount = topicData.solvedQuestions?.length || 0;
                       const qPercent = qCount > 0 ? Math.round((solvedCount / qCount) * 100) : 0;
                       return (

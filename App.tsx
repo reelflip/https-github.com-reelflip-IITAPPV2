@@ -161,7 +161,6 @@ const App: React.FC = () => {
     id: a.id,
     date: a.date,
     title: a.title || 'Mock Test',
-    // Fix: Replaced invalid (int) and (float) type casts with Number() to resolve TypeScript errors
     score: Number(a.score),
     totalMarks: Number(a.totalMarks || a.total_marks),
     accuracy: Number(a.accuracy),
