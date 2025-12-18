@@ -48,7 +48,7 @@ interface ErrorBoundaryProps {
 }
 interface ErrorBoundaryState { hasError: boolean; }
 
-// Fixed: Using the named import Component directly to fix property inheritance errors in TS
+// Fix: AppErrorBoundary must explicitly use Component from React to have state/props/setState correctly typed in TS
 class AppErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   constructor(props: ErrorBoundaryProps) { 
     super(props); 
@@ -63,6 +63,7 @@ class AppErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState>
   }
 
   render() {
+    // Fix: state property is provided by extending React Component (line 54)
     if (this.state.hasError) {
       return (
         <div className="flex flex-col items-center justify-center min-h-[400px] p-8 bg-red-50 rounded-2xl border border-red-100 text-center animate-in fade-in">
@@ -72,6 +73,7 @@ class AppErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState>
           
           <div className="flex gap-4 mt-8">
               <button 
+                // Fix: setState and props properties are provided by extending React Component (line 74)
                 onClick={() => { this.setState({ hasError: false }); this.props.resetAction(); }}
                 className="bg-red-600 text-white px-6 py-2 rounded-xl font-bold hover:bg-red-700 transition-all shadow-lg active:scale-95"
               >
@@ -87,6 +89,7 @@ class AppErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState>
         </div>
       );
     }
+    // Fix: props property is provided by extending React Component (line 89)
     return this.props.children;
   }
 }
@@ -122,7 +125,6 @@ export default function App() {
     try {
         const saved = localStorage.getItem('iitjee_last_screen');
         const validScreens: Screen[] = ['dashboard', 'syllabus', 'tests', 'ai-tutor', 'focus', 'analytics', 'timetable', 'revision', 'mistakes', 'flashcards', 'backlogs', 'hacks', 'wellness', 'profile', 'psychometric', 'overview', 'users', 'videos', 'content', 'diagnostics', 'system', 'deployment', 'tests_admin', 'content_admin', 'video_admin', 'admin_analytics', 'syllabus_admin', 'inbox', 'blog_admin', 'family', 'public-blog', 'about', 'blog', 'exams', 'privacy', 'contact', 'features'];
-        // NEVER allow initial boot into 'inbox' if a previous crash occurred there
         if (saved === 'inbox') return 'overview'; 
         return (saved && validScreens.includes(saved as Screen)) ? (saved as Screen) : 'dashboard';
     } catch (e) { return 'dashboard'; }
@@ -147,6 +149,29 @@ export default function App() {
   const [chapterNotes, setChapterNotes] = useState<Record<string, ChapterNote>>({});
   const [questionBank, setQuestionBank] = useState<Question[]>([]);
   const [adminTests, setAdminTests] = useState<Test[]>(MOCK_TESTS_DATA);
+
+  // Initialize Analytics
+  useEffect(() => {
+    fetch('/api/manage_settings.php?key=google_analytics_id')
+      .then(res => res.json())
+      .then(data => {
+          if (data?.value && (window as any).initGA) {
+              (window as any).initGA(data.value);
+          }
+      }).catch(() => {});
+  }, []);
+
+  // Track Page Views
+  useEffect(() => {
+    if (window.gtag) {
+        window.gtag('event', 'page_view', {
+            page_title: currentScreen,
+            page_path: '/' + currentScreen,
+            user_role: user?.role || 'GUEST'
+        });
+    }
+    localStorage.setItem('iitjee_last_screen', currentScreen);
+  }, [currentScreen, user?.role]);
 
   const fetchRemoteData = async (userId: string) => {
       setSyncStatus('SAVING'); 
@@ -178,10 +203,9 @@ export default function App() {
 
   useEffect(() => {
     if (user) {
-        localStorage.setItem('iitjee_last_screen', currentScreen);
         if (user.role === 'PARENT' && user.linkedStudentId) loadLinkedStudent(user.linkedStudentId);
     }
-  }, [currentScreen, user?.linkedStudentId, user?.role]);
+  }, [user?.linkedStudentId, user?.role]);
 
   const loadLinkedStudent = async (studentId: string) => {
       try {

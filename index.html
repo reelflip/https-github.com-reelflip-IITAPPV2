@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -7,16 +6,28 @@
     <title>IIT JEE Prep</title>
     <script>
       // --- RUNTIME CONFIGURATION ---
-      // To hide Demo Login buttons in production, set enableDevTools to false below.
       window.IITJEE_CONFIG = {
         enableDevTools: false 
       };
     </script>
     
-    <!-- Tailwind CSS CDN for robust preview rendering -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Analytics 4 (Dynamic Loader) -->
+    <script id="ga-initializer">
+      function initGA(id) {
+        if (!id || window.GA_INITIALIZED) return;
+        const s = document.createElement('script');
+        s.async = true;
+        s.src = "https://www.googletagmanager.com/gtag/js?id=" + id;
+        document.head.appendChild(s);
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', id);
+        window.GA_INITIALIZED = true;
+      }
+    </script>
     
-    <!-- Google Identity Services -->
+    <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script type="importmap">
 {

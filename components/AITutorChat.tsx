@@ -1,5 +1,4 @@
-
-// v10.2 - Fixed Import Error (Removed Google SDK) + FullScreen Mode
+// v10.5 - Restored free models support and GA integration
 import React, { useState, useEffect, useRef } from 'react';
 import { Bot, X, Send, Loader2, Sparkles, ChevronDown, Maximize2, Minimize2 } from 'lucide-react';
 
@@ -17,7 +16,7 @@ interface Props {
 export const AITutorChat: React.FC<Props> = ({ isFullScreen = false }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [enabled, setEnabled] = useState(true); 
-  const [modelName, setModelName] = useState('gemini-2.5-flash');
+  const [modelName, setModelName] = useState('gemini-3-flash-preview');
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -31,19 +30,6 @@ export const AITutorChat: React.FC<Props> = ({ isFullScreen = false }) => {
   }, [isFullScreen]);
 
   const loadConfig = () => {
-    const localConfig = localStorage.getItem('iitjee_ai_config');
-    if (localConfig) {
-        try {
-            const config = JSON.parse(localConfig);
-            setEnabled(config.enabled);
-            setModelName(config.model || 'gemini-2.5-flash');
-            if(config.enabled && messages.length === 0) {
-                 setMessages([{ id: 'welcome', role: 'model', text: "Hi! I'm your AI Tutor. Ask me anything about Physics, Chem, or Maths!", timestamp: new Date() }]);
-            }
-            return;
-        } catch(e) {}
-    }
-
     fetch('/api/manage_settings.php?key=ai_config')
       .then(res => res.ok ? res.text() : Promise.reject())
       .then(text => {
@@ -52,9 +38,9 @@ export const AITutorChat: React.FC<Props> = ({ isFullScreen = false }) => {
           if (data && data.value) {
             const config = JSON.parse(data.value);
             setEnabled(config.enabled);
-            setModelName(config.model || 'gemini-2.5-flash');
+            setModelName(config.model || 'gemini-3-flash-preview');
             if (config.enabled && messages.length === 0) {
-                setMessages([{ id: 'welcome', role: 'model', text: "Hi! I'm your AI Tutor. Ask me anything!", timestamp: new Date() }]);
+                setMessages([{ id: 'welcome', role: 'model', text: `Hi! I'm your AI Tutor (running ${config.model}). Ask me anything about Physics, Chem, or Maths!`, timestamp: new Date() }]);
             }
           }
       })
@@ -67,9 +53,6 @@ export const AITutorChat: React.FC<Props> = ({ isFullScreen = false }) => {
 
   useEffect(() => {
     loadConfig();
-    const handleStorageChange = () => loadConfig();
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, isOpen]);
@@ -81,16 +64,24 @@ export const AITutorChat: React.FC<Props> = ({ isFullScreen = false }) => {
     setInput('');
     setIsLoading(true);
 
+    // GA Event: Track student engagement
+    if (window.gtag) {
+        window.gtag('event', 'ai_chat_query', {
+            model: modelName,
+            query_length: input.length
+        });
+    }
+
     try {
       const history = messages.slice(-5).map(m => `${m.role === 'user' ? 'User' : 'Tutor'}: ${m.text}`).join('\n');
-      
       let systemInstruction = "You are an expert IIT JEE Tutor. Be concise, encouraging, and focus on Physics, Chemistry, and Math.";
       
       const SIMULATED_PERSONAS: Record<string, string> = {
-          'llama-3-70b': "Adopt the persona of Llama-3 70B. Your strength is general reasoning and theory. Provide very detailed, comprehensive conceptual explanations.",
-          'deepseek-r1': "Adopt the persona of DeepSeek R1. Your strength is multi-step reasoning. Break down every answer into rigorous logical steps. Focus on derivations.",
-          'qwen-2.5-math-72b': "Adopt the persona of Qwen 2.5 Math. You are a pure mathematics specialist. Be extremely precise with notation, calculus, and algebra.",
-          'phi-3-medium': "Adopt the persona of Phi-3 Medium. Be lightweight and fast. Provide short, punchy, step-wise breakdowns."
+          'gemini-3-pro-preview': "You are the 'Pro' reasoning model. Provide advanced step-by-step derivations for Physics and Maths.",
+          'llama-3.1-70b': "You are Llama-3.1. Strength: General knowledge and detailed theory explanations.",
+          'deepseek-v3': "You are DeepSeek-V3. Strength: High logic and fact-checking. Excellent for Organic and Inorganic Chemistry.",
+          'qwen-2.5-72b': "You are Qwen Math. Strength: Extremely precise calculus and algebraic solving.",
+          'mistral-large': "You are Mistral Large. Strength: Balanced, human-like guidance and motivational tips."
       };
 
       if (SIMULATED_PERSONAS[modelName]) {
@@ -113,7 +104,6 @@ export const AITutorChat: React.FC<Props> = ({ isFullScreen = false }) => {
 
   if (!enabled) return null;
 
-  // Render Full Screen Mode
   if (isFullScreen) {
       return (
           <div className="absolute inset-0 z-10 flex flex-col bg-slate-50 h-full animate-in fade-in pb-20 md:pb-0">
@@ -122,7 +112,7 @@ export const AITutorChat: React.FC<Props> = ({ isFullScreen = false }) => {
                     <div className="p-2 bg-violet-100 text-violet-700 rounded-lg"><Bot className="w-6 h-6" /></div>
                     <div>
                         <h2 className="text-lg font-bold text-slate-800">AI Tutor</h2>
-                        <p className="text-xs text-slate-500">Immersive Learning Mode</p>
+                        <p className="text-xs text-slate-500 uppercase tracking-tighter font-black">{modelName}</p>
                     </div>
                 </div>
              </div>
@@ -169,7 +159,6 @@ export const AITutorChat: React.FC<Props> = ({ isFullScreen = false }) => {
       );
   }
 
-  // Render Widget Mode (Floating) - Hidden on Mobile to avoid clutter
   return (
     <div className="hidden md:flex fixed bottom-6 right-6 z-[9999] flex-col items-end">
       {isOpen && (
@@ -177,7 +166,7 @@ export const AITutorChat: React.FC<Props> = ({ isFullScreen = false }) => {
           <div className="bg-gradient-to-r from-violet-600 to-indigo-600 p-4 flex justify-between items-center text-white shrink-0">
             <div className="flex items-center gap-2">
               <div className="p-1.5 bg-white/20 rounded-lg"><Bot className="w-5 h-5" /></div>
-              <div><h3 className="font-bold text-sm">AI Tutor</h3><span className="text-[10px] opacity-80">Always here to help</span></div>
+              <div><h3 className="font-bold text-sm">AI Tutor</h3><span className="text-[10px] opacity-80 uppercase tracking-widest font-black">{modelName.split('-')[0]} Mode</span></div>
             </div>
             <button onClick={() => setIsOpen(false)} className="p-1.5 hover:bg-white/10 rounded-full"><ChevronDown className="w-5 h-5" /></button>
           </div>
