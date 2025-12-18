@@ -38,20 +38,21 @@ import { AITutorChat } from './components/AITutorChat';
 import { User, UserProgress, TestAttempt, Screen, Goal, MistakeLog, Flashcard, MemoryHack, BlogPost, VideoLesson, Question, Test, TimetableConfig, Topic, BacklogItem, ChapterNote } from './lib/types';
 import { SYLLABUS_DATA } from './lib/syllabusData';
 import { MOCK_TESTS_DATA } from './lib/mockTestsData';
-import { LogOut, Cloud, CloudOff, RefreshCw, AlertOctagon, Trash2 } from 'lucide-react';
+import { LogOut, Cloud, CloudOff, RefreshCw, WifiOff, AlertOctagon, Trash2 } from 'lucide-react';
 
 interface ErrorBoundaryProps { children?: ReactNode; resetAction: () => void; }
 interface ErrorBoundaryState { hasError: boolean; }
 
-// Fix: Explicitly use React.Component and provide types in generic arguments to resolve Property 'setState' and 'props' not existing on AppErrorBoundary
-class AppErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+// Fix: Inherit from 'Component' named import to resolve 'setState' and 'props' not found errors in this environment
+class AppErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   public state: ErrorBoundaryState = { hasError: false };
 
   constructor(props: ErrorBoundaryProps) { 
     super(props); 
   }
 
-  static getDerivedStateFromError() { 
+  // Fix: Added error parameter to getDerivedStateFromError for correct TypeScript signature compliance
+  static getDerivedStateFromError(_error: Error) { 
     return { hasError: true }; 
   }
 
@@ -60,14 +61,16 @@ class AppErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundary
   }
 
   handleReset = () => {
+    // Fix: setState is now correctly inherited from the Component class
     this.setState({ hasError: false });
+    // Fix: props is now correctly inherited from the Component class
     this.props.resetAction();
-  };
+  }
 
   handleHardReset = () => { 
     localStorage.removeItem('iitjee_last_screen'); 
     window.location.href = '/'; 
-  };
+  }
 
   render() {
     if (this.state.hasError) {
@@ -82,15 +85,16 @@ class AppErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundary
         </div>
       );
     }
+    // Fix: props is now correctly inherited from the Component class
     return this.props.children;
   }
 }
 
 const SyncIndicator = ({ status, onRetry }: { status: 'SYNCED' | 'SAVING' | 'ERROR' | 'OFFLINE', onRetry: () => void }) => {
-    if (status === 'SYNCED') return <div className="flex items-center gap-1 text-green-600 bg-green-50 px-2 py-1 rounded text-[10px] font-bold border border-green-200"><Cloud className="w-3 h-3" /> <span>Synced</span></div>;
-    if (status === 'SAVING') return <div className="flex items-center gap-1 text-blue-600 bg-blue-50 px-2 py-1 rounded text-[10px] font-bold border border-blue-200"><RefreshCw className="w-3 h-3 animate-spin" /> <span>Saving...</span></div>;
-    return <button onClick={onRetry} className="flex items-center gap-1 text-red-600 bg-red-50 px-2 py-1 rounded text-[10px] font-bold border border-red-200 hover:bg-red-100"><CloudOff className="w-3 h-3" /> <span>Retry Sync</span></button>;
-};
+    if (status === 'SYNCED') return <div className="flex items-center gap-1 text-green-600 bg-green-50 px-2 py-1 rounded text-[10px] font-bold border border-green-200"><Cloud className="w-3 h-3" /> <span>Synced</span></div>
+    if (status === 'SAVING') return <div className="flex items-center gap-1 text-blue-600 bg-blue-50 px-2 py-1 rounded text-[10px] font-bold border border-blue-200"><RefreshCw className="w-3 h-3 animate-spin" /> <span>Saving...</span></div>
+    return <button onClick={onRetry} className="flex items-center gap-1 text-red-600 bg-red-50 px-2 py-1 rounded text-[10px] font-bold border border-red-200 hover:bg-red-100"><CloudOff className="w-3 h-3" /> <span>Retry Sync</span></button>
+}
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -193,14 +197,14 @@ export default function App() {
           if(res.ok) setSyncStatus('SYNCED');
           else setSyncStatus('ERROR');
       } catch (e) { setSyncStatus('OFFLINE'); }
-  };
+  }
 
   const handleToggleQuestion = async (topicId: string, questionId: string) => {
     const existing = progress[topicId] || { topicId, status: 'NOT_STARTED', lastRevised: null, revisionLevel: 0, nextRevisionDate: null, solvedQuestions: [] };
     const solved = [...(existing.solvedQuestions || [])];
     const newSolved = solved.includes(questionId) ? solved.filter(id => id !== questionId) : [...solved, questionId];
     await handleUpdateProgress(topicId, { solvedQuestions: newSolved });
-  };
+  }
 
   useEffect(() => {
       if(user) {
@@ -224,10 +228,10 @@ export default function App() {
               setLinkedStudentData({ progress: progMap, tests: data.attempts || [], studentName: data.userProfileSync?.name || 'Student' });
           }
       } catch(e) {}
-  };
+  }
 
-  const handleLogin = (userData: User) => { setUser(userData); localStorage.setItem('iitjee_last_screen', 'dashboard'); };
-  const handleLogout = () => { setUser(null); setCurrentScreen('dashboard'); localStorage.removeItem('iitjee_last_screen'); };
+  const handleLogin = (userData: User) => { setUser(userData); localStorage.setItem('iitjee_last_screen', 'dashboard'); }
+  const handleLogout = () => { setUser(null); setCurrentScreen('dashboard'); localStorage.removeItem('iitjee_last_screen'); }
   
   if (!user) return (
       <PublicLayout onNavigate={(p: any) => setCurrentScreen(p)} currentScreen={currentScreen}>
@@ -244,7 +248,7 @@ export default function App() {
               <AuthScreen onLogin={handleLogin} onNavigate={(p: any) => setCurrentScreen(p)} />
           )}
       </PublicLayout>
-  );
+  )
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900 flex">
@@ -262,7 +266,7 @@ export default function App() {
             {user.role === 'PARENT' ? (
                <>
                   {currentScreen === 'dashboard' && <DashboardScreen user={user} viewingStudentName={linkedStudentData?.studentName} progress={linkedStudentData?.progress || {}} testAttempts={linkedStudentData?.tests || []} goals={[]} addGoal={()=>{}} toggleGoal={()=>{}} setScreen={setCurrentScreen} />}
-                  {currentScreen === 'family' && <ParentFamilyScreen user={user} onSendRequest={async (id) => { const res = await fetch('/api/send_request.php', { method: 'POST', body: JSON.stringify({ action: 'send', student_identifier: id, parent_id: user.id, parent_name: user.name }) }); return await res.json(); }} linkedData={linkedStudentData} />}
+                  {currentScreen === 'family' && <ParentFamilyScreen user={user} onSendRequest={async (id) => { const res = await fetch('/api/send_request.php', { method: 'POST', body: JSON.stringify({ action: 'send', student_identifier: id, parent_id: user.id, parent_name: user.name }) }); return await res.json() }} linkedData={linkedStudentData} />}
                   {currentScreen === 'analytics' && <AnalyticsScreen user={user} viewingStudentName={linkedStudentData?.studentName} progress={linkedStudentData?.progress || {}} testAttempts={linkedStudentData?.tests || []} />}
                   {currentScreen === 'tests' && <TestScreen user={user} history={linkedStudentData?.tests || []} addTestAttempt={()=>{}} availableTests={adminTests} />}
                   {currentScreen === 'syllabus' && <SyllabusScreen user={user} viewingStudentName={linkedStudentData?.studentName} subjects={syllabus} progress={linkedStudentData?.progress || {}} onUpdateProgress={()=>{}} readOnly={true} summaryOnly={true} />}

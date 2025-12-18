@@ -106,7 +106,7 @@ export const SyllabusScreen: React.FC<SyllabusTrackerProps> = ({
       nextRevisionDate: null,
       solvedQuestions: []
     };
-  };
+  }
 
   const TopicDetailView = ({ topic, onClose }: { topic: Topic, onClose: () => void }) => {
       const [activeTab, setActiveTab] = useState<'NOTES' | 'VIDEOS' | 'PRACTICE'>('PRACTICE');
@@ -134,7 +134,7 @@ export const SyllabusScreen: React.FC<SyllabusTrackerProps> = ({
           if (optionIdx === correctIdx && onToggleQuestion) {
               onToggleQuestion(topic.id, qId);
           }
-      };
+      }
 
       return (
           <div className="fixed inset-0 z-50 bg-slate-50 flex flex-col animate-in slide-in-from-right-4 duration-300">
@@ -169,7 +169,6 @@ export const SyllabusScreen: React.FC<SyllabusTrackerProps> = ({
                   )}
               </div>
 
-              {/* Tabs */}
               <div className="bg-white border-b border-slate-100 flex justify-center px-4">
                   <div className="flex gap-8">
                     {['PRACTICE', 'NOTES', 'VIDEOS'].map((tab) => (
@@ -314,8 +313,8 @@ export const SyllabusScreen: React.FC<SyllabusTrackerProps> = ({
                   </div>
               </div>
           </div>
-      );
-  };
+      )
+  }
 
   return (
     <div className="space-y-8 font-inter animate-in fade-in slide-in-from-bottom-4 relative">
@@ -343,7 +342,7 @@ export const SyllabusScreen: React.FC<SyllabusTrackerProps> = ({
         <div className="flex space-x-1 w-full md:w-auto overflow-x-auto no-scrollbar">
             {['ALL', 'phys', 'chem', 'math'].map((filter) => {
                 const labels: Record<string, string> = { 'ALL': 'All', 'phys': 'Physics', 'chem': 'Chemistry', 'math': 'Maths' };
-                return <button key={filter} onClick={() => setActiveSubjectFilter(filter)} className={`px-4 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap ${activeSubjectFilter === filter ? 'bg-slate-800 text-white shadow-md' : 'bg-white text-slate-500 hover:bg-slate-50 border border-slate-100'}`}>{labels[filter]}</button>;
+                return <button key={filter} onClick={() => setActiveSubjectFilter(filter)} className={`px-4 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap ${activeSubjectFilter === filter ? 'bg-slate-800 text-white shadow-md' : 'bg-white text-slate-500 hover:bg-slate-50 border border-slate-100'}`}>{labels[filter]}</button>
             })}
         </div>
       </div>
@@ -390,7 +389,7 @@ export const SyllabusScreen: React.FC<SyllabusTrackerProps> = ({
                                {!summaryOnly && <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-blue-500 transition-colors" />}
                            </div>
                         </div>
-                      );
+                      )
                     })}
                   </div>
                 </div>
@@ -399,5 +398,5 @@ export const SyllabusScreen: React.FC<SyllabusTrackerProps> = ({
         ))}
       </div>
     </div>
-  );
-};
+  )
+}
