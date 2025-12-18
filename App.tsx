@@ -1,3 +1,4 @@
+
 import React, { Component, useState, useEffect, useCallback, ErrorInfo, ReactNode, Suspense, lazy } from 'react';
 import { Navigation, MobileNavigation } from './components/Navigation';
 import { AITutorChat } from './components/AITutorChat';
@@ -11,7 +12,7 @@ import { SYLLABUS_DATA } from './lib/syllabusData';
 import { calculateNextRevision } from './lib/utils';
 import { MOCK_TESTS_DATA, generateInitialQuestionBank } from './lib/mockTestsData';
 
-// --- Lazy Loading Screens for Bundle Separation (v12.24) ---
+// --- Lazy Loading Screens for Bundle Separation (v12.25) ---
 const AuthScreen = lazy(() => import('./screens/AuthScreen').then(m => ({ default: m.AuthScreen })));
 const DashboardScreen = lazy(() => import('./screens/DashboardScreen').then(m => ({ default: m.DashboardScreen })));
 const AdminDashboardScreen = lazy(() => import('./screens/AdminDashboardScreen').then(m => ({ default: m.AdminDashboardScreen })));

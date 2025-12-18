@@ -1,3 +1,4 @@
+
 import { MOCK_TESTS_DATA, generateInitialQuestionBank } from '../lib/mockTestsData';
 import { SYLLABUS_DATA } from '../lib/syllabusData';
 
@@ -54,7 +55,7 @@ try {
     {
         name: 'index.php',
         folder: 'deployment/api',
-        content: `${phpHeader} echo json_encode(["status" => "active", "version" => "12.24", "engine" => "IITGEE_PROD"]); ?>`
+        content: `${phpHeader} echo json_encode(["status" => "active", "version" => "12.25", "engine" => "IITGEE_PROD"]); ?>`
     },
     {
         name: 'login.php',
@@ -372,7 +373,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $data = json_decode(file_get_contents('php://input'));
     $stmt = $conn->prepare("INSERT INTO mistake_logs (id, user_id, question, subject, note, date) VALUES (?, ?, ?, ?, ?, ?)");
-    $stmt->execute([$data->id, $data->user_id, $data->question, $data->subject, $data->note, $data->date]);
+    $stmt->execute([$id, $data->user_id, $data->question, $data->subject, $data->note, $data->date]);
     echo json_encode(["status" => "success"]);
 } elseif ($_SERVER['REQUEST_METHOD'] == 'DELETE') {
     $id = $_GET['id'];
@@ -451,7 +452,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET') {
 try {
     $stats = [];
     $stats['totalUsers'] = $conn->query("SELECT COUNT(*) FROM users")->fetchColumn();
-    $stats['totalVisits'] = $conn->query("SELECT SUM(count) FROM analytics_visits")->fetchColumn() ?: 0;
+    $stats['totalVisits'] = $conn->query("SUM(count) FROM analytics_visits")->fetchColumn() ?: 0;
     $stmt = $conn->query("SELECT date, count as visits FROM analytics_visits ORDER BY date DESC LIMIT 7");
     $stats['dailyTraffic'] = array_reverse($stmt->fetchAll(PDO::FETCH_ASSOC));
     echo json_encode($stats);
@@ -703,7 +704,7 @@ Options -Indexes
 `;
 
 export const generateSQLSchema = () => {
-    let sql = `-- IITGEEPrep Complete Database Export v12.24\n`;
+    let sql = `-- IITGEEPrep Complete Database Export v12.25\n`;
     sql += `SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO"; START TRANSACTION; SET time_zone = "+00:00";\n\n`;
     
     const tables = [

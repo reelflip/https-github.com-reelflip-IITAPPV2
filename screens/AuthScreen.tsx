@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { User, Role, SocialConfig } from '../lib/types';
 import { COACHING_INSTITUTES, TARGET_YEARS, TARGET_EXAMS } from '../lib/constants';
@@ -458,7 +459,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate }) =
               <button onClick={() => onNavigate('contact')} className="hover:text-blue-600 transition-colors">Contact</button>
               <button onClick={() => onNavigate('privacy')} className="hover:text-blue-600 transition-colors">Privacy Policy</button>
           </div>
-          <p className="text-center mt-6 text-[9px] font-medium text-slate-300 uppercase tracking-[0.3em]">&copy; {new Date().getFullYear()} IITGEEPrep • STABLE v12.24</p>
+          <p className="text-center mt-6 text-[9px] font-medium text-slate-300 uppercase tracking-[0.3em]">&copy; {new Date().getFullYear()} IITGEEPrep • STABLE v12.25</p>
       </footer>
     </div>
   );

@@ -1,3 +1,4 @@
+
 import { User, TestAttempt, Role, Screen } from '../lib/types';
 
 export interface TestResult {
@@ -51,7 +52,7 @@ export class E2ETestRunner {
 
     public downloadJSONReport() {
         const report = {
-            metadata: { appName: "IITGEEPrep", version: "12.24", generatedAt: new Date().toISOString() },
+            metadata: { appName: "IITGEEPrep", version: "12.25", generatedAt: new Date().toISOString() },
             summary: {
                 totalTests: this.logs.length,
                 passed: this.logs.filter(l => l.status === 'PASS').length,
@@ -63,13 +64,13 @@ export class E2ETestRunner {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `IITGEEPrep_Diagnostic_Audit_v12_24.json`;
+        a.download = `IITGEEPrep_Diagnostic_Audit_v12_25.json`;
         a.click();
     }
 
     async runFullAudit() {
         this.logs = [];
-        this.log("START", "Comprehensive Multi-Role Audit Initialized (v12.24)", "PASS");
+        this.log("START", "Comprehensive Multi-Role Audit Initialized (v12.25)", "PASS");
 
         // --- SECTION 1: SYSTEM HEALTH (26 TESTS) ---
         this.log("H.01", "API Root Endpoint Connectivity", "RUNNING");

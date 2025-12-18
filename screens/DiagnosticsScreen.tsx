@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useMemo } from 'react';
 import { ShieldCheck, RefreshCw, Activity, Terminal, Download, HeartPulse, Play, FileJson, AlertTriangle, CheckCircle2, XCircle, Beaker, Shield, UserCheck, Database, Server } from 'lucide-react';
 import { E2ETestRunner, TestResult } from '../services/testRunnerService';
@@ -61,10 +62,10 @@ export const DiagnosticsScreen: React.FC = () => {
                     <div className="flex-1">
                         <div className="flex items-center gap-3 mb-2">
                             <Beaker className="w-8 h-8 text-blue-400" />
-                            <h2 className="text-3xl font-black tracking-tight uppercase">Integrity Audit v12.23</h2>
+                            <h2 className="text-3xl font-black tracking-tight uppercase">Integrity Audit v12.25</h2>
                         </div>
                         <p className="text-slate-400 text-sm max-w-xl">
-                            Comprehensive 43-point scan verifying server reliability, database schema compliance, advanced tool persistence, and cross-role screen accessibility.
+                            Comprehensive points scan verifying server reliability, database schema compliance, advanced tool persistence, and cross-role screen accessibility.
                         </p>
                     </div>
                     <div className="flex gap-3 shrink-0">
@@ -83,7 +84,7 @@ export const DiagnosticsScreen: React.FC = () => {
                     <div className="mt-8 grid grid-cols-2 md:grid-cols-5 gap-4 animate-in slide-in-from-top-4">
                         <div className="bg-white/5 border border-white/10 p-4 rounded-2xl text-center">
                             <span className="text-slate-400 text-[10px] font-black uppercase tracking-widest block">Total Scan</span>
-                            <span className="text-2xl font-bold text-white">{stats.total} / 43</span>
+                            <span className="text-2xl font-bold text-white">{stats.total} / 51</span>
                         </div>
                         <div className="bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-2xl text-center">
                             <span className="text-emerald-400 text-[10px] font-black uppercase tracking-widest block">Passed</span>
@@ -110,7 +111,7 @@ export const DiagnosticsScreen: React.FC = () => {
                         <div className="space-y-3">
                             <div className="flex justify-between items-center p-3 bg-slate-50 rounded-xl">
                                 <span className="text-sm font-medium text-slate-600">Runtime Version</span>
-                                <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-bold rounded uppercase">12.23</span>
+                                <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-bold rounded uppercase">12.25</span>
                             </div>
                             <div className="flex justify-between items-center p-3 bg-slate-50 rounded-xl">
                                 <span className="text-sm font-medium text-slate-600">Database</span>
