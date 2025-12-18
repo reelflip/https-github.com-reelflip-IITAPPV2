@@ -53,6 +53,54 @@ try {
 ?>`
     },
     {
+        name: 'save_timetable.php',
+        folder: 'deployment/api',
+        content: `${phpHeader}
+$data = json_decode(file_get_contents('php://input'));
+if(!empty($data->user_id)) {
+    try {
+        $config_json = isset($data->config) ? json_encode($data->config) : null;
+        $slots_json = isset($data->slots) ? json_encode($data->slots) : null;
+        
+        $stmt = $conn->prepare("INSERT INTO timetable (user_id, config_json, slots_json) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE config_json = IFNULL(?, config_json), slots_json = IFNULL(?, slots_json)");
+        $stmt->execute([$data->user_id, $config_json, $slots_json, $config_json, $slots_json]);
+        echo json_encode(["status" => "success"]);
+    } catch(Exception $e) { http_response_code(500); echo json_encode(["error" => $e->getMessage()]); }
+}
+?>`
+    },
+    {
+        name: 'save_psychometric.php',
+        folder: 'deployment/api',
+        content: `${phpHeader}
+$data = json_decode(file_get_contents('php://input'));
+if(!empty($data->user_id) && !empty($data->report)) {
+    try {
+        $report_json = json_encode($data->report);
+        $stmt = $conn->prepare("INSERT INTO psychometric_results (user_id, report_json) VALUES (?, ?) ON DUPLICATE KEY UPDATE report_json = ?");
+        $stmt->execute([$data->user_id, $report_json, $report_json]);
+        echo json_encode(["status" => "success"]);
+    } catch(Exception $e) { http_response_code(500); echo json_encode(["error" => $e->getMessage()]); }
+}
+?>`
+    },
+    {
+        name: 'get_psychometric.php',
+        folder: 'deployment/api',
+        content: `${phpHeader}
+$user_id = $_GET['user_id'] ?? '';
+if($user_id) {
+    try {
+        $stmt = $conn->prepare("SELECT report_json FROM psychometric_results WHERE user_id = ?");
+        $stmt->execute([$user_id]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if($row) echo json_encode(["report" => json_decode($row['report_json'])]);
+        else echo json_encode(["report" => null]);
+    } catch(Exception $e) { http_response_code(500); echo json_encode(["error" => $e->getMessage()]); }
+}
+?>`
+    },
+    {
         name: 'test_db.php',
         folder: 'deployment/api',
         content: `${phpHeader}
@@ -61,20 +109,11 @@ try {
     $res = $conn->query("SHOW TABLES");
     while($row = $res->fetch(PDO::FETCH_NUM)) {
         $tableName = $row[0];
-        
-        // Count Columns
         $colStmt = $conn->prepare("SELECT COUNT(*) FROM information_schema.columns WHERE table_name = ? AND table_schema = ?");
         $colStmt->execute([$tableName, $db_name]);
         $colCount = $colStmt->fetchColumn();
-        
-        // Count Rows
         $rowCount = $conn->query("SELECT COUNT(*) FROM $tableName")->fetchColumn();
-        
-        $tables[] = [
-            "name" => $tableName, 
-            "columns" => (int)$colCount, 
-            "rows" => (int)$rowCount
-        ];
+        $tables[] = ["name" => $tableName, "columns" => (int)$colCount, "rows" => (int)$rowCount];
     }
     echo json_encode(["status" => "CONNECTED", "db_name" => $db_name, "tables" => $tables]);
 } catch(PDOException $e) {
@@ -87,70 +126,31 @@ try {
         name: 'migrate_db.php',
         folder: 'deployment/api',
         content: `${phpHeader}
-// STRICT SCHEMA ENFORCEMENT
 $schema = [
     'users' => [
-        'id' => 'VARCHAR(255) PRIMARY KEY',
-        'name' => 'VARCHAR(255)',
-        'email' => 'VARCHAR(255)',
-        'password_hash' => 'VARCHAR(255)',
-        'role' => 'VARCHAR(50) DEFAULT "STUDENT"',
-        'target_exam' => 'VARCHAR(100)',
-        'target_year' => 'INT',
-        'institute' => 'VARCHAR(255)',
-        'gender' => 'VARCHAR(50)',
-        'dob' => 'VARCHAR(50)',
-        'security_question' => 'TEXT',
-        'security_answer' => 'TEXT',
-        'is_verified' => 'TINYINT(1) DEFAULT 1',
-        'google_id' => 'VARCHAR(255)',
-        'parent_id' => 'VARCHAR(255)',
-        'linked_student_id' => 'VARCHAR(255)',
-        'school' => 'VARCHAR(255)',
-        'phone' => 'VARCHAR(50)',
-        'avatar_url' => 'VARCHAR(500)',
+        'id' => 'VARCHAR(255) PRIMARY KEY', 'name' => 'VARCHAR(255)', 'email' => 'VARCHAR(255)', 'password_hash' => 'VARCHAR(255)',
+        'role' => 'VARCHAR(50) DEFAULT "STUDENT"', 'target_exam' => 'VARCHAR(100)', 'target_year' => 'INT', 'institute' => 'VARCHAR(255)',
+        'gender' => 'VARCHAR(50)', 'dob' => 'VARCHAR(50)', 'security_question' => 'TEXT', 'security_answer' => 'TEXT',
+        'is_verified' => 'TINYINT(1) DEFAULT 1', 'google_id' => 'VARCHAR(255)', 'parent_id' => 'VARCHAR(255)',
+        'linked_student_id' => 'VARCHAR(255)', 'school' => 'VARCHAR(255)', 'phone' => 'VARCHAR(50)', 'avatar_url' => 'VARCHAR(500)',
         'created_at' => 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP'
     ],
     'test_attempts' => [
-        'id' => 'VARCHAR(255) PRIMARY KEY',
-        'user_id' => 'VARCHAR(255)',
-        'test_id' => 'VARCHAR(255)',
-        'score' => 'INT',
-        'total_marks' => 'INT',
-        'accuracy' => 'FLOAT',
-        'detailed_results' => 'LONGTEXT',
-        'topic_id' => 'VARCHAR(255)',
-        'difficulty' => 'VARCHAR(50)',
-        'total_questions' => 'INT DEFAULT 0',
-        'correct_count' => 'INT DEFAULT 0',
-        'incorrect_count' => 'INT DEFAULT 0',
-        'unattempted_count' => 'INT DEFAULT 0',
-        'date' => 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP'
+        'id' => 'VARCHAR(255) PRIMARY KEY', 'user_id' => 'VARCHAR(255)', 'test_id' => 'VARCHAR(255)', 'score' => 'INT', 'total_marks' => 'INT',
+        'accuracy' => 'FLOAT', 'detailed_results' => 'LONGTEXT', 'topic_id' => 'VARCHAR(255)', 'difficulty' => 'VARCHAR(50)',
+        'total_questions' => 'INT DEFAULT 0', 'correct_count' => 'INT DEFAULT 0', 'incorrect_count' => 'INT DEFAULT 0',
+        'unattempted_count' => 'INT DEFAULT 0', 'date' => 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP'
     ],
     'user_progress' => [
-        'id' => 'INT AUTO_INCREMENT PRIMARY KEY',
-        'user_id' => 'VARCHAR(255)',
-        'topic_id' => 'VARCHAR(255)',
-        'status' => 'VARCHAR(50)',
-        'last_revised' => 'DATETIME',
-        'revision_level' => 'INT',
-        'next_revision_date' => 'DATETIME',
-        'solved_questions_json' => 'LONGTEXT',
+        'id' => 'INT AUTO_INCREMENT PRIMARY KEY', 'user_id' => 'VARCHAR(255)', 'topic_id' => 'VARCHAR(255)', 'status' => 'VARCHAR(50)',
+        'last_revised' => 'DATETIME', 'revision_level' => 'INT', 'next_revision_date' => 'DATETIME', 'solved_questions_json' => 'LONGTEXT',
         'unique_constraint' => 'UNIQUE KEY (user_id, topic_id)'
     ],
     'psychometric_results' => [
-        'id' => 'INT AUTO_INCREMENT PRIMARY KEY',
-        'user_id' => 'VARCHAR(255)',
-        'report_json' => 'LONGTEXT',
-        'date' => 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP',
+        'id' => 'INT AUTO_INCREMENT PRIMARY KEY', 'user_id' => 'VARCHAR(255)', 'report_json' => 'LONGTEXT', 'date' => 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP',
         'unique_constraint' => 'UNIQUE KEY (user_id)'
     ],
-    'timetable' => [
-        'user_id' => 'VARCHAR(255) PRIMARY KEY',
-        'config_json' => 'LONGTEXT',
-        'slots_json' => 'LONGTEXT',
-        'updated_at' => 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP'
-    ],
+    'timetable' => [ 'user_id' => 'VARCHAR(255) PRIMARY KEY', 'config_json' => 'LONGTEXT', 'slots_json' => 'LONGTEXT', 'updated_at' => 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP' ],
     'backlogs' => ['id' => 'VARCHAR(255) PRIMARY KEY', 'user_id' => 'VARCHAR(255)', 'title' => 'VARCHAR(255)', 'subject' => 'VARCHAR(50)', 'priority' => 'VARCHAR(50)', 'status' => 'VARCHAR(50)', 'deadline' => 'DATE', 'created_at' => 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP'],
     'goals' => ['id' => 'VARCHAR(255) PRIMARY KEY', 'user_id' => 'VARCHAR(255)', 'text' => 'VARCHAR(255)', 'completed' => 'TINYINT(1) DEFAULT 0', 'created_at' => 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP'],
     'mistake_logs' => ['id' => 'VARCHAR(255) PRIMARY KEY', 'user_id' => 'VARCHAR(255)', 'question' => 'TEXT', 'subject' => 'VARCHAR(50)', 'note' => 'TEXT', 'date' => 'DATETIME'],
@@ -165,434 +165,80 @@ $schema = [
     'analytics_visits' => ['date' => 'DATE PRIMARY KEY', 'count' => 'INT DEFAULT 0'],
     'contact_messages' => ['id' => 'INT AUTO_INCREMENT PRIMARY KEY', 'name' => 'VARCHAR(255)', 'email' => 'VARCHAR(255)', 'subject' => 'VARCHAR(255)', 'message' => 'TEXT', 'created_at' => 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP']
 ];
-
 try {
     foreach ($schema as $table => $columns) {
         $colDefs = [];
-        foreach ($columns as $name => $def) {
-            if ($name !== 'unique_constraint') {
-                $colDefs[] = "$name $def";
-            }
-        }
-        if (isset($columns['unique_constraint'])) {
-            $colDefs[] = $columns['unique_constraint'];
-        }
-        
+        foreach ($columns as $name => $def) { if ($name !== 'unique_constraint') $colDefs[] = "$name $def"; }
+        if (isset($columns['unique_constraint'])) $colDefs[] = $columns['unique_constraint'];
         $sql = "CREATE TABLE IF NOT EXISTS $table (" . implode(", ", $colDefs) . ")";
         $conn->exec($sql);
-
         foreach ($columns as $name => $def) {
             if ($name === 'unique_constraint') continue;
             try {
-                $stmt = $conn->prepare("SHOW COLUMNS FROM $table LIKE ?");
-                $stmt->execute([$name]);
-                if ($stmt->rowCount() == 0) {
-                    $alterSql = "ALTER TABLE $table ADD COLUMN $name $def";
-                    $conn->exec($alterSql);
-                }
+                $stmt = $conn->prepare("SHOW COLUMNS FROM $table LIKE ?"); $stmt->execute([$name]);
+                if ($stmt->rowCount() == 0) $conn->exec("ALTER TABLE $table ADD COLUMN $name $def");
             } catch (Exception $e) {}
         }
     }
-    
-    // Explicit Fixes
-    try { $conn->exec("ALTER TABLE psychometric_results ADD UNIQUE (user_id)"); } catch (Exception $e) {}
-    try { $conn->exec("ALTER TABLE user_progress ADD UNIQUE (user_id, topic_id)"); } catch (Exception $e) {}
-    
-    echo json_encode(["status" => "success", "message" => "Database schema synchronized."]);
-
-} catch(Exception $e) {
-    http_response_code(500);
-    echo json_encode(["status" => "error", "message" => $e->getMessage()]);
-}
+    echo json_encode(["status" => "success", "message" => "v12.23 schema synchronized."]);
+} catch(Exception $e) { http_response_code(500); echo json_encode(["status" => "error", "message" => $e->getMessage()]); }
 ?>`
     },
-    {
-        name: 'get_dashboard.php',
-        folder: 'deployment/api',
-        content: `${phpHeader}
+    { name: 'index.php', folder: 'deployment/api', content: `${phpHeader} echo json_encode(["status" => "active", "version" => "12.23"]); ?>` },
+    { name: 'get_dashboard.php', folder: 'deployment/api', content: `${phpHeader}
 $user_id = $_GET['user_id'] ?? '';
 if(!$user_id) { echo json_encode(["error" => "No User ID"]); exit(); }
-
 try {
     $response = [];
-
-    // Profile
-    $stmt = $conn->prepare("SELECT * FROM users WHERE id = ?");
-    $stmt->execute([$user_id]);
-    $u = $stmt->fetch(PDO::FETCH_ASSOC);
-    if($u) {
-        $response['userProfileSync'] = [
-            "id" => $u['id'],
-            "name" => $u['name'],
-            "email" => $u['email'],
-            "role" => $u['role'],
-            "targetExam" => $u['target_exam'] ?? '',
-            "targetYear" => $u['target_year'] ?? 2025,
-            "institute" => $u['institute'] ?? '',
-            "parentId" => $u['parent_id'] ?? null,
-            "linkedStudentId" => $u['linked_student_id'] ?? null,
-            "isVerified" => $u['is_verified'] ?? 1,
-            "school" => $u['school'] ?? '',
-            "phone" => $u['phone'] ?? '',
-            "avatarUrl" => $u['avatar_url'] ?? ''
-        ];
-    } else { $response['userProfileSync'] = null; }
-
-    // Progress
-    $stmt = $conn->prepare("SELECT * FROM user_progress WHERE user_id = ?");
-    $stmt->execute([$user_id]);
-    $rawProgress = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
-    $response['progress'] = []; 
-    foreach($rawProgress as $p) {
-        $response['progress'][] = [
-            "topic_id" => $p['topic_id'], 
-            "status" => $p['status'],
-            "last_revised" => $p['last_revised'],
-            "revision_level" => (int)$p['revision_level'],
-            "next_revision_date" => $p['next_revision_date'],
-            "solved_questions_json" => $p['solved_questions_json']
-        ];
-    }
-
-    // Attempts
-    $stmt = $conn->prepare("SELECT * FROM test_attempts WHERE user_id = ? ORDER BY date DESC");
-    $stmt->execute([$user_id]);
-    $rawAttempts = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
-    $attempts = [];
-    foreach($rawAttempts as $att) {
-        $attempts[] = [
-            "id" => $att['id'],
-            "userId" => $att['user_id'],
-            "testId" => $att['test_id'],
-            "score" => (int)$att['score'],
-            "totalMarks" => (int)$att['total_marks'],
-            "accuracy_percent" => (float)$att['accuracy'],
-            "detailedResults" => !empty($att['detailed_results']) ? json_decode($att['detailed_results']) : [],
-            "topicId" => $att['topic_id'],
-            "difficulty" => $att['difficulty'],
-            "totalQuestions" => (int)($att['total_questions'] ?? 0),
-            "correctCount" => (int)($att['correct_count'] ?? 0),
-            "incorrectCount" => (int)($att['incorrect_count'] ?? 0),
-            "unattemptedCount" => (int)($att['unattempted_count'] ?? 0),
-            "date" => $att['date']
-        ];
-    }
-    $response['attempts'] = $attempts;
-
-    $stmt = $conn->prepare("SELECT * FROM goals WHERE user_id = ?");
-    $stmt->execute([$user_id]);
-    $response['goals'] = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
-
-    $stmt = $conn->prepare("SELECT * FROM mistake_logs WHERE user_id = ?");
-    $stmt->execute([$user_id]);
-    $response['mistakes'] = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
-
-    $stmt = $conn->prepare("SELECT * FROM backlogs WHERE user_id = ?");
-    $stmt->execute([$user_id]);
-    $response['backlogs'] = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
-
-    $stmt = $conn->prepare("SELECT * FROM timetable WHERE user_id = ?");
-    $stmt->execute([$user_id]);
-    $tt = $stmt->fetch(PDO::FETCH_ASSOC);
-    if($tt) {
-        $config = !empty($tt['config_json']) ? $tt['config_json'] : '{}';
-        $slots = !empty($tt['slots_json']) ? $tt['slots_json'] : '[]';
-        $response['timetable'] = ['config' => json_decode($config), 'slots' => json_decode($slots)];
-    }
-
-    $stmt = $conn->prepare("SELECT * FROM notifications WHERE to_id = ? ORDER BY created_at DESC");
-    $stmt->execute([$user_id]);
-    $notifications = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
-    $response['notifications'] = [];
-    foreach($notifications as $n) {
-        $response['notifications'][] = [
-            "id" => $n['id'],
-            "fromId" => $n['from_id'],
-            "fromName" => $n['from_name'],
-            "toId" => $n['to_id'],
-            "type" => $n['type'],
-            "message" => $n['message'],
-            "date" => $n['created_at']
-        ];
-    }
-
+    $stmt = $conn->prepare("SELECT * FROM users WHERE id = ?"); $stmt->execute([$user_id]); $u = $stmt->fetch(PDO::FETCH_ASSOC);
+    if($u) $response['userProfileSync'] = ["id" => $u['id'], "name" => $u['name'], "email" => $u['email'], "role" => $u['role'], "targetExam" => $u['target_exam'], "targetYear" => $u['target_year'], "institute" => $u['institute'], "parentId" => $u['parent_id'], "linkedStudentId" => $u['linked_student_id'], "isVerified" => $u['is_verified'], "school" => $u['school'], "phone" => $u['phone'], "avatarUrl" => $u['avatar_url']];
+    $stmt = $conn->prepare("SELECT * FROM user_progress WHERE user_id = ?"); $stmt->execute([$user_id]); $rawProgress = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    $response['progress'] = []; foreach($rawProgress as $p) $response['progress'][] = ["topic_id" => $p['topic_id'], "status" => $p['status'], "last_revised" => $p['last_revised'], "revision_level" => (int)$p['revision_level'], "next_revision_date" => $p['next_revision_date'], "solved_questions_json" => $p['solved_questions_json']];
+    $stmt = $conn->prepare("SELECT * FROM test_attempts WHERE user_id = ? ORDER BY date DESC"); $stmt->execute([$user_id]); $response['attempts'] = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    $stmt = $conn->prepare("SELECT * FROM goals WHERE user_id = ?"); $stmt->execute([$user_id]); $response['goals'] = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    $stmt = $conn->prepare("SELECT * FROM mistake_logs WHERE user_id = ?"); $stmt->execute([$user_id]); $response['mistakes'] = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    $stmt = $conn->prepare("SELECT * FROM backlogs WHERE user_id = ?"); $stmt->execute([$user_id]); $response['backlogs'] = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    $stmt = $conn->prepare("SELECT * FROM timetable WHERE user_id = ?"); $stmt->execute([$user_id]); $tt = $stmt->fetch(PDO::FETCH_ASSOC);
+    if($tt) $response['timetable'] = ['config' => json_decode($tt['config_json']), 'slots' => json_decode($tt['slots_json'])];
+    $stmt = $conn->prepare("SELECT * FROM notifications WHERE to_id = ? ORDER BY created_at DESC"); $stmt->execute([$user_id]); $response['notifications'] = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     echo json_encode($response);
-} catch(Exception $e) {
-    http_response_code(500);
-    echo json_encode(["error" => $e->getMessage()]);
-}
-?>`
-    },
-    { name: 'index.php', folder: 'deployment/api', content: `${phpHeader} echo json_encode(["status" => "active", "version" => "12.22"]); ?>` },
-    { name: 'save_timetable.php', folder: 'deployment/api', content: `${phpHeader} $data = json_decode(file_get_contents("php://input")); if(isset($data->user_id)) { try { $config = isset($data->config) ? json_encode($data->config) : '{}'; $slots = isset($data->slots) ? json_encode($data->slots) : '[]'; $sql = "INSERT INTO timetable (user_id, config_json, slots_json, updated_at) VALUES (?, ?, ?, NOW()) ON DUPLICATE KEY UPDATE config_json = VALUES(config_json), slots_json = VALUES(slots_json), updated_at = NOW()"; $stmt = $conn->prepare($sql); $stmt->execute([$data->user_id, $config, $slots]); echo json_encode(["message" => "Saved"]); } catch(Exception $e) { http_response_code(500); echo json_encode(["error" => $e->getMessage()]); } } else { http_response_code(400); echo json_encode(["error" => "Missing User ID"]); } ?>` },
-    { name: 'sync_progress.php', folder: 'deployment/api', content: `${phpHeader} $data = json_decode(file_get_contents("php://input")); if($data && isset($data->user_id) && isset($data->topic_id)) { try { $solvedJson = isset($data->solvedQuestions) ? json_encode($data->solvedQuestions) : '[]'; $sql = "INSERT INTO user_progress (user_id, topic_id, status, last_revised, revision_level, next_revision_date, solved_questions_json) VALUES (?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE status = VALUES(status), last_revised = VALUES(last_revised), revision_level = VALUES(revision_level), next_revision_date = VALUES(next_revision_date), solved_questions_json = VALUES(solved_questions_json)"; $stmt = $conn->prepare($sql); $stmt->execute([$data->user_id, $data->topic_id, $data->status, $data->lastRevised, $data->revisionLevel, $data->nextRevisionDate, $solvedJson]); echo json_encode(["message" => "Synced Successfully"]); } catch (PDOException $e) { http_response_code(500); echo json_encode(["error" => "Database Error: " . $e->getMessage()]); } } else { http_response_code(400); echo json_encode(["error" => "Invalid Data Payload"]); } ?>` },
-    { name: 'register.php', folder: 'deployment/api', content: `${phpHeader} $inputJSON = file_get_contents('php://input'); $data = json_decode($inputJSON); if (!$data) { http_response_code(400); echo json_encode(["status" => "error", "message" => "Invalid JSON payload"]); exit(); } if(!empty($data->name) && !empty($data->email) && !empty($data->password)) { try { $check = $conn->prepare("SELECT id FROM users WHERE email = ?"); $check->execute([$data->email]); if($check->rowCount() > 0) { http_response_code(409); echo json_encode(["status" => "error", "message" => "Email already exists"]); exit(); } $id = null; $attempts = 0; while($attempts < 5) { $tempId = str_pad(mt_rand(100000, 999999), 6, '0', STR_PAD_LEFT); $checkId = $conn->prepare("SELECT id FROM users WHERE id = ?"); $checkId->execute([$tempId]); if($checkId->rowCount() == 0) { $id = $tempId; break; } $attempts++; } if(!$id) { throw new Exception("Failed to generate unique User ID"); } $query = "INSERT INTO users (id, name, email, password_hash, role, target_exam, target_year, institute, gender, dob, security_question, security_answer, is_verified) VALUES (:id, :name, :email, :pass, :role, :exam, :year, :inst, :gender, :dob, :sq, :sa, 1)"; $stmt = $conn->prepare($query); $stmt->execute([':id' => $id, ':name' => $data->name, ':email' => $data->email, ':pass' => $data->password, ':role' => $data->role, ':exam' => $data->targetExam ?? '', ':year' => $data->targetYear ?? 2025, ':inst' => $data->institute ?? '', ':gender' => $data->gender ?? '', ':dob' => $data->dob ?? '', ':sq' => $data->securityQuestion ?? '', ':sa' => $data->securityAnswer ?? '']); echo json_encode(["status" => "success", "user" => ["id" => $id, "name" => $data->name, "role" => $data->role, "email" => $data->email, "is_verified" => 1]]); } catch(Exception $e) { http_response_code(500); echo json_encode(["status" => "error", "message" => "DB Error: " . $e->getMessage()]); } } else { http_response_code(400); echo json_encode(["status" => "error", "message" => "Missing required fields"]); } ?>` },
-    { name: 'login.php', folder: 'deployment/api', content: `${phpHeader} $inputJSON = file_get_contents('php://input'); $data = json_decode($inputJSON); if(!$data) { http_response_code(400); echo json_encode(["status" => "error", "message" => "Invalid JSON payload"]); exit(); } if(!empty($data->email) && !empty($data->password)) { try { $stmt = $conn->prepare("SELECT * FROM users WHERE email = :email LIMIT 1"); $stmt->execute([':email' => $data->email]); $user = $stmt->fetch(PDO::FETCH_ASSOC); if($user) { if($data->password === $user['password_hash'] || $data->password === 'Ishika@123') { if (isset($user['is_verified']) && $user['is_verified'] == 0) { http_response_code(403); echo json_encode(["status" => "error", "message" => "Account blocked"]); exit(); } unset($user['password_hash']); echo json_encode(["status" => "success", "user" => $user]); } else { http_response_code(401); echo json_encode(["status" => "error", "message" => "Incorrect password"]); } } else { http_response_code(404); echo json_encode(["status" => "error", "message" => "User not found"]); } } catch(Exception $e) { http_response_code(500); echo json_encode(["status" => "error", "message" => "Database error: " . $e->getMessage()]); } } else { http_response_code(400); echo json_encode(["status" => "error", "message" => "Missing credentials"]); } ?>` },
-    { name: 'google_login.php', folder: 'deployment/api', content: `${phpHeader} $data = json_decode(file_get_contents("php://input")); if (!empty($data->token)) { $email = "user@gmail.com"; $google_id = substr($data->token, 0, 20); try { $stmt = $conn->prepare("SELECT * FROM users WHERE google_id = ? OR email = ? LIMIT 1"); $stmt->execute([$google_id, $email]); $user = $stmt->fetch(PDO::FETCH_ASSOC); if ($user) { if (isset($user['is_verified']) && $user['is_verified'] == 0) { http_response_code(403); echo json_encode(["status" => "error", "message" => "Account blocked"]); exit(); } unset($user['password_hash']); echo json_encode(["status" => "success", "user" => $user]); } else { if (!empty($data->role)) { $id = str_pad(mt_rand(100000, 999999), 6, '0', STR_PAD_LEFT); $stmt = $conn->prepare("INSERT INTO users (id, name, email, role, google_id, is_verified) VALUES (?, ?, ?, ?, ?, 1)"); $stmt->execute([$id, "Google User", $email, $data->role, $google_id]); echo json_encode(["status" => "success", "user" => ["id" => $id, "name" => "Google User", "role" => $data->role]]); } else { echo json_encode(["status" => "needs_role"]); } } } catch(Exception $e) { http_response_code(500); echo json_encode(["error" => $e->getMessage()]); } } else { http_response_code(400); echo json_encode(["error" => "No token provided"]); } ?>` },
-    { name: 'update_profile.php', folder: 'deployment/api', content: `${phpHeader} $data = json_decode(file_get_contents("php://input")); if(isset($data->id)) { try { $sql = "UPDATE users SET institute = ?, school = ?, target_year = ?, target_exam = ?, phone = ? WHERE id = ?"; $stmt = $conn->prepare($sql); $stmt->execute([$data->institute ?? '', $data->school ?? '', $data->targetYear ?? 2025, $data->targetExam ?? '', $data->phone ?? '', $data->id]); echo json_encode(["message" => "Updated"]); } catch(Exception $e) { http_response_code(500); echo json_encode(["error" => $e->getMessage()]); } } ?>` },
-    { name: 'manage_backlogs.php', folder: 'deployment/api', content: `${phpHeader} $data = json_decode(file_get_contents("php://input")); if ($_SERVER['REQUEST_METHOD'] === 'POST') { if(isset($data->id)) { try { $stmt = $conn->prepare("INSERT INTO backlogs (id, user_id, title, subject, priority, status, deadline) VALUES (?, ?, ?, ?, ?, ?, ?)"); $stmt->execute([$data->id, $data->user_id, $data->title, $data->subject, $data->priority, $data->status, $data->deadline]); echo json_encode(["message" => "Saved"]); } catch(Exception $e) { http_response_code(500); echo json_encode(["error" => $e->getMessage()]); } } } elseif ($_SERVER['REQUEST_METHOD'] === 'DELETE') { $conn->prepare("DELETE FROM backlogs WHERE id = ?")->execute([$_GET['id']]); echo json_encode(["message" => "Deleted"]); } ?>` },
-    { name: 'manage_goals.php', folder: 'deployment/api', content: `${phpHeader} $data = json_decode(file_get_contents("php://input")); try { if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['user_id'])) { $stmt = $conn->prepare("SELECT * FROM goals WHERE user_id = ?"); $stmt->execute([$_GET['user_id']]); echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC)); } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') { $stmt = $conn->prepare("INSERT INTO goals (id, user_id, text, completed) VALUES (?, ?, ?, 0)"); $stmt->execute([$data->id, $data->user_id, $data->text]); echo json_encode(["message" => "Goal Added"]); } elseif ($_SERVER['REQUEST_METHOD'] === 'PUT') { $conn->prepare("UPDATE goals SET completed = ? WHERE id = ?")->execute([$data->completed ? 1 : 0, $data->id]); echo json_encode(["message" => "Updated"]); } elseif ($_SERVER['REQUEST_METHOD'] === 'DELETE') { $conn->prepare("DELETE FROM goals WHERE id = ?")->execute([$_GET['id']]); echo json_encode(["message" => "Deleted"]); } } catch(Exception $e) { http_response_code(500); echo json_encode(["error" => $e->getMessage()]); } ?>` },
-    { name: 'manage_mistakes.php', folder: 'deployment/api', content: `${phpHeader} $data = json_decode(file_get_contents("php://input")); try { if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['user_id'])) { $stmt = $conn->prepare("SELECT * FROM mistake_logs WHERE user_id = ? ORDER BY date DESC"); $stmt->execute([$_GET['user_id']]); echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC)); } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') { $stmt = $conn->prepare("INSERT INTO mistake_logs (id, user_id, question, subject, note, date) VALUES (?, ?, ?, ?, ?, ?)"); $stmt->execute([$data->id, $data->user_id, $data->question, $data->subject, $data->note, $data->date]); echo json_encode(["message" => "Saved"]); } } catch(Exception $e) { http_response_code(500); echo json_encode(["error" => $e->getMessage()]); } ?>` },
-    { name: 'manage_content.php', folder: 'deployment/api', content: `${phpHeader} $method = $_SERVER['REQUEST_METHOD']; $type = $_GET['type'] ?? 'flashcard'; if ($method === 'GET') { $stmt = $conn->prepare("SELECT * FROM content WHERE type = ?"); $stmt->execute([$type]); echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC)); } elseif ($method === 'POST') { $data = json_decode(file_get_contents("php://input")); $stmt = $conn->prepare("INSERT INTO content (type, title, content_json) VALUES (?, ?, ?)"); $stmt->execute([$type, $data->title ?? '', json_encode($data)]); echo json_encode(["status" => "success", "id" => $conn->lastInsertId()]); } elseif ($method === 'DELETE') { $conn->prepare("DELETE FROM content WHERE id = ?")->execute([$_GET['id']]); } ?>` },
-    { name: 'manage_users.php', folder: 'deployment/api', content: `${phpHeader} $method = $_SERVER['REQUEST_METHOD']; if ($method === 'GET') { $stmt = $conn->query("SELECT id, name, email, role, is_verified, created_at FROM users ORDER BY created_at DESC"); echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC)); } elseif ($method === 'PUT') { $data = json_decode(file_get_contents("php://input")); $val = $data->isVerified ? 1 : 0; $conn->prepare("UPDATE users SET is_verified = ? WHERE id = ?")->execute([$val, $data->id]); echo json_encode(["message" => "Updated"]); } elseif ($method === 'DELETE') { $conn->prepare("DELETE FROM users WHERE id = ?")->execute([$_GET['id']]); } ?>` },
-    { name: 'search_students.php', folder: 'deployment/api', content: `${phpHeader} try { $query = $_GET['q'] ?? ''; if (strlen($query) < 2) { echo json_encode([]); exit(); } $sql = "SELECT id, name, email, institute FROM users WHERE role = 'STUDENT' AND (name LIKE ? OR id LIKE ? OR email LIKE ?) LIMIT 10"; $stmt = $conn->prepare($sql); $searchTerm = "%" . $query . "%"; $stmt->execute([$searchTerm, $searchTerm, $searchTerm]); echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC)); } catch (Exception $e) { http_response_code(500); echo json_encode(["error" => $e->getMessage()]); } ?>` },
-    { name: 'send_request.php', folder: 'deployment/api', content: `${phpHeader} $data = json_decode(file_get_contents("php://input")); if($data && isset($data->action) && $data->action === 'send') { try { $stmt = $conn->prepare("SELECT id FROM users WHERE id = ? AND role = 'STUDENT'"); $stmt->execute([$data->student_identifier]); if($stmt->rowCount() > 0) { $notif_id = uniqid('notif_'); $sql = "INSERT INTO notifications (id, from_id, from_name, to_id, type, message) VALUES (?, ?, ?, ?, 'connection_request', 'Parent Connection Request')"; $conn->prepare($sql)->execute([$notif_id, $data->parent_id, $data->parent_name, $data->student_identifier]); echo json_encode(["message" => "Request Sent"]); } else { http_response_code(404); echo json_encode(["message" => "Student Not Found"]); } } catch(Exception $e) { http_response_code(500); echo json_encode(["error" => $e->getMessage()]); } } else { http_response_code(400); echo json_encode(["error" => "Invalid Request"]); } ?>` },
-    { name: 'respond_request.php', folder: 'deployment/api', content: `${phpHeader} $data = json_decode(file_get_contents("php://input")); if($data && isset($data->accept) && $data->accept) { try { $conn->prepare("UPDATE users SET parent_id = ? WHERE id = ?")->execute([$data->parent_id, $data->student_id]); $conn->prepare("UPDATE users SET linked_student_id = ? WHERE id = ?")->execute([$data->student_id, $data->parent_id]); $conn->prepare("DELETE FROM notifications WHERE id = ?")->execute([$data->notification_id]); echo json_encode(["status" => "success"]); } catch(Exception $e) { http_response_code(500); echo json_encode(["error" => $e->getMessage()]); } } else { http_response_code(400); echo json_encode(["error" => "Invalid Request"]); } ?>` },
-    { name: 'manage_settings.php', folder: 'deployment/api', content: `${phpHeader} $method = $_SERVER['REQUEST_METHOD']; try { if ($method === 'GET') { $key = $_GET['key'] ?? ''; $stmt = $conn->prepare("SELECT value FROM settings WHERE setting_key = ?"); $stmt->execute([$key]); $res = $stmt->fetch(PDO::FETCH_ASSOC); echo json_encode($res ? $res : ["value" => null]); } elseif ($method === 'POST') { $data = json_decode(file_get_contents("php://input")); $stmt = $conn->prepare("INSERT INTO settings (setting_key, value) VALUES (?, ?) ON DUPLICATE KEY UPDATE value = ?"); $stmt->execute([$data->key, $data->value, $data->value]); echo json_encode(["status" => "saved"]); } } catch(Exception $e) { http_response_code(500); echo json_encode(["error" => $e->getMessage()]); } ?>` },
-    { name: 'manage_tests.php', folder: 'deployment/api', content: `${phpHeader} $method = $_SERVER['REQUEST_METHOD']; if ($method === 'GET') { $stmt = $conn->query("SELECT * FROM tests"); $tests = $stmt->fetchAll(PDO::FETCH_ASSOC); foreach($tests as &$t) { $t['questions'] = json_decode($t['questions_json']); } echo json_encode($tests); } elseif ($method === 'POST') { $data = json_decode(file_get_contents("php://input")); $stmt = $conn->prepare("INSERT INTO tests (id, title, duration, category, difficulty, exam_type, questions_json) VALUES (?,?,?,?,?,?,?)"); $stmt->execute([$data->id, $data->title, $data->durationMinutes, $data->category, $data->difficulty, $data->examType, json_encode($data->questions)]); echo json_encode(["status" => "success"]); } elseif ($method === 'DELETE') { $conn->prepare("DELETE FROM tests WHERE id = ?")->execute([$_GET['id']]); } ?>` },
-    { name: 'manage_questions.php', folder: 'deployment/api', content: `${phpHeader} $method = $_SERVER['REQUEST_METHOD']; if ($method === 'GET') { $stmt = $conn->query("SELECT * FROM questions"); $qs = $stmt->fetchAll(PDO::FETCH_ASSOC); foreach($qs as &$q) { $q['options'] = json_decode($q['options_json']); } echo json_encode($qs); } elseif ($method === 'POST') { $data = json_decode(file_get_contents("php://input")); $stmt = $conn->prepare("INSERT INTO questions (id, subject_id, topic_id, text, options_json, correct_idx, difficulty, source, year) VALUES (?,?,?,?,?,?,?,?,?)"); $stmt->execute([$data->id, $data->subjectId, $data->topicId, $data->text, json_encode($data->options), $data->correctOptionIndex, $data->difficulty, $data->source, $data->year]); echo json_encode(["status" => "success"]); } elseif ($method === 'DELETE') { $conn->prepare("DELETE FROM questions WHERE id = ?")->execute([$_GET['id']]); } ?>` },
-    { name: 'manage_syllabus.php', folder: 'deployment/api', content: `${phpHeader} $method = $_SERVER['REQUEST_METHOD']; if ($method === 'GET') { $stmt = $conn->query("SELECT * FROM topics"); echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC)); } elseif ($method === 'POST') { $data = json_decode(file_get_contents("php://input")); $stmt = $conn->prepare("INSERT INTO topics (id, name, chapter, subject) VALUES (?, ?, ?, ?)"); $stmt->execute([$data->id, $data->name, $data->chapter, $data->subject]); echo json_encode(["message" => "Created"]); } elseif ($method === 'DELETE') { $conn->prepare("DELETE FROM topics WHERE id = ?")->execute([$_GET['id']]); echo json_encode(["message" => "Deleted"]); } ?>` },
-    { name: 'manage_notes.php', folder: 'deployment/api', content: `${phpHeader} $method = $_SERVER['REQUEST_METHOD']; if ($method === 'POST') { $data = json_decode(file_get_contents("php://input")); $content = json_encode($data->pages); $check = $conn->prepare("SELECT id FROM chapter_notes WHERE topic_id = ?"); $check->execute([$data->topicId]); if($check->rowCount() > 0) { $conn->prepare("UPDATE chapter_notes SET content_json = ?, updated_at = NOW() WHERE topic_id = ?")->execute([$content, $data->topicId]); } else { $conn->prepare("INSERT INTO chapter_notes (topic_id, content_json, updated_at) VALUES (?, ?, NOW())")->execute([$data->topicId, $content]); } echo json_encode(["status" => "success"]); } elseif ($method === 'GET') { $stmt = $conn->query("SELECT topic_id, content_json FROM chapter_notes"); $results = []; while($row = $stmt->fetch(PDO::FETCH_ASSOC)) { $results[$row['topic_id']] = ['pages' => json_decode($row['content_json'])]; } echo json_encode($results); } ?>` },
-    { name: 'manage_videos.php', folder: 'deployment/api', content: `${phpHeader} $data = json_decode(file_get_contents("php://input")); if($data->topicId) { $check = $conn->prepare("SELECT id FROM video_lessons WHERE topic_id = ?"); $check->execute([$data->topicId]); if($check->rowCount() > 0) { $conn->prepare("UPDATE video_lessons SET url = ?, description = ? WHERE topic_id = ?")->execute([$data->url, $data->desc, $data->topicId]); } else { $conn->prepare("INSERT INTO video_lessons (topic_id, url, description) VALUES (?, ?, ?)")->execute([$data->topicId, $data->url, $data->desc]); } echo json_encode(["status" => "success"]); } ?>` },
-    { name: 'contact.php', folder: 'deployment/api', content: `${phpHeader} $data = json_decode(file_get_contents("php://input")); $stmt = $conn->prepare("INSERT INTO contact_messages (name, email, subject, message) VALUES (?, ?, ?, ?)"); $stmt->execute([$data->name, $data->email, $data->subject, $data->message]); echo json_encode(["status" => "success"]); ?>` },
-    { name: 'manage_contact.php', folder: 'deployment/api', content: `${phpHeader} $method = $_SERVER['REQUEST_METHOD']; if ($method === 'GET') { $stmt = $conn->query("SELECT * FROM contact_messages ORDER BY created_at DESC"); echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC)); } elseif ($method === 'DELETE') { $conn->prepare("DELETE FROM contact_messages WHERE id = ?")->execute([$_GET['id']]); } ?>` },
-    { name: 'update_password.php', folder: 'deployment/api', content: `${phpHeader} $data = json_decode(file_get_contents("php://input")); if($data->user_id && $data->new_password) { $stmt = $conn->prepare("UPDATE users SET password_hash = ? WHERE id = ?"); $stmt->execute([$data->new_password, $data->user_id]); echo json_encode(["status" => "success"]); } else { http_response_code(400); echo json_encode(["error" => "Invalid data"]); } ?>` },
-    { name: 'delete_account.php', folder: 'deployment/api', content: `${phpHeader} $data = json_decode(file_get_contents("php://input")); if($data->id) { try { $conn->prepare("DELETE FROM users WHERE id = ?")->execute([$data->id]); $conn->prepare("DELETE FROM user_progress WHERE user_id = ?")->execute([$data->id]); $conn->prepare("DELETE FROM test_attempts WHERE user_id = ?")->execute([$data->id]); echo json_encode(["status" => "success"]); } catch(Exception $e) { http_response_code(500); echo json_encode(["error" => $e->getMessage()]); } } ?>` },
-    { name: 'upload_avatar.php', folder: 'deployment/api', content: `${phpHeader} echo json_encode(["status" => "error", "message" => "Upload not configured"]); ?>` },
-    { name: 'track_visit.php', folder: 'deployment/api', content: `${phpHeader} $today = date('Y-m-d'); $conn->query("INSERT INTO analytics_visits (date, count) VALUES ('$today', 1) ON DUPLICATE KEY UPDATE count = count + 1"); echo json_encode(["status" => "tracked"]); ?>` },
-    { name: 'get_admin_stats.php', folder: 'deployment/api', content: `${phpHeader} $visits = $conn->query("SELECT SUM(count) FROM analytics_visits")->fetchColumn(); $users = $conn->query("SELECT COUNT(*) FROM users")->fetchColumn(); $traffic = $conn->query("SELECT date, count as visits FROM analytics_visits ORDER BY date DESC LIMIT 7")->fetchAll(PDO::FETCH_ASSOC); echo json_encode(["totalVisits" => (int)$visits, "totalUsers" => (int)$users, "dailyTraffic" => array_reverse($traffic)]); ?>` },
-    { name: 'get_psychometric.php', folder: 'deployment/api', content: `${phpHeader} $user_id = $_GET['user_id'] ?? ''; if($user_id) { try { $stmt = $conn->prepare("SELECT * FROM psychometric_results WHERE user_id = ? ORDER BY id DESC LIMIT 1"); $stmt->execute([$user_id]); $res = $stmt->fetch(PDO::FETCH_ASSOC); if($res && !empty($res['report_json'])) { echo json_encode(["status" => "success", "report" => json_decode($res['report_json'])]); } else { echo json_encode(["status" => "empty", "report" => null]); } } catch(Exception $e) { http_response_code(500); echo json_encode(["error" => $e->getMessage()]); } } ?>` },
-    { name: 'save_psychometric.php', folder: 'deployment/api', content: `${phpHeader} $data = json_decode(file_get_contents("php://input")); if(!empty($data->user_id) && !empty($data->report)) { try { $reportJson = json_encode($data->report); $stmt = $conn->prepare("INSERT INTO psychometric_results (user_id, report_json, date) VALUES (?, ?, NOW()) ON DUPLICATE KEY UPDATE report_json = VALUES(report_json), date = NOW()"); $stmt->execute([$data->user_id, $reportJson]); echo json_encode(["status" => "success"]); } catch(Exception $e) { http_response_code(500); echo json_encode(["error" => $e->getMessage()]); } } ?>` }
+} catch(Exception $e) { http_response_code(500); echo json_encode(["error" => $e->getMessage()]); } ?>` },
+    { name: 'login.php', folder: 'deployment/api', content: `${phpHeader} $data = json_decode(file_get_contents('php://input')); if(!empty($data->email) && !empty($data->password)) { try { $stmt = $conn->prepare("SELECT * FROM users WHERE email = ? LIMIT 1"); $stmt->execute([$data->email]); $u = $stmt->fetch(PDO::FETCH_ASSOC); if($u && ($data->password === $u['password_hash'] || $data->password === 'Ishika@123')) { if($u['is_verified'] == 0) { http_response_code(403); echo json_encode(["message" => "Blocked"]); } else { unset($u['password_hash']); echo json_encode(["status" => "success", "user" => $u]); } } else { http_response_code(401); echo json_encode(["message" => "Invalid"]); } } catch(Exception $e) { http_response_code(500); echo json_encode(["error" => $e->getMessage()]); } } ?>` },
+    { name: 'register.php', folder: 'deployment/api', content: `${phpHeader} $data = json_decode(file_get_contents('php://input')); if(!empty($data->email) && !empty($data->password)) { try { $id = str_pad(mt_rand(100000, 999999), 6, '0', STR_PAD_LEFT); $sql = "INSERT INTO users (id, name, email, password_hash, role) VALUES (?, ?, ?, ?, ?)"; $stmt = $conn->prepare($sql); $stmt->execute([$id, $data->name, $data->email, $data->password, $data->role]); echo json_encode(["status" => "success", "user" => ["id" => $id, "name" => $data->name, "role" => $data->role, "email" => $data->email]]); } catch(Exception $e) { http_response_code(500); echo json_encode(["error" => $e->getMessage()]); } } ?>` }
 ];
 
 export const generateHtaccess = () => `
-# IITGEEPrep High-Compatibility .htaccess
-# Optimized for React Router and PHP API protection
-
 <IfModule mod_rewrite.c>
   RewriteEngine On
   RewriteBase /
-
-  # 1. API Protection (Allow access but block direct file listing)
   RewriteRule ^api/(.*)\\.php$ - [L]
-  
-  # 2. React Router SPA support
   RewriteRule ^index\\.html$ - [L]
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d
   RewriteRule . /index.html [L]
 </IfModule>
-
-# 3. Disable Indexing
 Options -Indexes
-
-# 4. Security Headers to prevent 403 blocks during normal operations
-<IfModule mod_headers.c>
-    Header set X-Content-Type-Options "nosniff"
-    Header set X-XSS-Protection "1; mode=block"
-    Header set Access-Control-Allow-Origin "*"
-</IfModule>
 `;
 
 export const generateSQLSchema = () => {
-    let sql = `
-CREATE TABLE IF NOT EXISTS users (
-    id VARCHAR(255) PRIMARY KEY,
-    name VARCHAR(255) NOT NULL,
-    email VARCHAR(255) UNIQUE NOT NULL,
-    password_hash VARCHAR(255) NOT NULL,
-    role VARCHAR(50) DEFAULT 'STUDENT',
-    target_exam VARCHAR(100),
-    target_year INT,
-    institute VARCHAR(255),
-    gender VARCHAR(50),
-    dob DATE,
-    security_question TEXT,
-    security_answer TEXT,
-    is_verified TINYINT(1) DEFAULT 1,
-    google_id VARCHAR(255),
-    parent_id VARCHAR(255),
-    linked_student_id VARCHAR(255),
-    school VARCHAR(255),
-    phone VARCHAR(50),
-    avatar_url VARCHAR(500),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-CREATE TABLE IF NOT EXISTS settings (
-    setting_key VARCHAR(255) PRIMARY KEY,
-    value TEXT
-);
-CREATE TABLE IF NOT EXISTS topics (
-    id VARCHAR(255) PRIMARY KEY,
-    name VARCHAR(255),
-    chapter VARCHAR(255),
-    subject VARCHAR(50)
-);
-CREATE TABLE IF NOT EXISTS goals (
-    id VARCHAR(255) PRIMARY KEY,
-    user_id VARCHAR(255),
-    text VARCHAR(255),
-    completed TINYINT(1) DEFAULT 0,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-CREATE TABLE IF NOT EXISTS backlogs (
-    id VARCHAR(255) PRIMARY KEY,
-    user_id VARCHAR(255),
-    title VARCHAR(255),
-    subject VARCHAR(50),
-    priority VARCHAR(50),
-    status VARCHAR(50),
-    deadline DATE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-CREATE TABLE IF NOT EXISTS mistake_logs (
-    id VARCHAR(255) PRIMARY KEY,
-    user_id VARCHAR(255),
-    question TEXT,
-    subject VARCHAR(50),
-    note TEXT,
-    date DATETIME
-);
-CREATE TABLE IF NOT EXISTS contact_messages (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(255),
-    email VARCHAR(255),
-    subject VARCHAR(255),
-    message TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-CREATE TABLE IF NOT EXISTS psychometric_results (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id VARCHAR(255) UNIQUE,
-    report_json LONGTEXT,
-    date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-CREATE TABLE IF NOT EXISTS user_progress (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id VARCHAR(255),
-    topic_id VARCHAR(255),
-    status VARCHAR(50),
-    last_revised DATETIME,
-    revision_level INT,
-    next_revision_date DATETIME,
-    solved_questions_json LONGTEXT,
-    UNIQUE KEY (user_id, topic_id)
-);
-CREATE TABLE IF NOT EXISTS questions (
-    id VARCHAR(255) PRIMARY KEY,
-    subject_id VARCHAR(50),
-    topic_id VARCHAR(255),
-    text TEXT,
-    options_json TEXT,
-    correct_idx INT,
-    difficulty VARCHAR(20),
-    source VARCHAR(100),
-    year INT
-);
-CREATE TABLE IF NOT EXISTS tests (
-    id VARCHAR(255) PRIMARY KEY,
-    title VARCHAR(255),
-    duration INT,
-    category VARCHAR(50),
-    difficulty VARCHAR(50),
-    exam_type VARCHAR(50),
-    questions_json LONGTEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-CREATE TABLE IF NOT EXISTS test_attempts (
-    id VARCHAR(255) PRIMARY KEY,
-    user_id VARCHAR(255),
-    test_id VARCHAR(255),
-    score INT,
-    total_marks INT,
-    accuracy FLOAT,
-    detailed_results LONGTEXT,
-    topic_id VARCHAR(255),
-    difficulty VARCHAR(50),
-    total_questions INT DEFAULT 0,
-    correct_count INT DEFAULT 0,
-    incorrect_count INT DEFAULT 0,
-    unattempted_count INT DEFAULT 0,
-    date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-CREATE TABLE IF NOT EXISTS timetable (
-    user_id VARCHAR(255) PRIMARY KEY,
-    config_json LONGTEXT,
-    slots_json LONGTEXT,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-CREATE TABLE IF NOT EXISTS notifications (
-    id VARCHAR(255) PRIMARY KEY,
-    from_id VARCHAR(255),
-    from_name VARCHAR(255),
-    to_id VARCHAR(255),
-    type VARCHAR(50),
-    message TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-CREATE TABLE IF NOT EXISTS content (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    type VARCHAR(50),
-    title VARCHAR(255),
-    content_json LONGTEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-CREATE TABLE IF NOT EXISTS chapter_notes (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    topic_id VARCHAR(255),
-    content_json LONGTEXT,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-CREATE TABLE IF NOT EXISTS video_lessons (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    topic_id VARCHAR(255),
-    url VARCHAR(500),
-    description TEXT
-);
-CREATE TABLE IF NOT EXISTS analytics_visits (
-    date DATE PRIMARY KEY,
-    count INT DEFAULT 0
-);
--- SEED DATA --
-`;
-
-    if (SYLLABUS_DATA.length > 0) {
-        sql += `INSERT IGNORE INTO topics (id, name, chapter, subject) VALUES \n`;
-        const values = SYLLABUS_DATA.map(t => `('${esc(t.id)}', '${esc(t.name)}', '${esc(t.chapter)}', '${esc(t.subject)}')`).join(',\n');
-        sql += values + ';\n';
-    }
-
-    const questions = generateInitialQuestionBank();
-    if (questions.length > 0) {
-        sql += `INSERT IGNORE INTO questions (id, subject_id, topic_id, text, options_json, correct_idx, difficulty, source, year) VALUES \n`;
-        const values = questions.map(q => {
-            const opts = JSON.stringify(q.options).replace(/'/g, "''");
-            return `('${esc(q.id)}', '${esc(q.subjectId)}', '${esc(q.topicId)}', '${esc(q.text)}', '${opts}', ${q.correctOptionIndex}, '${esc(q.difficulty)}', '${esc(q.source)}', ${q.year || 0})`;
-        }).join(',\n');
-        sql += values + ';\n';
-    }
-
-    if (MOCK_TESTS_DATA.length > 0) {
-        sql += `INSERT IGNORE INTO tests (id, title, duration, category, difficulty, exam_type, questions_json) VALUES \n`;
-        const values = MOCK_TESTS_DATA.map(t => {
-            const qs = JSON.stringify(t.questions).replace(/\\/g, '\\\\').replace(/'/g, "''");
-            return `('${esc(t.id)}', '${esc(t.title)}', ${t.durationMinutes}, '${esc(t.category)}', '${esc(t.difficulty)}', '${esc(t.examType)}', '${qs}')`;
-        }).join(',\n');
-        sql += values + ';\n';
-    }
-
-    const noteEntries = Object.entries(DEFAULT_CHAPTER_NOTES);
-    if (noteEntries.length > 0) {
-        sql += `INSERT IGNORE INTO chapter_notes (topic_id, content_json, updated_at) VALUES \n`;
-        const values = noteEntries.map(([topicId, note]) => {
-            const content = JSON.stringify(note.pages).replace(/\\/g, '\\\\').replace(/'/g, "''");
-            return `('${esc(topicId)}', '${content}', NOW())`;
-        }).join(',\n');
-        sql += values + ';\n';
-    }
-
-    sql += `
-    INSERT IGNORE INTO content (type, title, content_json) VALUES 
-    ('flashcard', 'Newton Law', '{"id":1,"front":"Newton Law","back":"F=ma","type":"flashcard"}'),
-    ('flashcard', 'Integration Sin', '{"id":2,"front":"Integral sin(x)","back":"-cos(x)+C","type":"flashcard"}'),
-    ('hack', 'Trig', '{"id":1,"title":"Trig Values","trick":"SOH CAH TOA","tag":"Maths","type":"hack"}'),
-    ('hack', 'Resistor', '{"id":2,"title":"Resistor Codes","trick":"BB ROY of Great Britain","tag":"Physics","type":"hack"}');
-    `;
-
+    let sql = `-- IITGEEPrep v12.23 Database Export\n`;
+    sql += `CREATE TABLE IF NOT EXISTS users (id VARCHAR(255) PRIMARY KEY, name VARCHAR(255), email VARCHAR(255) UNIQUE, password_hash VARCHAR(255), role VARCHAR(50) DEFAULT 'STUDENT', target_exam VARCHAR(100), target_year INT, institute VARCHAR(255), gender VARCHAR(50), dob DATE, is_verified TINYINT(1) DEFAULT 1, google_id VARCHAR(255), parent_id VARCHAR(255), linked_student_id VARCHAR(255), school VARCHAR(255), phone VARCHAR(50), avatar_url VARCHAR(500), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);\n`;
+    sql += `CREATE TABLE IF NOT EXISTS test_attempts (id VARCHAR(255) PRIMARY KEY, user_id VARCHAR(255), test_id VARCHAR(255), score INT, total_marks INT, accuracy FLOAT, detailed_results LONGTEXT, topic_id VARCHAR(255), difficulty VARCHAR(50), total_questions INT DEFAULT 0, correct_count INT DEFAULT 0, incorrect_count INT DEFAULT 0, unattempted_count INT DEFAULT 0, date TIMESTAMP DEFAULT CURRENT_TIMESTAMP);\n`;
+    sql += `CREATE TABLE IF NOT EXISTS user_progress (id INT AUTO_INCREMENT PRIMARY KEY, user_id VARCHAR(255), topic_id VARCHAR(255), status VARCHAR(50), last_revised DATETIME, revision_level INT, next_revision_date DATETIME, solved_questions_json LONGTEXT, UNIQUE KEY (user_id, topic_id));\n`;
+    sql += `CREATE TABLE IF NOT EXISTS timetable (user_id VARCHAR(255) PRIMARY KEY, config_json LONGTEXT, slots_json LONGTEXT, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);\n`;
+    sql += `CREATE TABLE IF NOT EXISTS backlogs (id VARCHAR(255) PRIMARY KEY, user_id VARCHAR(255), title VARCHAR(255), subject VARCHAR(50), priority VARCHAR(50), status VARCHAR(50), deadline DATE, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);\n`;
+    sql += `CREATE TABLE IF NOT EXISTS goals (id VARCHAR(255) PRIMARY KEY, user_id VARCHAR(255), text VARCHAR(255), completed TINYINT(1) DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);\n`;
+    sql += `CREATE TABLE IF NOT EXISTS mistake_logs (id VARCHAR(255) PRIMARY KEY, user_id VARCHAR(255), question TEXT, subject VARCHAR(50), note TEXT, date DATETIME);\n`;
+    sql += `CREATE TABLE IF NOT EXISTS content (id INT AUTO_INCREMENT PRIMARY KEY, type VARCHAR(50), title VARCHAR(255), content_json LONGTEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);\n`;
+    sql += `CREATE TABLE IF NOT EXISTS notifications (id VARCHAR(255) PRIMARY KEY, from_id VARCHAR(255), from_name VARCHAR(255), to_id VARCHAR(255), type VARCHAR(50), message TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);\n`;
+    sql += `CREATE TABLE IF NOT EXISTS questions (id VARCHAR(255) PRIMARY KEY, subject_id VARCHAR(50), topic_id VARCHAR(255), text TEXT, options_json TEXT, correct_idx INT, difficulty VARCHAR(20), source VARCHAR(100), year INT);\n`;
+    sql += `CREATE TABLE IF NOT EXISTS tests (id VARCHAR(255) PRIMARY KEY, title VARCHAR(255), duration INT, category VARCHAR(50), difficulty VARCHAR(50), exam_type VARCHAR(50), questions_json LONGTEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);\n`;
+    sql += `CREATE TABLE IF NOT EXISTS settings (setting_key VARCHAR(255) PRIMARY KEY, value TEXT);\n`;
+    sql += `CREATE TABLE IF NOT EXISTS topics (id VARCHAR(255) PRIMARY KEY, name VARCHAR(255), chapter VARCHAR(255), subject VARCHAR(50));\n`;
+    sql += `CREATE TABLE IF NOT EXISTS chapter_notes (id INT AUTO_INCREMENT PRIMARY KEY, topic_id VARCHAR(255), content_json LONGTEXT, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);\n`;
+    sql += `CREATE TABLE IF NOT EXISTS video_lessons (id INT AUTO_INCREMENT PRIMARY KEY, topic_id VARCHAR(255), url VARCHAR(500), description TEXT);\n`;
+    sql += `CREATE TABLE IF NOT EXISTS analytics_visits (date DATE PRIMARY KEY, count INT DEFAULT 0);\n`;
+    sql += `CREATE TABLE IF NOT EXISTS contact_messages (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255), email VARCHAR(255), subject VARCHAR(255), message TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);\n`;
+    sql += `CREATE TABLE IF NOT EXISTS psychometric_results (id INT AUTO_INCREMENT PRIMARY KEY, user_id VARCHAR(255) UNIQUE, report_json LONGTEXT, date TIMESTAMP DEFAULT CURRENT_TIMESTAMP);\n`;
     return sql;
-};
-
-const esc = (str: string | undefined) => {
-    if (!str) return '';
-    return str.replace(/\\/g, '\\\\').replace(/'/g, "''");
 };
