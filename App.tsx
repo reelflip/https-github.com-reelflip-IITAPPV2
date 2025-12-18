@@ -1,38 +1,5 @@
-import React, { useState, useEffect, useCallback, Component, ErrorInfo, ReactNode } from 'react';
+import React, { useState, useEffect, useCallback, Component, ErrorInfo, ReactNode, Suspense, lazy } from 'react';
 import { Navigation, MobileNavigation } from './components/Navigation';
-import { AuthScreen } from './screens/AuthScreen';
-import { DashboardScreen } from './screens/DashboardScreen';
-import { AdminDashboardScreen } from './screens/AdminDashboardScreen';
-import { SyllabusScreen } from './screens/SyllabusScreen';
-import { RevisionScreen } from './screens/RevisionScreen';
-import { TimetableScreen } from './screens/TimetableScreen';
-import { TestScreen } from './screens/TestScreen';
-import { FlashcardScreen } from './screens/FlashcardScreen';
-import { MistakesScreen } from './screens/MistakesScreen';
-import { AnalyticsScreen } from './screens/AnalyticsScreen';
-import { FocusScreen } from './screens/FocusScreen';
-import { WellnessScreen } from './screens/WellnessScreen';
-import { BacklogScreen } from './screens/BacklogScreen';
-import { HacksScreen } from './screens/HacksScreen';
-import { PsychometricScreen } from './screens/PsychometricScreen';
-import { AdminUserManagementScreen } from './screens/AdminUserManagementScreen';
-import { AdminInboxScreen } from './screens/AdminInboxScreen';
-import { AdminSyllabusScreen } from './screens/AdminSyllabusScreen';
-import { AdminTestManagerScreen } from './screens/AdminTestManagerScreen';
-import { AdminAnalyticsScreen } from './screens/AdminAnalyticsScreen';
-import { AdminSystemScreen } from './screens/AdminSystemScreen';
-import { DeploymentScreen } from './screens/DeploymentScreen';
-import { ContentManagerScreen } from './screens/ContentManagerScreen';
-import { AdminBlogScreen } from './screens/AdminBlogScreen';
-import { PublicBlogScreen } from './screens/PublicBlogScreen';
-import { AboutUsScreen } from './screens/AboutUsScreen';
-import { ExamGuideScreen } from './screens/ExamGuideScreen';
-import { ContactUsScreen } from './screens/ContactUsScreen';
-import { PrivacyPolicyScreen } from './screens/PrivacyPolicyScreen';
-import { FeaturesScreen } from './screens/FeaturesScreen';
-import { ParentFamilyScreen } from './screens/ParentFamilyScreen';
-import { ProfileScreen } from './screens/ProfileScreen';
-import { VideoManagerScreen } from './screens/VideoManagerScreen';
 import { AITutorChat } from './components/AITutorChat';
 import { PublicLayout } from './components/PublicLayout';
 import { 
@@ -44,8 +11,39 @@ import { SYLLABUS_DATA } from './lib/syllabusData';
 import { calculateNextRevision } from './lib/utils';
 import { MOCK_TESTS_DATA, generateInitialQuestionBank } from './lib/mockTestsData';
 
-// IITJEE_CONFIG v12.23 ErrorBoundary
-/* Fix: Explicitly define Props and State interfaces and extend Component from 'react' to resolve property access errors on 'this' */
+// --- Lazy Loading Screens for Bundle Separation (v12.24) ---
+const AuthScreen = lazy(() => import('./screens/AuthScreen').then(m => ({ default: m.AuthScreen })));
+const DashboardScreen = lazy(() => import('./screens/DashboardScreen').then(m => ({ default: m.DashboardScreen })));
+const AdminDashboardScreen = lazy(() => import('./screens/AdminDashboardScreen').then(m => ({ default: m.AdminDashboardScreen })));
+const SyllabusScreen = lazy(() => import('./screens/SyllabusScreen').then(m => ({ default: m.SyllabusScreen })));
+const RevisionScreen = lazy(() => import('./screens/RevisionScreen').then(m => ({ default: m.RevisionScreen })));
+const TimetableScreen = lazy(() => import('./screens/TimetableScreen').then(m => ({ default: m.TimetableScreen })));
+const TestScreen = lazy(() => import('./screens/TestScreen').then(m => ({ default: m.TestScreen })));
+const FlashcardScreen = lazy(() => import('./screens/FlashcardScreen').then(m => ({ default: m.FlashcardScreen })));
+const MistakesScreen = lazy(() => import('./screens/MistakesScreen').then(m => ({ default: m.MistakesScreen })));
+const AnalyticsScreen = lazy(() => import('./screens/AnalyticsScreen').then(m => ({ default: m.AnalyticsScreen })));
+const WellnessScreen = lazy(() => import('./screens/WellnessScreen').then(m => ({ default: m.WellnessScreen })));
+const BacklogScreen = lazy(() => import('./screens/BacklogScreen').then(m => ({ default: m.BacklogScreen })));
+const HacksScreen = lazy(() => import('./screens/HacksScreen').then(m => ({ default: m.HacksScreen })));
+const PsychometricScreen = lazy(() => import('./screens/PsychometricScreen').then(m => ({ default: m.PsychometricScreen })));
+const AdminUserManagementScreen = lazy(() => import('./screens/AdminUserManagementScreen').then(m => ({ default: m.AdminUserManagementScreen })));
+const AdminInboxScreen = lazy(() => import('./screens/AdminInboxScreen').then(m => ({ default: m.AdminInboxScreen })));
+const AdminSyllabusScreen = lazy(() => import('./screens/AdminSyllabusScreen').then(m => ({ default: m.AdminSyllabusScreen })));
+const AdminTestManagerScreen = lazy(() => import('./screens/AdminTestManagerScreen').then(m => ({ default: m.AdminTestManagerScreen })));
+const AdminAnalyticsScreen = lazy(() => import('./screens/AdminAnalyticsScreen').then(m => ({ default: m.AdminAnalyticsScreen })));
+const AdminSystemScreen = lazy(() => import('./screens/AdminSystemScreen').then(m => ({ default: m.AdminSystemScreen })));
+const DeploymentScreen = lazy(() => import('./screens/DeploymentScreen').then(m => ({ default: m.DeploymentScreen })));
+const ContentManagerScreen = lazy(() => import('./screens/ContentManagerScreen').then(m => ({ default: m.ContentManagerScreen })));
+const AdminBlogScreen = lazy(() => import('./screens/AdminBlogScreen').then(m => ({ default: m.AdminBlogScreen })));
+const PublicBlogScreen = lazy(() => import('./screens/PublicBlogScreen').then(m => ({ default: m.PublicBlogScreen })));
+const AboutUsScreen = lazy(() => import('./screens/AboutUsScreen').then(m => ({ default: m.AboutUsScreen })));
+const ExamGuideScreen = lazy(() => import('./screens/ExamGuideScreen').then(m => ({ default: m.ExamGuideScreen })));
+const ContactUsScreen = lazy(() => import('./screens/ContactUsScreen').then(m => ({ default: m.ContactUsScreen })));
+const PrivacyPolicyScreen = lazy(() => import('./screens/PrivacyPolicyScreen').then(m => ({ default: m.PrivacyPolicyScreen })));
+const FeaturesScreen = lazy(() => import('./screens/FeaturesScreen').then(m => ({ default: m.FeaturesScreen })));
+const ParentFamilyScreen = lazy(() => import('./screens/ParentFamilyScreen').then(m => ({ default: m.ParentFamilyScreen })));
+const ProfileScreen = lazy(() => import('./screens/ProfileScreen').then(m => ({ default: m.ProfileScreen })));
+
 interface ErrorBoundaryProps {
   children?: ReactNode;
 }
@@ -54,15 +52,20 @@ interface ErrorBoundaryState {
   hasError: boolean;
 }
 
-class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+// Fix: Explicitly extending React.Component and initializing state to fix TypeScript property access errors
+class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  public override state: ErrorBoundaryState = { hasError: false };
+
   constructor(props: ErrorBoundaryProps) {
     super(props);
-    this.state = { hasError: false };
   }
+  
   static getDerivedStateFromError() { return { hasError: true }; }
+  
   componentDidCatch(error: Error, errorInfo: ErrorInfo) { console.error("App Crash:", error, errorInfo); }
+  
   render() {
-    // Fix: Access state property hasError after proper class definition
+    // Fix: access property via this.state
     if (this.state.hasError) {
       return (
         <div className="min-h-screen flex flex-col items-center justify-center p-4 text-center bg-slate-50">
@@ -75,10 +78,17 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
         </div>
       );
     }
-    // Fix: Access props property children after proper class definition
+    // Fix: access property via this.props
     return this.props.children;
   }
 }
+
+const LoadingView = () => (
+  <div className="flex flex-col items-center justify-center min-h-[60vh] text-slate-400">
+    <div className="w-10 h-10 border-4 border-slate-200 border-t-blue-600 rounded-full animate-spin mb-4"></div>
+    <p className="text-xs font-bold uppercase tracking-widest">Loading Module...</p>
+  </div>
+);
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(() => {
@@ -106,7 +116,6 @@ const App: React.FC = () => {
   const [videoMap, setVideoMap] = useState<Record<string, VideoLesson>>({});
   const [linkedData, setLinkedData] = useState<{ progress: Record<string, UserProgress>, tests: TestAttempt[], studentName: string } | undefined>();
 
-  // Role-Based Screen Correction (Fix for blank screen on Admin login)
   useEffect(() => {
     if (user) {
         const isAdmin = user.role === 'ADMIN' || user.role === 'ADMIN_EXECUTIVE';
@@ -242,17 +251,19 @@ const App: React.FC = () => {
       const publicScreens: Screen[] = ['about', 'blog', 'exams', 'privacy', 'contact', 'features'];
       if (publicScreens.includes(currentScreen)) {
           return (
-              <PublicLayout onNavigate={setScreen} currentScreen={currentScreen}>
-                  {currentScreen === 'about' && <AboutUsScreen />}
-                  {currentScreen === 'blog' && <PublicBlogScreen blogs={blogs} onBack={() => setScreen('dashboard')} />}
-                  {currentScreen === 'exams' && <ExamGuideScreen />}
-                  {currentScreen === 'privacy' && <PrivacyPolicyScreen />}
-                  {currentScreen === 'contact' && <ContactUsScreen />}
-                  {currentScreen === 'features' && <FeaturesScreen />}
-              </PublicLayout>
+              <Suspense fallback={<LoadingView />}>
+                <PublicLayout onNavigate={setScreen} currentScreen={currentScreen}>
+                    {currentScreen === 'about' && <AboutUsScreen />}
+                    {currentScreen === 'blog' && <PublicBlogScreen blogs={blogs} onBack={() => setScreen('dashboard')} />}
+                    {currentScreen === 'exams' && <ExamGuideScreen />}
+                    {currentScreen === 'privacy' && <PrivacyPolicyScreen />}
+                    {currentScreen === 'contact' && <ContactUsScreen />}
+                    {currentScreen === 'features' && <FeaturesScreen />}
+                </PublicLayout>
+              </Suspense>
           );
       }
-      return <AuthScreen onLogin={handleLogin} onNavigate={setScreen} />;
+      return <Suspense fallback={<LoadingView />}><AuthScreen onLogin={handleLogin} onNavigate={setScreen} /></Suspense>;
   }
 
   const isAdminRole = user.role === 'ADMIN' || user.role === 'ADMIN_EXECUTIVE';
@@ -319,7 +330,9 @@ const App: React.FC = () => {
       <div className="flex bg-slate-50 min-h-screen font-inter">
         <Navigation currentScreen={currentScreen} setScreen={setScreen} logout={handleLogout} user={user} />
         <main className="flex-1 md:ml-64 p-4 md:p-8 pb-24 md:pb-8 max-w-[1600px] mx-auto w-full">
-          {renderContent()}
+          <Suspense fallback={<LoadingView />}>
+            {renderContent()}
+          </Suspense>
         </main>
         <MobileNavigation currentScreen={currentScreen} setScreen={setScreen} logout={handleLogout} user={user} />
         {user.role === 'STUDENT' && currentScreen !== 'ai-tutor' && <AITutorChat />}
