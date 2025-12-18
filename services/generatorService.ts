@@ -138,8 +138,10 @@ if(!empty($data->credential)) {
         } else {
             $id = str_pad(mt_rand(100000, 999999), 6, '0', STR_PAD_LEFT);
             $role = !empty($data->role) ? $data->role : 'STUDENT';
-            $ins = $conn->prepare("INSERT INTO users (id, name, email, google_id, avatar_url, role) VALUES (?, ?, ?, ?, ?, ?)");
-            $ins->execute([$id, $name, $email, $google_id, $avatar, $role]);
+            $targetExam = ($role === 'STUDENT') ? 'JEE Main & Advanced' : null;
+            $targetYear = ($role === 'STUDENT') ? 2025 : null;
+            $ins = $conn->prepare("INSERT INTO users (id, name, email, google_id, avatar_url, role, target_exam, target_year) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+            $ins->execute([$id, $name, $email, $google_id, $avatar, $role, $targetExam, $targetYear]);
             $stmt = $conn->prepare("SELECT * FROM users WHERE id = ?");
             $stmt->execute([$id]);
             $newUser = $stmt->fetch(PDO::FETCH_ASSOC);

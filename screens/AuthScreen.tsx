@@ -100,7 +100,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate }) =
         }
         if (view === 'LOGIN') window.google.accounts.id.prompt();
     }
-  }, [googleConfig, view]);
+  }, [googleConfig, view, role]); // Added role to dependencies so the Google button re-renders with the correct role if needed, though role is passed in callback.
 
   const handleGoogleCredentialResponse = async (response: any) => {
       setIsLoading(true); setError('');
@@ -195,25 +195,23 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate }) =
                 {error && <div className="mb-6 p-4 bg-red-50 text-red-600 text-xs font-bold rounded-xl flex items-center gap-3 border border-red-100"><WifiOff size={16}/> {error}</div>}
                 {successMessage && <div className="mb-6 p-4 bg-green-50 text-green-700 text-xs font-bold rounded-xl flex items-center gap-3 border border-green-100"><CheckCircle2 size={16}/> {successMessage}</div>}
 
-                {/* Role Selector for Registration */}
-                {view === 'REGISTER' && (
-                    <div className="flex bg-slate-100 p-1 rounded-xl mb-8">
-                        <button 
-                            type="button"
-                            onClick={() => setRole('STUDENT')}
-                            className={`flex-1 py-2.5 text-xs font-black uppercase tracking-wider rounded-lg transition-all flex items-center justify-center gap-2 ${role === 'STUDENT' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                        >
-                            <GraduationCap size={16} /> Student
-                        </button>
-                        <button 
-                            type="button"
-                            onClick={() => setRole('PARENT')}
-                            className={`flex-1 py-2.5 text-xs font-black uppercase tracking-wider rounded-lg transition-all flex items-center justify-center gap-2 ${role === 'PARENT' ? 'bg-white text-teal-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                        >
-                            <Users size={16} /> Parent
-                        </button>
-                    </div>
-                )}
+                {/* Role Selector - Visible for both Login and Register views to accommodate Google Sign-In as new user */}
+                <div className="flex bg-slate-100 p-1 rounded-xl mb-8">
+                    <button 
+                        type="button"
+                        onClick={() => setRole('STUDENT')}
+                        className={`flex-1 py-2.5 text-xs font-black uppercase tracking-wider rounded-lg transition-all flex items-center justify-center gap-2 ${role === 'STUDENT' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                    >
+                        <GraduationCap size={16} /> Student
+                    </button>
+                    <button 
+                        type="button"
+                        onClick={() => setRole('PARENT')}
+                        className={`flex-1 py-2.5 text-xs font-black uppercase tracking-wider rounded-lg transition-all flex items-center justify-center gap-2 ${role === 'PARENT' ? 'bg-white text-teal-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                    >
+                        <Users size={16} /> Parent
+                    </button>
+                </div>
 
                 <form onSubmit={handleAuth} className="space-y-6">
                     {view === 'REGISTER' && (
@@ -247,7 +245,9 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate }) =
                                                     value={formData.targetExam}
                                                     onChange={e => setFormData({...formData, targetExam: e.target.value})}
                                                 >
-                                                    {TARGET_EXAMS.map(exam => <option key={exam} value={exam}>{exam}</option>)}
+                                                    {TARGET_EXAMS.map(exam => (
+                                                        <option key={exam} value={exam}>{exam}</option>
+                                                    ))}
                                                 </select>
                                                 <ChevronDown className="absolute right-3 top-3.5 text-slate-400 pointer-events-none" size={14} />
                                             </div>

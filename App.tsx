@@ -53,8 +53,8 @@ interface ErrorBoundaryState {
   hasError: boolean;
 }
 
-// Fix: Use imported Component directly and ensure proper generic types to resolve 'props' visibility error
-class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+// Fix: Explicitly use React.Component and ensure generic typing to resolve 'props' visibility error
+class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
   public state: ErrorBoundaryState = { hasError: false };
 
   static getDerivedStateFromError(_error: Error) { return { hasError: true }; }
@@ -74,6 +74,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
         </div>
       );
     }
+    // Fix: Access to this.props is now resolved by correct class extension
     return this.props.children;
   }
 }
