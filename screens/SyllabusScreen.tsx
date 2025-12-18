@@ -67,9 +67,14 @@ const TopicDetailView: React.FC<{
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmitChapterTest = async () => {
-    if (Object.keys(currentAnswers).length === 0) {
+    const answeredCount = Object.keys(currentAnswers).length;
+    if (answeredCount === 0) {
         alert("Please answer at least one question before submitting.");
         return;
+    }
+
+    if (answeredCount < topicQuestions.length) {
+        if(!confirm(`You answered ${answeredCount} of ${topicQuestions.length} questions. Submit anyway?`)) return;
     }
 
     setIsSubmitting(true);
@@ -107,7 +112,7 @@ const TopicDetailView: React.FC<{
 
     if (addTestAttempt) {
         await addTestAttempt(attempt);
-        alert(`Chapter Test Submitted!\nScore: ${score}/${totalMarks}\nResult saved to history.`);
+        alert(`Chapter Test Submitted!\nScore: ${score}/${totalMarks}\nResult saved to your history.`);
         onClose();
     }
     setIsSubmitting(false);
@@ -453,7 +458,7 @@ export const SyllabusScreen: React.FC<SyllabusTrackerProps> = ({
               {subject.chapters.map(chapter => (
                 <div key={chapter.id}>
                   <div className="flex items-center space-x-3 mb-4 pb-2 border-b border-slate-200/60">
-                     <span className={`h-2 w-2 rounded-full ${subject.id === 'phys' ? 'bg-purple-500' : subject.id === 'chem' ? 'bg-amber-500' : 'bg-blue-500'}`}></span>
+                     <span className={`h-2 w-2 rounded-full ${subject.id === 'phys' ? 'bg-purple-50' : subject.id === 'chem' ? 'bg-amber-50' : 'bg-blue-50'}`}></span>
                      <h2 className="text-sm font-bold text-slate-700 uppercase tracking-wide">{chapter.name}</h2>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

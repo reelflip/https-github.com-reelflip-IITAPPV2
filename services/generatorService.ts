@@ -1,5 +1,3 @@
-
-import { MOCK_TESTS_DATA, generateInitialQuestionBank } from '../lib/mockTestsData';
 import { SYLLABUS_DATA } from '../lib/syllabusData';
 
 const phpHeader = `<?php
@@ -55,7 +53,23 @@ try {
     {
         name: 'index.php',
         folder: 'deployment/api',
-        content: `${phpHeader} echo json_encode(["status" => "active", "version" => "12.25", "engine" => "IITGEE_PROD"]); ?>`
+        content: `<?php echo json_encode(["status" => "active", "version" => "12.25", "engine" => "IITGEE_PROD_READY"]); ?>`
+    },
+    {
+        name: 'test_db.php',
+        folder: 'deployment/api',
+        content: `${phpHeader}
+try {
+    $tables = [];
+    $stmt = $conn->query("SHOW TABLES");
+    while ($row = $stmt->fetch(PDO::FETCH_NUM)) {
+        $name = $row[0];
+        $countStmt = $conn->query("SELECT COUNT(*) FROM $name");
+        $tables[] = ["name" => $name, "rows" => $countStmt->fetchColumn()];
+    }
+    echo json_encode(["status" => "CONNECTED", "db_name" => $db_name, "tables" => $tables]);
+} catch(Exception $e) { http_response_code(500); echo json_encode(["error" => $e->getMessage()]); }
+?>`
     },
     {
         name: 'login.php',
@@ -94,21 +108,12 @@ if(!empty($data->email) && !empty($data->password)) {
         $sql = "INSERT INTO users (id, name, email, password_hash, role, institute, target_exam, target_year, dob, gender, security_question, security_answer) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         $stmt = $conn->prepare($sql);
         $stmt->execute([
-            $id, 
-            $data->name, 
-            $data->email, 
-            $data->password, 
-            $data->role,
-            $data->institute ?? null,
-            $data->targetExam ?? null,
-            $data->targetYear ?? 2025,
-            $data->dob ?? null,
-            $data->gender ?? null,
-            $data->securityQuestion ?? null,
-            $data->securityAnswer ?? null
+            $id, $data->name, $data->email, $data->password, $data->role,
+            $data->institute ?? null, $data->targetExam ?? null, $data->targetYear ?? 2025,
+            $data->dob ?? null, $data->gender ?? null, $data->securityQuestion ?? null, $data->securityAnswer ?? null
         ]);
         echo json_encode(["status" => "success", "user" => ["id" => $id, "name" => $data->name, "role" => $data->role, "email" => $data->email]]);
-    } catch(Exception $e) { http_response_code(500); echo json_encode(["error" => "Registration failed. Email may exist."]); }
+    } catch(Exception $e) { http_response_code(500); echo json_encode(["error" => "Registration failed. Email might exist."]); }
 }
 ?>`
     },
@@ -121,55 +126,51 @@ if(!$user_id) { echo json_encode(["error" => "No User ID"]); exit(); }
 try {
     $response = [];
     $stmt = $conn->prepare("SELECT * FROM users WHERE id = ?"); $stmt->execute([$user_id]); $u = $stmt->fetch(PDO::FETCH_ASSOC);
-    if($u) $response['userProfileSync'] = ["id" => $u['id'], "name" => $u['name'], "email" => $u['email'], "role" => $u['role'], "targetExam" => $u['target_exam'], "targetYear" => $u['target_year'], "institute" => $u['institute'], "parentId" => $u['parent_id'], "linkedStudentId" => $u['linked_student_id'], "isVerified" => $u['is_verified'], "school" => $u['school'], "phone" => $u['phone'], "avatarUrl" => $u['avatar_url']];
-    
-    // Map Progress to CamelCase
-    $stmt = $conn->prepare("SELECT * FROM user_progress WHERE user_id = ?"); $stmt->execute([$user_id]); $rawProgress = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
-    $response['progress'] = []; 
-    foreach($rawProgress as $p) {
-        $response['progress'][] = [
-            "topicId" => $p['topic_id'], 
-            "status" => $p['status'], 
-            "lastRevised" => $p['last_revised'], 
-            "revisionLevel" => (int)$p['revision_level'], 
-            "nextRevisionDate" => $p['next_revision_date'], 
-            "solvedQuestions" => $p['solved_questions_json'] ? JSON_decode($p['solved_questions_json']) : []
+    if($u) {
+        $response['userProfileSync'] = [
+            "id" => $u['id'], "name" => $u['name'], "email" => $u['email'], "role" => $u['role'], 
+            "targetExam" => $u['target_exam'], "targetYear" => $u['target_year'], "institute" => $u['institute'], 
+            "parentId" => $u['parent_id'], "linkedStudentId" => $u['linked_student_id'], "isVerified" => $u['is_verified'] == 1,
+            "school" => $u['school'], "phone" => $u['phone'], "avatarUrl" => $u['avatar_url']
         ];
     }
     
-    // Map Attempts to CamelCase and include Title
-    $stmt = $conn->prepare("SELECT * FROM test_attempts WHERE user_id = ? ORDER BY date DESC"); 
-    $stmt->execute([$user_id]); 
+    $stmt = $conn->prepare("SELECT topic_id as topicId, status, last_revised as lastRevised, revision_level as revisionLevel, next_revision_date as nextRevisionDate, solved_questions_json FROM user_progress WHERE user_id = ?");
+    $stmt->execute([$user_id]);
+    $rawProgress = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    $response['progress'] = array_map(function($p) {
+        $p['solvedQuestions'] = $p['solved_questions_json'] ? json_decode($p['solved_questions_json']) : [];
+        unset($p['solved_questions_json']);
+        return $p;
+    }, $rawProgress);
+    
+    $stmt = $conn->prepare("SELECT * FROM test_attempts WHERE user_id = ? ORDER BY date DESC");
+    $stmt->execute([$user_id]);
     $rawAttempts = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
-    $response['attempts'] = [];
-    foreach($rawAttempts as $a) {
-        $response['attempts'][] = [
-            "id" => $a['id'],
-            "date" => $a['date'],
-            "title" => $a['title'],
-            "score" => (int)$a['score'],
-            "totalMarks" => (int)$a['total_marks'],
-            "accuracy" => (float)$a['accuracy'],
-            "accuracy_percent" => (int)($a['accuracy_percent'] ?? $a['accuracy']),
-            "testId" => $a['test_id'],
-            "totalQuestions" => (int)$a['total_questions'],
-            "correctCount" => (int)$a['correct_count'],
-            "incorrectCount" => (int)$a['incorrect_count'],
-            "unattemptedCount" => (int)$a['unattempted_count'],
-            "topicId" => $a['topic_id'],
-            "difficulty" => $a['difficulty'],
-            "detailedResults" => $a['detailed_results'] ? JSON_decode($a['detailed_results']) : []
+    $response['attempts'] = array_map(function($a) {
+        return [
+            "id" => $a['id'], "date" => $a['date'], "title" => $a['title'], "score" => (int)$a['score'], 
+            "totalMarks" => (int)$a['total_marks'], "accuracy" => (float)$a['accuracy'], "accuracy_percent" => (int)$a['accuracy_percent'],
+            "testId" => $a['test_id'], "totalQuestions" => (int)$a['total_questions'], "correctCount" => (int)$a['correct_count'],
+            "incorrectCount" => (int)$a['incorrect_count'], "unattemptedCount" => (int)$a['unattempted_count'],
+            "topicId" => $a['topic_id'], "detailedResults" => json_decode($a['detailed_results'])
         ];
-    }
+    }, $rawAttempts);
 
     $stmt = $conn->prepare("SELECT * FROM goals WHERE user_id = ?"); $stmt->execute([$user_id]); $response['goals'] = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     $stmt = $conn->prepare("SELECT * FROM mistake_logs WHERE user_id = ?"); $stmt->execute([$user_id]); $response['mistakes'] = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     $stmt = $conn->prepare("SELECT * FROM backlogs WHERE user_id = ?"); $stmt->execute([$user_id]); $response['backlogs'] = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    
     $stmt = $conn->prepare("SELECT * FROM timetable WHERE user_id = ?"); $stmt->execute([$user_id]); $tt = $stmt->fetch(PDO::FETCH_ASSOC);
     if($tt) $response['timetable'] = ['config' => json_decode($tt['config_json']), 'slots' => json_decode($tt['slots_json'])];
-    $stmt = $conn->prepare("SELECT * FROM notifications WHERE to_id = ? ORDER BY created_at DESC"); $stmt->execute([$user_id]); $response['notifications'] = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    
+    $stmt = $conn->prepare("SELECT * FROM notifications WHERE to_id = ? ORDER BY created_at DESC");
+    $stmt->execute([$user_id]);
+    $response['notifications'] = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
     echo json_encode($response);
-} catch(Exception $e) { http_response_code(500); echo json_encode(["error" => $e.getMessage()]); } ?>`
+} catch(Exception $e) { http_response_code(500); echo json_encode(["error" => $e->getMessage()]); }
+?>`
     },
     {
         name: 'save_attempt.php',
@@ -179,31 +180,168 @@ $data = json_decode(file_get_contents('php://input'));
 if(!empty($data->user_id)) {
     try {
         $id = !empty($data->id) ? $data->id : 'att_'.time().'_'.mt_rand(10,99);
-        $accuracy = isset($data->accuracy) ? $data->accuracy : ($data->accuracy_percent ?? 0);
-        
         $sql = "INSERT INTO test_attempts (id, user_id, test_id, title, score, total_marks, accuracy, accuracy_percent, detailed_results, topic_id, difficulty, total_questions, correct_count, incorrect_count, unattempted_count) 
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON DUPLICATE KEY UPDATE score = VALUES(score), accuracy = VALUES(accuracy), accuracy_percent = VALUES(accuracy_percent)";
         $stmt = $conn->prepare($sql);
         $stmt->execute([
-            $id, 
-            $data->user_id, 
-            $data->testId ?? '', 
-            $data->title ?? 'Mock Test',
-            $data->score ?? 0, 
-            $data->totalMarks ?? 0, 
-            $accuracy,
-            $data->accuracy_percent ?? $accuracy,
-            json_encode($data->detailedResults ?? []), 
-            $data->topicId ?? null, 
-            $data->difficulty ?? null, 
-            $data->totalQuestions ?? 0, 
-            $data->correctCount ?? 0, 
-            $data->incorrectCount ?? 0, 
-            $data->unattemptedCount ?? 0
+            $id, $data->user_id, $data->testId ?? '', $data->title ?? 'Mock Test',
+            $data->score ?? 0, $data->totalMarks ?? 0, $data->accuracy ?? 0, $data->accuracy_percent ?? 0,
+            json_encode($data->detailedResults ?? []), $data->topicId ?? null, $data->difficulty ?? null,
+            $data->totalQuestions ?? 0, $data->correctCount ?? 0, $data->incorrectCount ?? 0, $data->unattemptedCount ?? 0
         ]);
         echo json_encode(["status" => "success", "id" => $id]);
     } catch(Exception $e) { http_response_code(500); echo json_encode(["error" => $e->getMessage()]); }
+}
+?>`
+    },
+    {
+        name: 'sync_progress.php',
+        folder: 'deployment/api',
+        content: `${phpHeader}
+$data = json_decode(file_get_contents('php://input'));
+if(!empty($data->user_id) && !empty($data->topicId)) {
+    try {
+        $sql = "INSERT INTO user_progress (user_id, topic_id, status, last_revised, revision_level, next_revision_date, solved_questions_json) 
+                VALUES (?, ?, ?, ?, ?, ?, ?) 
+                ON DUPLICATE KEY UPDATE status = VALUES(status), last_revised = VALUES(last_revised), 
+                revision_level = VALUES(revision_level), next_revision_date = VALUES(next_revision_date), 
+                solved_questions_json = VALUES(solved_questions_json)";
+        $stmt = $conn->prepare($sql);
+        $stmt->execute([
+            $data->user_id, $data->topicId, $data->status, $data->lastRevised, 
+            $data->revisionLevel ?? 0, $data->nextRevisionDate, json_encode($data->solvedQuestions ?? [])
+        ]);
+        echo json_encode(["status" => "success"]);
+    } catch(Exception $e) { http_response_code(500); echo json_encode(["error" => $e->getMessage()]); }
+}
+?>`
+    },
+    {
+        name: 'manage_settings.php',
+        folder: 'deployment/api',
+        content: `${phpHeader}
+$method = $_SERVER['REQUEST_METHOD'];
+if($method === 'GET') {
+    $key = $_GET['key'] ?? '';
+    $stmt = $conn->prepare("SELECT value FROM settings WHERE setting_key = ?");
+    $stmt->execute([$key]);
+    echo json_encode($stmt->fetch(PDO::FETCH_ASSOC) ?: ["value" => null]);
+} else if($method === 'POST') {
+    $data = json_decode(file_get_contents('php://input'));
+    $stmt = $conn->prepare("INSERT INTO settings (setting_key, value) VALUES (?, ?) ON DUPLICATE KEY UPDATE value = VALUES(value)");
+    $stmt->execute([$data->key, $data->value]);
+    echo json_encode(["status" => "success"]);
+}
+?>`
+    },
+    {
+        name: 'manage_goals.php',
+        folder: 'deployment/api',
+        content: `${phpHeader}
+$method = $_SERVER['REQUEST_METHOD'];
+$data = json_decode(file_get_contents('php://input'));
+if($method === 'POST') {
+    $stmt = $conn->prepare("INSERT INTO goals (id, user_id, text, completed) VALUES (?, ?, ?, ?)");
+    $stmt->execute([$data->id, $data->user_id, $data->text, $data->completed ? 1 : 0]);
+} else if($method === 'PUT') {
+    $stmt = $conn->prepare("UPDATE goals SET completed = ? WHERE id = ?");
+    $stmt->execute([$data->completed ? 1 : 0, $data->id]);
+} else if($method === 'DELETE') {
+    $stmt = $conn->prepare("DELETE FROM goals WHERE id = ?");
+    $stmt->execute([$_GET['id']]);
+}
+echo json_encode(["status" => "success"]);
+?>`
+    },
+    {
+        name: 'manage_content.php',
+        folder: 'deployment/api',
+        content: `${phpHeader}
+$type = $_GET['type'] ?? 'blog';
+$method = $_SERVER['REQUEST_METHOD'];
+if($method === 'GET') {
+    $stmt = $conn->prepare("SELECT * FROM content WHERE type = ? ORDER BY created_at DESC");
+    $stmt->execute([$type]);
+    echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
+} else if($method === 'POST') {
+    $data = json_decode(file_get_contents('php://input'));
+    $stmt = $conn->prepare("INSERT INTO content (type, title, content_json) VALUES (?, ?, ?)");
+    $stmt->execute([$data->type, $data->title, json_encode($data->content)]);
+    echo json_encode(["status" => "success", "id" => $conn->lastInsertId()]);
+} else if($method === 'DELETE') {
+    $stmt = $conn->prepare("DELETE FROM content WHERE id = ?");
+    $stmt->execute([$_GET['id']]);
+    echo json_encode(["status" => "success"]);
+}
+?>`
+    },
+    {
+        name: 'search_students.php',
+        folder: 'deployment/api',
+        content: `${phpHeader}
+$q = $_GET['q'] ?? '';
+if(strlen($q) < 3) { echo json_encode([]); exit; }
+$stmt = $conn->prepare("SELECT id, name, email FROM users WHERE role = 'STUDENT' AND (id = ? OR name LIKE ? OR email LIKE ?) LIMIT 10");
+$stmt->execute([$q, "%$q%", "%$q%"]);
+echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
+?>`
+    },
+    {
+        name: 'send_request.php',
+        folder: 'deployment/api',
+        content: `${phpHeader}
+$data = json_decode(file_get_contents('php://input'));
+if(!empty($data->from_id) && !empty($data->to_id)) {
+    try {
+        $id = 'req_'.time();
+        $stmt = $conn->prepare("INSERT INTO notifications (id, from_id, from_name, to_id, type, message) VALUES (?, ?, ?, ?, 'connection_request', ?)");
+        $stmt->execute([$id, $data->from_id, $data->from_name, $data->to_id, "Wants to link as parent to your account."]);
+        echo json_encode(["success" => true, "message" => "Request sent to student."]);
+    } catch(Exception $e) { echo json_encode(["success" => false, "message" => "Request failed."]); }
+}
+?>`
+    },
+    {
+        name: 'respond_request.php',
+        folder: 'deployment/api',
+        content: `${phpHeader}
+$data = json_decode(file_get_contents('php://input'));
+if(!empty($data->notification_id) && $data->action === 'ACCEPT') {
+    try {
+        $stmt = $conn->prepare("SELECT * FROM notifications WHERE id = ?");
+        $stmt->execute([$data->notification_id]);
+        $n = $stmt->fetch(PDO::FETCH_ASSOC);
+        if($n) {
+            $conn->prepare("UPDATE users SET parent_id = ? WHERE id = ?")->execute([$n['from_id'], $n['to_id']]);
+            $conn->prepare("UPDATE users SET linked_student_id = ? WHERE id = ?")->execute([$n['to_id'], $n['from_id']]);
+            $conn->prepare("DELETE FROM notifications WHERE id = ?")->execute([$data->notification_id]);
+            echo json_encode(["success" => true]);
+        }
+    } catch(Exception $e) { http_response_code(500); }
+}
+?>`
+    },
+    {
+        name: 'get_psychometric.php',
+        folder: 'deployment/api',
+        content: `${phpHeader}
+$user_id = $_GET['user_id'] ?? '';
+$stmt = $conn->prepare("SELECT report_json FROM psychometric_results WHERE user_id = ?");
+$stmt->execute([$user_id]);
+$res = $stmt->fetch(PDO::FETCH_ASSOC);
+echo json_encode(["report" => $res ? json_decode($res['report_json']) : null]);
+?>`
+    },
+    {
+        name: 'save_psychometric.php',
+        folder: 'deployment/api',
+        content: `${phpHeader}
+$data = json_decode(file_get_contents('php://input'));
+if(!empty($data->user_id)) {
+    $stmt = $conn->prepare("INSERT INTO psychometric_results (user_id, report_json) VALUES (?, ?) ON DUPLICATE KEY UPDATE report_json = VALUES(report_json)");
+    $stmt->execute([$data->user_id, json_encode($data->report)]);
+    echo json_encode(["status" => "success"]);
 }
 ?>`
     },
@@ -212,11 +350,11 @@ if(!empty($data->user_id)) {
         folder: 'deployment/api',
         content: `${phpHeader}
 $schema = [
-    'users' => "(id VARCHAR(255) PRIMARY KEY, name VARCHAR(255), email VARCHAR(255) UNIQUE, password_hash VARCHAR(255), role VARCHAR(50) DEFAULT 'STUDENT', target_exam VARCHAR(100), target_year INT, institute VARCHAR(255), gender VARCHAR(50), dob DATE, is_verified TINYINT(1) DEFAULT 1, google_id VARCHAR(255), parent_id VARCHAR(255), linked_student_id VARCHAR(255), school VARCHAR(255), phone VARCHAR(50), avatar_url VARCHAR(500), security_question TEXT, security_answer TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
-    'test_attempts' => "(id VARCHAR(255) PRIMARY KEY, user_id VARCHAR(255), test_id VARCHAR(255), title VARCHAR(255), score INT, total_marks INT, accuracy FLOAT, accuracy_percent INT, detailed_results LONGTEXT, topic_id VARCHAR(255), difficulty VARCHAR(50), total_questions INT DEFAULT 0, correct_count INT DEFAULT 0, incorrect_count INT DEFAULT 0, unattempted_count INT DEFAULT 0, date TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
+    'users' => "(id VARCHAR(255) PRIMARY KEY, name VARCHAR(255), email VARCHAR(255) UNIQUE, password_hash VARCHAR(255), role VARCHAR(50) DEFAULT 'STUDENT', target_exam VARCHAR(100), target_year INT, institute VARCHAR(255), gender VARCHAR(50), dob DATE, is_verified TINYINT(1) DEFAULT 1, parent_id VARCHAR(255), linked_student_id VARCHAR(255), school VARCHAR(255), phone VARCHAR(50), avatar_url VARCHAR(500), security_question TEXT, security_answer TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
+    'test_attempts' => "(id VARCHAR(255) PRIMARY KEY, user_id VARCHAR(255), test_id VARCHAR(255), title VARCHAR(255), score INT, total_marks INT, accuracy FLOAT, accuracy_percent INT, detailed_results LONGTEXT, topic_id VARCHAR(255), difficulty VARCHAR(50), total_questions INT DEFAULT 0, correct_count INT DEFAULT 0, incorrect_count INT DEFAULT 0, unattempted_count INT DEFAULT 0, date TIMESTAMP DEFAULT CURRENT_TIMESTAMP, INDEX(user_id))",
     'user_progress' => "(id INT AUTO_INCREMENT PRIMARY KEY, user_id VARCHAR(255), topic_id VARCHAR(255), status VARCHAR(50), last_revised DATETIME, revision_level INT, next_revision_date DATETIME, solved_questions_json LONGTEXT, UNIQUE KEY (user_id, topic_id))",
     'timetable' => "(user_id VARCHAR(255) PRIMARY KEY, config_json LONGTEXT, slots_json LONGTEXT, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
-    'backlogs' => "(id VARCHAR(255) PRIMARY KEY, user_id VARCHAR(255), title VARCHAR(255), subject VARCHAR(50), priority VARCHAR(50), status VARCHAR(50), deadline DATE, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
+    'backlogs' => "(id VARCHAR(255) PRIMARY KEY, user_id VARCHAR(255), topic VARCHAR(255), subject VARCHAR(50), priority VARCHAR(50), status VARCHAR(50), deadline DATE, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
     'goals' => "(id VARCHAR(255) PRIMARY KEY, user_id VARCHAR(255), text VARCHAR(255), completed TINYINT(1) DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
     'mistake_logs' => "(id VARCHAR(255) PRIMARY KEY, user_id VARCHAR(255), question TEXT, subject VARCHAR(50), note TEXT, date DATETIME)",
     'content' => "(id INT AUTO_INCREMENT PRIMARY KEY, type VARCHAR(50), title VARCHAR(255), content_json LONGTEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
@@ -224,21 +362,13 @@ $schema = [
     'questions' => "(id VARCHAR(255) PRIMARY KEY, subject_id VARCHAR(50), topic_id VARCHAR(255), text TEXT, options_json TEXT, correct_idx INT, difficulty VARCHAR(20), source VARCHAR(100), year INT)",
     'tests' => "(id VARCHAR(255) PRIMARY KEY, title VARCHAR(255), duration INT, category VARCHAR(50), difficulty VARCHAR(50), exam_type VARCHAR(50), questions_json LONGTEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
     'settings' => "(setting_key VARCHAR(255) PRIMARY KEY, value TEXT)",
-    'topics' => "(id VARCHAR(255) PRIMARY KEY, name VARCHAR(255), chapter VARCHAR(255), subject VARCHAR(50))",
     'chapter_notes' => "(id INT AUTO_INCREMENT PRIMARY KEY, topic_id VARCHAR(255) UNIQUE, content_json LONGTEXT, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
     'video_lessons' => "(id INT AUTO_INCREMENT PRIMARY KEY, topic_id VARCHAR(255) UNIQUE, url VARCHAR(500), description TEXT)",
     'analytics_visits' => "(date DATE PRIMARY KEY, count INT DEFAULT 0)",
-    'contact_messages' => "(id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255), email VARCHAR(255), subject VARCHAR(255), message TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
     'psychometric_results' => "(id INT AUTO_INCREMENT PRIMARY KEY, user_id VARCHAR(255) UNIQUE, report_json LONGTEXT, date TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"
 ];
 try {
-    foreach ($schema as $table => $def) {
-        $conn->exec("CREATE TABLE IF NOT EXISTS $table $def");
-    }
-    // Update attempts table with missing title column
-    try { $conn->exec("ALTER TABLE test_attempts ADD COLUMN IF NOT EXISTS title VARCHAR(255) AFTER test_id"); } catch(Exception $e){}
-    try { $conn->exec("ALTER TABLE test_attempts ADD COLUMN IF NOT EXISTS accuracy_percent INT AFTER accuracy"); } catch(Exception $e){}
-    
+    foreach ($schema as $table => $def) { $conn->exec("CREATE TABLE IF NOT EXISTS $table $def"); }
     echo json_encode(["status" => "success", "message" => "Schema synchronized."]);
 } catch(Exception $e) { http_response_code(500); echo json_encode(["status" => "error", "message" => $e->getMessage()]); }
 ?>`
@@ -250,9 +380,17 @@ export const generateSQLSchema = () => {
     sql += `SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO"; START TRANSACTION; SET time_zone = "+00:00";\n\n`;
     
     const tables = [
-        `CREATE TABLE users (id VARCHAR(255) PRIMARY KEY, name VARCHAR(255), email VARCHAR(255) UNIQUE, password_hash VARCHAR(255), role VARCHAR(50) DEFAULT 'STUDENT', target_exam VARCHAR(100), target_year INT, institute VARCHAR(255), gender VARCHAR(50), dob DATE, is_verified TINYINT(1) DEFAULT 1, google_id VARCHAR(255), parent_id VARCHAR(255), linked_student_id VARCHAR(255), school VARCHAR(255), phone VARCHAR(50), avatar_url VARCHAR(500), security_question TEXT, security_answer TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
-        `CREATE TABLE test_attempts (id VARCHAR(255) PRIMARY KEY, user_id VARCHAR(255), test_id VARCHAR(255), title VARCHAR(255), score INT, total_marks INT, accuracy FLOAT, accuracy_percent INT, detailed_results LONGTEXT, topic_id VARCHAR(255), difficulty VARCHAR(50), total_questions INT DEFAULT 0, correct_count INT DEFAULT 0, incorrect_count INT DEFAULT 0, unattempted_count INT DEFAULT 0, date TIMESTAMP DEFAULT CURRENT_TIMESTAMP, INDEX(user_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
-        `CREATE TABLE user_progress (id INT AUTO_INCREMENT PRIMARY KEY, user_id VARCHAR(255), topic_id VARCHAR(255), status VARCHAR(50), last_revised DATETIME, revision_level INT, next_revision_date DATETIME, solved_questions_json LONGTEXT, UNIQUE KEY (user_id, topic_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`
+        `CREATE TABLE IF NOT EXISTS users (id VARCHAR(255) PRIMARY KEY, name VARCHAR(255), email VARCHAR(255) UNIQUE, password_hash VARCHAR(255), role VARCHAR(50) DEFAULT 'STUDENT', target_exam VARCHAR(100), target_year INT, institute VARCHAR(255), gender VARCHAR(50), dob DATE, is_verified TINYINT(1) DEFAULT 1, parent_id VARCHAR(255), linked_student_id VARCHAR(255), school VARCHAR(255), phone VARCHAR(50), avatar_url VARCHAR(500), security_question TEXT, security_answer TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
+        `CREATE TABLE IF NOT EXISTS test_attempts (id VARCHAR(255) PRIMARY KEY, user_id VARCHAR(255), test_id VARCHAR(255), title VARCHAR(255), score INT, total_marks INT, accuracy FLOAT, accuracy_percent INT, detailed_results LONGTEXT, topic_id VARCHAR(255), difficulty VARCHAR(50), total_questions INT DEFAULT 0, correct_count INT DEFAULT 0, incorrect_count INT DEFAULT 0, unattempted_count INT DEFAULT 0, date TIMESTAMP DEFAULT CURRENT_TIMESTAMP, INDEX(user_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
+        `CREATE TABLE IF NOT EXISTS user_progress (id INT AUTO_INCREMENT PRIMARY KEY, user_id VARCHAR(255), topic_id VARCHAR(255), status VARCHAR(50), last_revised DATETIME, revision_level INT, next_revision_date DATETIME, solved_questions_json LONGTEXT, UNIQUE KEY (user_id, topic_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
+        `CREATE TABLE IF NOT EXISTS timetable (user_id VARCHAR(255) PRIMARY KEY, config_json LONGTEXT, slots_json LONGTEXT, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
+        `CREATE TABLE IF NOT EXISTS backlogs (id VARCHAR(255) PRIMARY KEY, user_id VARCHAR(255), topic VARCHAR(255), subject VARCHAR(50), priority VARCHAR(50), status VARCHAR(50), deadline DATE, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
+        `CREATE TABLE IF NOT EXISTS goals (id VARCHAR(255) PRIMARY KEY, user_id VARCHAR(255), text VARCHAR(255), completed TINYINT(1) DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
+        `CREATE TABLE IF NOT EXISTS mistake_logs (id VARCHAR(255) PRIMARY KEY, user_id VARCHAR(255), question TEXT, subject VARCHAR(50), note TEXT, date DATETIME) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
+        `CREATE TABLE IF NOT EXISTS content (id INT AUTO_INCREMENT PRIMARY KEY, type VARCHAR(50), title VARCHAR(255), content_json LONGTEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
+        `CREATE TABLE IF NOT EXISTS notifications (id VARCHAR(255) PRIMARY KEY, from_id VARCHAR(255), from_name VARCHAR(255), to_id VARCHAR(255), type VARCHAR(50), message TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
+        `CREATE TABLE IF NOT EXISTS settings (setting_key VARCHAR(255) PRIMARY KEY, value TEXT) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
+        `CREATE TABLE IF NOT EXISTS psychometric_results (id INT AUTO_INCREMENT PRIMARY KEY, user_id VARCHAR(255) UNIQUE, report_json LONGTEXT, date TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`
     ];
 
     sql += tables.join('\n\n') + '\n\nCOMMIT;';
