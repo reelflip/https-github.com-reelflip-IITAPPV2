@@ -53,8 +53,8 @@ interface ErrorBoundaryState {
   hasError: boolean;
 }
 
-// Fix: Using named Component import to ensure TypeScript correctly recognizes this.props and this.state.
-class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+// Fix: Using React.Component explicitly to ensure TypeScript correctly recognizes this.props and this.state.
+class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
   // Fix: Removed redundant constructor and initialized state directly for better type inference.
   public state: ErrorBoundaryState = { hasError: false };
 
@@ -77,7 +77,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
         </div>
       );
     }
-    // Fix: Property 'props' is now correctly inherited from Component when extending it using the named import.
+    // Fix: Property 'props' is now correctly inherited from Component when extending it using the React.Component syntax.
     return this.props.children;
   }
 }

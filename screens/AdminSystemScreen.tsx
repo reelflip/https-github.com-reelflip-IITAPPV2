@@ -77,6 +77,7 @@ export const AdminSystemScreen: React.FC = () => {
     setScanning(true);
     try {
       const dbRes = await fetch('/api/test_db.php');
+      // Fix: Use correct variable name 'dbRes' instead of undefined 'res'
       if (dbRes.ok) { const data = await dbRes.json(); if (data.tables) setDbTables(data.tables); }
       const statusMap: any = {};
       for (const file of API_FILE_LIST) {
@@ -195,7 +196,7 @@ export const AdminSystemScreen: React.FC = () => {
                                   className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-100 outline-none"
                               />
                           </div>
-                          <p className="text-[10px] text-slate-400 mt-2">Obtain this from Google Cloud Console (APIs & Services > Credentials).</p>
+                          <p className="text-[10px] text-slate-400 mt-2">Obtain this from Google Cloud Console (APIs &amp; Services &gt; Credentials).</p>
                       </div>
                   </div>
               </div>
