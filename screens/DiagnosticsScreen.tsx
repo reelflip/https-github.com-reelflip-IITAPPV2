@@ -1,7 +1,6 @@
 import React, { useState, useRef, useMemo, useEffect } from 'react';
-import { Brain, ShieldCheck, RefreshCw, Activity, Terminal, Download, Play, FileJson, AlertTriangle, CheckCircle2, XCircle, Shield, Database, Server, Sparkles, Code, FileText, ChevronRight, Lightbulb, AlertCircle, Wrench, Layers, ChevronUp, ChevronDown, Send, MessageSquare, Bot, User as UserIcon, HelpCircle, FileCode, Check, Search, Zap } from 'lucide-react';
-import { E2ETestRunner, TestResult, AIFixRecommendation } from '../services/testRunnerService';
-import { GoogleGenAI } from "@google/genai";
+import { ShieldCheck, RefreshCw, Activity, Terminal, Play, CheckCircle2, XCircle, Shield, Database, Wrench, Layers, ChevronUp, ChevronDown, Send, MessageSquare, Bot, User as UserIcon, AlertTriangle, Zap, Info } from 'lucide-react';
+import { E2ETestRunner, TestResult, LocalKnowledgeBase } from '../services/testRunnerService';
 
 interface ChatMessage {
     role: 'user' | 'assistant';
@@ -11,18 +10,16 @@ interface ChatMessage {
 
 export const DiagnosticsScreen: React.FC = () => {
     const [isRunning, setIsRunning] = useState(false);
-    const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [results, setResults] = useState<TestResult[]>([]);
-    const [aiFixes, setAiFixes] = useState<AIFixRecommendation[]>([]);
     const [dbTables, setDbTables] = useState<any[]>([]);
     const [expandedTable, setExpandedTable] = useState<string | null>(null);
     const runnerRef = useRef<E2ETestRunner | null>(null);
 
-    // --- AI Debug Chat State ---
+    // --- Local Rule-Based Chat State ---
     const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
         { 
             role: 'assistant', 
-            content: "Expert System Debugger initialized. I can analyze PHP crashes and SQL mismatches.\n\nNOTE: For 500/404/403 errors, I provide **Deterministic Fixes** automatically in the Audit Feed below, which do not require an API key.",
+            content: "Welcome to the Keyless Diagnostic Assistant. I use built-in logic to analyze crashes, syntax errors, and database mismatches locally.\n\nHow can I help you troubleshoot your deployment today?",
             timestamp: new Date()
         }
     ]);
@@ -50,7 +47,6 @@ export const DiagnosticsScreen: React.FC = () => {
 
     const runFullAudit = async () => {
         setResults([]);
-        setAiFixes([]);
         setIsRunning(true);
         const runner = initRunner();
         await runner.runFullAudit();
@@ -67,55 +63,22 @@ export const DiagnosticsScreen: React.FC = () => {
         setChatMessages(prev => [...prev, { role: 'user', content: userMsg, timestamp: new Date() }]);
         setIsChatLoading(true);
 
-        // API Key Check (Internal Rule-based responses for simple queries if key missing)
-        if (!process.env.API_KEY || process.env.API_KEY === "undefined") {
-            setTimeout(() => {
-                setChatMessages(prev => [...prev, { 
-                    role: 'assistant', 
-                    content: "The AI Diagnostic Engine (Gemini) is currently offline because no API Key is detected. \n\nHowever, you can still use the **Audit Feed** below. Our built-in Heuristic Engine identifies 500/404/403 errors and provides recovery instructions locally without needing any external API.", 
-                    timestamp: new Date() 
-                }]);
-                setIsChatLoading(false);
-            }, 800);
-            return;
-        }
-
-        try {
-            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-            const model = 'gemini-3-flash-preview';
-            
-            const failures = results.filter(r => r.status === 'FAIL').map(r => `${r.step}: ${r.description} (${r.details})`).join('\n');
-            const dbSchema = dbTables.map(t => `${t.name} (${t.rows} rows)`).join(', ');
-
-            const systemPrompt = `You are the Lead Systems Architect for the IIT JEE Prep platform. 
-            CONTEXT: PHP 8.1 LAMP Stack. Endpoints in /api/. React 19 Frontend. 26 SQL Tables.
-            DIAGNOSTIC STATE: ${failures || 'All systems green.'}
-            SCHEMA: ${dbSchema}
-            INSTRUCTIONS: Provide exact line-by-line PHP/SQL fixes for deployment crashes. Be concise and actionable for non-developers.`;
-
-            const response = await ai.models.generateContent({
-                model: model,
-                contents: userMsg,
-                config: { systemInstruction: systemPrompt, temperature: 0.1 }
-            });
-
+        // Simulated processing time for "Expert Analysis" feel
+        setTimeout(() => {
+            const responseText = LocalKnowledgeBase.query(userMsg, results.filter(r => r.status === 'FAIL'));
             setChatMessages(prev => [...prev, { 
                 role: 'assistant', 
-                content: response.text || "I processed your query but could not generate a recommendation. Refer to the deterministic feed below.", 
+                content: responseText, 
                 timestamp: new Date() 
             }]);
-        } catch (error: any) {
-            setChatMessages(prev => [...prev, { role: 'assistant', content: "AI Connection Error. Please verify your API Key or check the local Heuristic Engine logs below.", timestamp: new Date() }]);
-        } finally {
             setIsChatLoading(false);
-        }
+        }, 600);
     };
 
     const stats = useMemo(() => ({
         total: results.length,
         passed: results.filter(r => r.status === 'PASS').length,
         failed: results.filter(r => r.status === 'FAIL').length,
-        running: results.filter(r => r.status === 'RUNNING').length
     }), [results]);
 
     const criticalFixes = useMemo(() => results.filter(r => r.status === 'FAIL' && r.metadata?.deterministicAdvice), [results]);
@@ -128,16 +91,16 @@ export const DiagnosticsScreen: React.FC = () => {
                     <div className="flex-1">
                         <div className="flex items-center gap-3 mb-2">
                             <ShieldCheck className="w-8 h-8 text-blue-400" />
-                            <h2 className="text-3xl font-black tracking-tight uppercase">Diagnostic Center</h2>
+                            <h2 className="text-3xl font-black tracking-tight uppercase">Identity Recovery Core</h2>
                         </div>
                         <p className="text-slate-400 text-sm max-w-xl font-medium">
-                            Deterministic Recovery Core (v12.45): Rule-based troubleshooting that works even without an AI key.
+                            Deterministic v12.45 Core: Rule-based troubleshooting that works 100% offline with zero API key dependency.
                         </p>
                     </div>
                     <div className="flex flex-wrap gap-3 shrink-0">
                         <button onClick={runFullAudit} disabled={isRunning} className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-3 rounded-xl font-bold text-sm flex items-center gap-2 transition-all shadow-lg shadow-blue-900/40 disabled:opacity-50 active:scale-95">
                             {isRunning ? <RefreshCw className="animate-spin" size={18} /> : <Play size={18} />}
-                            {isRunning ? 'Auditing 51 Nodes...' : 'Launch 51-Point Scan'}
+                            {isRunning ? 'Auditing 51 Nodes...' : 'Run Deterministic Scan'}
                         </button>
                     </div>
                 </div>
@@ -148,12 +111,12 @@ export const DiagnosticsScreen: React.FC = () => {
                             <span className="text-2xl font-bold text-white">{Math.round((stats.passed / (stats.total || 1)) * 100)}%</span>
                         </div>
                         <div className="bg-rose-500/10 border border-rose-500/20 p-4 rounded-2xl text-center">
-                            <span className="text-rose-400 text-[10px] font-black uppercase tracking-widest block mb-1">Failures</span>
+                            <span className="text-rose-400 text-[10px] font-black uppercase tracking-widest block mb-1">Errors</span>
                             <span className="text-2xl font-bold text-rose-400">{stats.failed}</span>
                         </div>
                         <div className="bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-2xl text-center">
-                            <span className="text-emerald-400 text-[10px] font-black uppercase tracking-widest block mb-1">Status</span>
-                            <span className="text-2xl font-bold text-emerald-400">{stats.failed === 0 ? 'Ready' : 'Repair Req.'}</span>
+                            <span className="text-emerald-400 text-[10px] font-black uppercase tracking-widest block mb-1">Sync status</span>
+                            <span className="text-2xl font-bold text-emerald-400">Offline-Core</span>
                         </div>
                         <div className="bg-blue-500/10 border border-blue-500/20 p-4 rounded-2xl text-center">
                             <span className="text-blue-400 text-[10px] font-black uppercase tracking-widest block mb-1">Coverage</span>
@@ -163,7 +126,7 @@ export const DiagnosticsScreen: React.FC = () => {
                 )}
             </div>
 
-            {/* Offline-First Deterministic Fix Advisor */}
+            {/* Deterministic Fix Advisor */}
             {criticalFixes.length > 0 && !isRunning && (
                 <div className="bg-amber-50 border border-amber-200 rounded-[2.5rem] p-8 shadow-sm animate-in zoom-in-95">
                     <div className="flex items-center gap-3 mb-6">
@@ -171,8 +134,8 @@ export const DiagnosticsScreen: React.FC = () => {
                             <AlertTriangle size={24} />
                         </div>
                         <div>
-                            <h3 className="text-xl font-black text-amber-900 uppercase tracking-tight">Local Recovery Advisor</h3>
-                            <p className="text-amber-700 text-sm font-bold">Actionable repairs detected by local system heuristics (Independent of AI Key).</p>
+                            <h3 className="text-xl font-black text-amber-900 uppercase tracking-tight">Built-in Recovery Engine</h3>
+                            <p className="text-amber-700 text-sm font-bold">Rule-based repairs identified by the heuristic core.</p>
                         </div>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -192,7 +155,7 @@ export const DiagnosticsScreen: React.FC = () => {
             )}
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                {/* Left: AI Debug Console */}
+                {/* Left: Rule-Based Chat Assistant */}
                 <div className="lg:col-span-7 flex flex-col h-[600px] bg-white rounded-[2.5rem] border border-slate-200 shadow-xl overflow-hidden relative">
                     <div className="bg-slate-900 px-6 py-4 flex items-center justify-between shrink-0">
                         <div className="flex items-center gap-3">
@@ -200,15 +163,11 @@ export const DiagnosticsScreen: React.FC = () => {
                                 <Bot size={20} className="text-blue-400" />
                             </div>
                             <div>
-                                <h3 className="text-white font-black text-sm uppercase tracking-tight">AI Expert layer</h3>
-                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Optional Reasoning Module</p>
+                                <h3 className="text-white font-black text-sm uppercase tracking-tight">Local Expert System</h3>
+                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">100% Dependency-Free Logic Assistant</p>
                             </div>
                         </div>
-                        {!process.env.API_KEY || process.env.API_KEY === "undefined" ? (
-                            <span className="bg-rose-500/20 text-rose-400 px-2 py-1 rounded text-[9px] font-black uppercase tracking-tighter">AI Core Offline</span>
-                        ) : (
-                            <span className="bg-emerald-500/20 text-emerald-400 px-2 py-1 rounded text-[9px] font-black uppercase tracking-tighter">AI Online</span>
-                        )}
+                        <span className="bg-emerald-500/20 text-emerald-400 px-2 py-1 rounded text-[9px] font-black uppercase tracking-tighter">Keyless Mode</span>
                     </div>
 
                     <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50/30 custom-scrollbar">
@@ -245,7 +204,7 @@ export const DiagnosticsScreen: React.FC = () => {
                             <input 
                                 value={chatInput}
                                 onChange={(e) => setChatInput(e.target.value)}
-                                placeholder="Consult the expert about a crash..."
+                                placeholder="Ask about login, 500 errors, or DB config..."
                                 className="w-full bg-slate-100 border-none rounded-[1.5rem] pl-5 pr-14 py-4 text-sm focus:ring-2 focus:ring-blue-100 outline-none placeholder:text-slate-400 font-medium transition-all"
                             />
                             <button type="submit" disabled={!chatInput.trim() || isChatLoading} className="absolute right-2 top-2 p-3 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-100 disabled:opacity-30 active:scale-95">
@@ -255,7 +214,7 @@ export const DiagnosticsScreen: React.FC = () => {
                     </form>
                 </div>
 
-                {/* Right: Core Audit Feed (Deterministic) */}
+                {/* Right: Core Audit Feed */}
                 <div className="lg:col-span-5 flex flex-col bg-white rounded-[2.5rem] border border-slate-200 shadow-sm h-[600px] overflow-hidden">
                     <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center shrink-0">
                         <div className="flex items-center gap-3">
@@ -268,7 +227,7 @@ export const DiagnosticsScreen: React.FC = () => {
                         {results.length === 0 ? (
                             <div className="h-full flex flex-col items-center justify-center text-center p-12 text-slate-300">
                                 <Shield className="w-12 h-12 mb-3 opacity-10" />
-                                <p className="font-black uppercase tracking-widest text-[10px]">Awaiting Deployment Scan</p>
+                                <p className="font-black uppercase tracking-widest text-[10px]">Awaiting Manual Scan</p>
                             </div>
                         ) : (
                             <div className="divide-y divide-slate-50">

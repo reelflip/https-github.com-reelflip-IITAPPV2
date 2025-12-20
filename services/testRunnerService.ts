@@ -14,21 +14,62 @@ export interface TestResult {
     };
 }
 
-export interface AIFixRecommendation {
-    stepId: string;
-    problem: string;
-    filesToModify: {
-        path: string;
-        language: 'php' | 'typescript' | 'sql';
-        action: string;
-        codeSnippet?: string;
-    }[];
-    confidence: number;
+/**
+ * Local Rule-Based Expert System (No API Key Required)
+ * Provides expert-level advice by matching keywords and system patterns.
+ */
+export class LocalKnowledgeBase {
+    private static platformRules = [
+        {
+            keywords: ['login', 'auth', 'password', 'Ishika'],
+            response: "The Auth module uses Bcrypt hashing in 'api/login.php'. If logins fail with 401, check if the 'users' table is empty or if password hashes are valid. For demo access, ensure 'Ishika@123' is being checked correctly in the PHP logic."
+        },
+        {
+            keywords: ['500', 'crash', 'syntax', 'error', 'semicolon'],
+            response: "A 500 error usually indicates a PHP Parse Error. Check the last modified file in '/api/' for missing semicolons (;) or mismatched braces {}. Use an online PHP Syntax checker if you cannot see the server logs."
+        },
+        {
+            keywords: ['database', 'mysql', 'connection', 'hostinger', 'link'],
+            response: "Verify 'api/config.php'. Ensure the host is 'localhost' for most CPanel hosts. If the error is 'Access Denied', your MySQL user does not have permissions for the specified database name."
+        },
+        {
+            keywords: ['schema', 'table', 'missing', 'exist', 'migrate'],
+            response: "Run the 'api/migrate_db.php' script by clicking 'Repair Schema' in the Deployment tab. This will automatically re-create all 26 required tables and columns without deleting existing data."
+        },
+        {
+            keywords: ['cors', 'access-control', 'origin', 'options'],
+            response: "Ensure 'api/cors.php' is included in every endpoint. It must send 'Access-Control-Allow-Origin: *' before any other output. If you see CORS errors, check if the server is outputting whitespace before the PHP tags."
+        },
+        {
+            keywords: ['sync', 'progress', 'dashboard', 'load'],
+            response: "'api/get_dashboard.php' is the main data hub. If the dashboard is empty, verify this file exists and that the 'userId' parameter is being passed correctly from the React frontend."
+        }
+    ];
+
+    static query(userInput: string, lastFailures: TestResult[]): string {
+        const input = userInput.toLowerCase();
+        
+        // 1. Check for specific failure mentions
+        if (lastFailures.length > 0) {
+            const mentionedFailure = lastFailures.find(f => input.includes(f.step.toLowerCase()));
+            if (mentionedFailure && mentionedFailure.metadata?.deterministicAdvice) {
+                return `Expert Advice for ${mentionedFailure.step}: ${mentionedFailure.metadata.deterministicAdvice}`;
+            }
+        }
+
+        // 2. Keyword matching
+        for (const rule of this.platformRules) {
+            if (rule.keywords.some(k => input.includes(k))) {
+                return rule.response;
+            }
+        }
+
+        return "I'm the Local Knowledge Assistant. I don't see a direct match for your query in my offline database. \n\nGeneral Tip: Try running a 'Full Set Scan' in the Deployment Center and look for Red HTTP codes—they usually point to the exact file causing the issue.";
+    }
 }
 
 /**
  * Deterministic Diagnostic Engine (No API Key Required)
- * Analyzes common PHP/MySQL/Deployment patterns to provide instant fixes.
  */
 export class HeuristicEngine {
     static analyze(result: { code: number, raw: string, file: string }): { advice: string, type: TestResult['metadata']['errorType'] } {
