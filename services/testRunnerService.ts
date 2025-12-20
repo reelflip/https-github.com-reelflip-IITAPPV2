@@ -1,3 +1,5 @@
+import { API_FILES_LIST } from './generatorService';
+
 export interface TestResult {
     step: string;
     description: string;
@@ -13,6 +15,8 @@ export interface TestResult {
         errorType?: 'SYNTAX' | 'DB_LINK' | 'PERMISSION' | 'MISSING_FILE' | 'SCHEMA_MISMATCH' | 'UNKNOWN';
     };
 }
+
+export const API_FILES = API_FILES_LIST;
 
 /**
  * Local Rule-Based Expert System (No API Key Required)
@@ -175,7 +179,7 @@ export class E2ETestRunner {
         this.log("START", "Legacy 51-Point Deterministic Audit", "PASS", "Initializing Offline-First Recovery Core...");
 
         // Category H: Host (H.01 - H.10)
-        const hostFiles = ['index.php', 'config.php', 'cors.php', 'test_db.php', 'migrate_db.php'];
+        const hostFiles = ['index.php', 'config.php', 'cors.php', 'test_db.php', 'migrate_db.php', 'read_source.php'];
         for (let i = 1; i <= 10; i++) {
             const file = hostFiles[(i-1) % hostFiles.length];
             const id = `H.${i.toString().padStart(2, '0')}`;
@@ -207,5 +211,13 @@ export class E2ETestRunner {
         }
 
         this.log("FINISH", "51-Point Deterministic Scan Complete", "PASS", "System logic verified. AI Key is not required for these deterministic results.");
+    }
+
+    async fetchFileSource(filename: string): Promise<{ source: string } | { error: string }> {
+        const res = await this.safeFetch(`/api/read_source.php?file=${filename}`, { method: 'GET' });
+        if (res.ok && res.data?.source) {
+            return { source: res.data.source };
+        }
+        return { error: res.data?.error || "Failed to read file source." };
     }
 }

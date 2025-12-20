@@ -31,6 +31,22 @@ function getV($data, $p) {
 }
 `;
 
+export const API_FILES_LIST = [
+    'index.php', 'config.php', 'cors.php', 'test_db.php', 'migrate_db.php', 'read_source.php',
+    'login.php', 'register.php', 'google_login.php', 'update_password.php',
+    'get_dashboard.php', 'sync_progress.php', 
+    'save_attempt.php', 'save_timetable.php',
+    'manage_users.php', 'manage_content.php', 'manage_tests.php', 
+    'manage_syllabus.php', 'manage_questions.php', 'manage_backlogs.php',
+    'manage_goals.php', 'manage_mistakes.php', 'manage_notes.php',
+    'manage_videos.php', 'manage_contact.php', 'contact.php',
+    'manage_settings.php', 'update_profile.php', 'track_visit.php',
+    'get_admin_stats.php', 'search_students.php', 'send_request.php',
+    'respond_request.php', 'get_psychometric.php', 'save_psychometric.php',
+    'delete_account.php', 'upload_avatar.php', 'get_topics.php', 
+    'get_attempt_details.php', 'manage_chapter_test.php'
+];
+
 export const getBackendFiles = (dbConfig: any) => [
     {
         name: 'cors.php',
@@ -41,6 +57,27 @@ header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-W
 header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
 if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') { exit(0); }
 header("Content-Type: application/json; charset=UTF-8");
+?>`
+    },
+    {
+        name: 'read_source.php',
+        folder: 'deployment/api',
+        content: `<?php
+include_once 'cors.php';
+$file = $_GET['file'] ?? '';
+$allowed = [${API_FILES_LIST.map(f => "'$f'").join(', ')}];
+if (!in_array($file, $allowed)) {
+    http_response_code(403);
+    echo json_encode(["error" => "Access denied"]);
+    exit;
+}
+$path = __DIR__ . '/' . $file;
+if (file_exists($path)) {
+    echo json_encode(["source" => file_get_contents($path)]);
+} else {
+    http_response_code(404);
+    echo json_encode(["error" => "File not found"]);
+}
 ?>`
     },
     {
@@ -65,7 +102,7 @@ try {
     {
         name: 'index.php',
         folder: 'deployment/api',
-        content: `<?php echo json_encode(["status" => "active", "version" => "12.45", "files" => 38, "engine" => "Stability Core"]); ?>`
+        content: `<?php echo json_encode(["status" => "active", "version" => "12.45", "files" => 39, "engine" => "Stability Core"]); ?>`
     },
     {
         name: 'test_db.php',
