@@ -291,7 +291,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate }) =
                                                     <option value="FEMALE">Female</option>
                                                     <option value="OTHER">Other</option>
                                                 </select>
-                                                <ChevronDown className="absolute right-3 top-3.5 text-slate-400 pointer-events-none" size={14} />
+                                                <ChevronDown className="absolute right-3 top-3 text-slate-400 pointer-events-none" size={14} />
                                             </div>
                                         </div>
                                     </div>
@@ -458,7 +458,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate }) =
               <button onClick={() => onNavigate('contact')} className="hover:text-blue-600 transition-colors">Contact</button>
               <button onClick={() => onNavigate('privacy')} className="hover:text-blue-600 transition-colors">Privacy Policy</button>
           </div>
-          <p className="text-center mt-6 text-[9px] font-medium text-slate-300 uppercase tracking-[0.3em]">&copy; {new Date().getFullYear()} IITGEEPrep • STABLE v12.34</p>
+          <p className="text-center mt-6 text-[9px] font-medium text-slate-300 uppercase tracking-[0.3em]">&copy; {new Date().getFullYear()} IITGEEPrep • ULTIMATE v12.37</p>
       </footer>
     </div>
   );

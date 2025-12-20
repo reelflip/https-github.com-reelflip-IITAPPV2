@@ -95,7 +95,7 @@ export const DeploymentScreen: React.FC = () => {
         try {
             const res = await fetch('/api/migrate_db.php');
             if(res.ok) {
-                alert("v12.34 Synchronized Schema Verification Successful!");
+                alert("v12.37 Synchronized Schema Verification Successful!");
                 scanDatabase();
             }
             else throw new Error(`HTTP ${res.status}`);
@@ -122,7 +122,7 @@ export const DeploymentScreen: React.FC = () => {
             const content = await zip.generateAsync({ type: "blob" });
             const url = URL.createObjectURL(content);
             const link = document.createElement('a');
-            link.href = url; link.download = "IITGEEPrep_Sync_v12_34.zip";
+            link.href = url; link.download = "IITGEEPrep_Sync_v12_37.zip";
             link.click();
         } catch (error) { alert("Zip creation failed."); }
         setIsZipping(false);
@@ -135,7 +135,7 @@ export const DeploymentScreen: React.FC = () => {
                     <div>
                         <div className="flex items-center gap-3 mb-2">
                             <h2 className="text-3xl font-bold">Deployment Center</h2>
-                            <span className="px-2 py-1 rounded-md bg-blue-600 text-xs font-mono text-white animate-pulse uppercase tracking-widest">v12.34 SYNC STABLE</span>
+                            <span className="px-2 py-1 rounded-md bg-blue-600 text-xs font-mono text-white animate-pulse uppercase tracking-widest">v12.37 ULTIMATE SYNC</span>
                         </div>
                         <p className="text-slate-400 text-lg">Platform-wide synchronization for 38 endpoints and SQL schema.</p>
                     </div>
@@ -150,7 +150,7 @@ export const DeploymentScreen: React.FC = () => {
                 <div className="space-y-8">
                     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
                         <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
-                            <div><h3 className="text-lg font-bold text-slate-800 flex items-center gap-2"><Database className="text-blue-500" size={20}/> Database Sync Tracker</h3><p className="text-sm text-slate-500">Checking v12.34 schema compliance and record counts.</p></div>
+                            <div><h3 className="text-lg font-bold text-slate-800 flex items-center gap-2"><Database className="text-blue-500" size={20}/> Database Sync Tracker</h3><p className="text-sm text-slate-500">Checking v12.37 schema compliance and record counts.</p></div>
                             <div className="flex gap-2 w-full md:w-auto">
                                 <button onClick={runDbRepair} disabled={repairing} className="flex-1 md:flex-none bg-slate-800 hover:bg-black text-white px-6 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50">{repairing ? <RefreshCw className="animate-spin" size={18}/> : <ShieldCheck size={18}/>} Repair Schema</button>
                                 <button onClick={scanDatabase} disabled={scanningDb} className="flex-1 md:flex-none bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50">{scanningDb ? <RefreshCw className="animate-spin" size={18}/> : <RefreshCw size={18}/>} Test DB Connection</button>
@@ -226,7 +226,7 @@ export const DeploymentScreen: React.FC = () => {
                     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
                         <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
                             <div>
-                                <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2"><Activity className="text-orange-500" size={20}/> Module Integrity Scan (v12.34)</h3>
+                                <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2"><Activity className="text-orange-500" size={20}/> Module Integrity Scan (v12.37)</h3>
                                 <p className="text-sm text-slate-500">Checking for syntax stability across the full 38-file set.</p>
                             </div>
                             <button onClick={runIntegrityScan} disabled={scanning} className="bg-orange-600 hover:bg-orange-700 text-white px-6 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all active:scale-95 disabled:opacity-50">{scanning ? <RefreshCw className="animate-spin" size={18}/> : <Activity size={18}/>} Full Set Scan</button>
@@ -269,11 +269,11 @@ export const DeploymentScreen: React.FC = () => {
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     <div className="lg:col-span-2 bg-white p-8 rounded-2xl border border-slate-200 shadow-sm space-y-6">
                         <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2 text-blue-600"><CheckCircle2 className="animate-pulse" /> Unified Synchronization Guide</h3>
-                        <p className="text-slate-600 text-sm leading-relaxed">System v12.34 ensures complete synchronization between frontend and backend. Follow these steps for a clean install:</p>
+                        <p className="text-slate-600 text-sm leading-relaxed">System v12.37 ensures complete synchronization between frontend and backend. Follow these steps for a clean install:</p>
                         <ol className="space-y-4 text-slate-600 text-sm list-decimal pl-5">
-                            <li>Download the <strong>v12.34 Master Sync Bundle</strong>. This contains the full, matching set of 38 PHP scripts.</li>
+                            <li>Download the <strong>v12.37 Master Sync Bundle</strong>. This contains the full, matching set of 38 PHP scripts.</li>
                             <li><b>Completely empty</b> your server's <code>/api</code> directory before uploading. Mixing versions causes internal conflicts.</li>
-                            <li>Use the <b>Full Set Scan</b> to verify that all 38 endpoints are reachable and correctly reporting v12.34.</li>
+                            <li>Use the <b>Full Set Scan</b> to verify that all 38 endpoints are reachable and correctly reporting v12.37.</li>
                             <li>Run <b>Repair Schema</b> to align the SQL tables with the latest audit requirements.</li>
                         </ol>
                     </div>
@@ -281,10 +281,10 @@ export const DeploymentScreen: React.FC = () => {
                         <div className="bg-blue-900 rounded-2xl p-6 text-white shadow-xl relative overflow-hidden flex flex-col h-full">
                             <div className="flex-1">
                                 <h3 className="text-xl font-bold mb-2">Sync Master Bundle</h3>
-                                <p className="text-blue-200 text-sm mb-6 leading-relaxed">Contains 38 Synchronized PHP APIs and updated v12.34 SQL Schema for full system restoration.</p>
+                                <p className="text-blue-200 text-sm mb-6 leading-relaxed">Contains 38 Synchronized PHP APIs and updated v12.37 SQL Schema for full system restoration.</p>
                             </div>
                             <button onClick={downloadAllZip} disabled={isZipping} className="w-full bg-white text-blue-900 font-black py-3 rounded-xl flex items-center justify-center transition-all disabled:opacity-50 shadow-lg active:scale-95 mt-4">
-                                {isZipping ? <RefreshCw className="animate-spin mr-2"/> : <Download className="mr-2"/>} Download v12.34 (38 Files)
+                                {isZipping ? <RefreshCw className="animate-spin mr-2"/> : <Download className="mr-2"/>} Download v12.37 (38 Files)
                             </button>
                         </div>
                     </div>
