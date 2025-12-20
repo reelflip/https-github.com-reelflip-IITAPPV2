@@ -71,7 +71,7 @@ try {
     $conn->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
 } catch(PDOException $e) {
     http_response_code(200); 
-    echo json_encode(["status" => "error", "message" => "DATABASE_CONNECTION_ERROR", "details" => $e->getMessage()]);
+    echo json_encode(["status" => "error", "message" => "DATABASE_CONNECTION_ERROR", "details" => $e.getMessage()]);
     exit;
 }
 ?>`
