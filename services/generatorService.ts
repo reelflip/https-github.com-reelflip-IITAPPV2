@@ -2,7 +2,7 @@ import { SYLLABUS_DATA } from '../lib/syllabusData';
 
 const phpHeader = `<?php
 /**
- * IITGEEPrep Engine v12.38 - Master Sync Core
+ * IITGEEPrep Engine v12.39 - Sync Status Core
  * 100% Complete 38-File Backend Deployment
  */
 error_reporting(E_ALL);
@@ -67,7 +67,7 @@ try {
     {
         name: 'index.php',
         folder: 'deployment/api',
-        content: `<?php echo json_encode(["status" => "active", "version" => "12.38", "files" => 38, "engine" => "Master Sync Core"]); ?>`
+        content: `<?php echo json_encode(["status" => "active", "version" => "12.39", "files" => 38, "engine" => "Sync Status Core"]); ?>`
     },
     {
         name: 'test_db.php',
@@ -86,7 +86,7 @@ try {
         }
         $tables[] = ["name" => $tableName, "rows" => (int)$count, "columns" => $cols];
     }
-    echo json_encode(["status" => "CONNECTED", "db_name" => $db_name, "tables" => $tables, "version" => "12.38"]);
+    echo json_encode(["status" => "CONNECTED", "db_name" => $db_name, "tables" => $tables, "version" => "12.39"]);
 } catch(Exception $e) { echo json_encode(["status" => "error", "message" => $e->getMessage()]); }
 ?>`
     },
@@ -124,7 +124,7 @@ $tables = [
     'content' => "(id INT AUTO_INCREMENT PRIMARY KEY, type VARCHAR(50), title VARCHAR(255), content_json LONGTEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"
 ];
 foreach($tables as $name => $def) { $conn->exec("CREATE TABLE IF NOT EXISTS $name $def ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"); }
-echo json_encode(["status" => "success", "message" => "Master Schema v12.38 Unified", "tables_created" => count($tables)]);
+echo json_encode(["status" => "success", "message" => "Master Schema v12.39 Unified", "tables_created" => count($tables)]);
 ?>`
     },
     {
@@ -473,8 +473,8 @@ echo json_encode(["status" => "success"]);
         content: `${phpHeader}
 $d = getJsonInput();
 if(getV($d, 'action') === 'accept') {
-    $conn->prepare("UPDATE users SET linked_student_id = ? WHERE id = ?")->execute([getV($d, 'studentId'), getV($d, 'parentId')]);
-    $conn->prepare("UPDATE users SET parent_id = ? WHERE id = ?")->execute([getV($d, 'parentId'), getV($d, 'studentId')]);
+    $conn->prepare("UPDATE users SET linked_student_id = ? WHERE id = ?")->execute([getV($studentId), getV($parentId)]);
+    $conn->prepare("UPDATE users SET parent_id = ? WHERE id = ?")->execute([getV($parentId), getV($studentId)]);
 }
 $conn->prepare("DELETE FROM notifications WHERE id = ?")->execute([getV($d, 'notifId')]);
 echo json_encode(["status" => "success"]);
@@ -544,7 +544,7 @@ echo json_encode(["status" => "ready"]);
 ];
 
 export const generateSQLSchema = () => {
-    return `-- IITGEEPrep v12.38 Master Sync Schema
+    return `-- IITGEEPrep v12.39 Master Sync Schema
 -- Total Tables: 26 (Aligned with production environment)
 
 START TRANSACTION;

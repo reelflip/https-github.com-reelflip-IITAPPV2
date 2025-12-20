@@ -26,13 +26,15 @@ const API_FILE_LIST = [
     'manage_settings.php', 'update_profile.php', 'track_visit.php',
     'get_admin_stats.php', 'search_students.php', 'send_request.php',
     'respond_request.php', 'get_psychometric.php', 'save_psychometric.php',
-    'delete_account.php', 'upload_avatar.php'
+    'delete_account.php', 'upload_avatar.php', 'get_topics.php', 
+    'get_attempt_details.php', 'manage_chapter_test.php'
 ];
 
 export const AdminSystemScreen: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'ai' | 'auth' | 'health'>('ai');
   const [aiConfig, setAiConfig] = useState({ enabled: true, model: 'gemini-3-flash-preview' });
   const [googleAuthEnabled, setGoogleAuthEnabled] = useState(false);
+  const [showSyncStatus, setShowSyncStatus] = useState(false);
   const [googleClientId, setGoogleClientId] = useState('');
   const [gaId, setGaId] = useState('');
   const [saving, setSaving] = useState(false);
@@ -60,6 +62,9 @@ export const AdminSystemScreen: React.FC = () => {
 
       const oEnableRes = await fetch('/api/manage_settings.php?key=google_auth_enabled');
       if(oEnableRes.ok) { const data = await oEnableRes.json(); if(data?.value) setGoogleAuthEnabled(data.value === '1'); }
+
+      const syncRes = await fetch('/api/manage_settings.php?key=show_sync_status');
+      if(syncRes.ok) { const data = await syncRes.json(); if(data?.value) setShowSyncStatus(data.value === '1'); }
     } catch (e) {}
   };
 
@@ -117,6 +122,11 @@ export const AdminSystemScreen: React.FC = () => {
                   body: JSON.stringify({ key: 'google_auth_enabled', value: googleAuthEnabled ? '1' : '0' }) 
               }),
               fetch('/api/manage_settings.php', { 
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json' }, 
+                body: JSON.stringify({ key: 'show_sync_status', value: showSyncStatus ? '1' : '0' }) 
+            }),
+              fetch('/api/manage_settings.php', { 
                   method: 'POST', 
                   headers: { 'Content-Type': 'application/json' }, 
                   body: JSON.stringify({ key: 'google_analytics_id', value: gaId }) 
@@ -132,7 +142,7 @@ export const AdminSystemScreen: React.FC = () => {
     <div className="space-y-8 animate-in fade-in pb-12">
       <div className="bg-slate-900 rounded-2xl p-8 text-white shadow-xl relative overflow-hidden">
         <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-6">
-          <div><h2 className="text-3xl font-black flex items-center gap-3"><Activity className="text-blue-400" /> Admin System</h2><p className="text-slate-400 mt-2">v12.29 Master Restore Panel</p></div>
+          <div><h2 className="text-3xl font-black flex items-center gap-3"><Activity className="text-blue-400" /> Admin System</h2><p className="text-slate-400 mt-2">v12.39 Sync Status Control</p></div>
           <div className="flex bg-slate-800/50 p-1 rounded-xl border border-slate-700/50">
              <button onClick={() => setActiveTab('ai')} className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'ai' ? 'bg-blue-600 text-white' : 'text-slate-400'}`}>AI</button>
              <button onClick={() => setActiveTab('auth')} className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'auth' ? 'bg-blue-600 text-white' : 'text-slate-400'}`}>Auth & Analytics</button>
@@ -195,8 +205,22 @@ export const AdminSystemScreen: React.FC = () => {
                                   className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-100 outline-none"
                               />
                           </div>
-                          <p className="text-[10px] text-slate-400 mt-2">Obtain this from Google Cloud Console (APIs &amp; Services &gt; Credentials).</p>
                       </div>
+                  </div>
+              </div>
+
+              <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+                  <div className="p-6 border-b border-slate-100 bg-slate-50/50">
+                      <div className="flex items-center gap-3">
+                          <div className="p-2 bg-orange-100 text-orange-600 rounded-lg"><RefreshCw size={20}/></div>
+                          <div>
+                              <h3 className="font-bold text-slate-800">Visual Sync Indicators</h3>
+                              <p className="text-xs text-slate-500">Display 'Synced' / 'Not Synced' badges in the app headers.</p>
+                          </div>
+                      </div>
+                      <button onClick={() => setShowSyncStatus(!showSyncStatus)} className={`flex items-center gap-2 transition-colors ${showSyncStatus ? 'text-orange-600' : 'text-slate-400'}`}>
+                          {showSyncStatus ? <ToggleRight size={32} /> : <ToggleLeft size={32} />}
+                      </button>
                   </div>
               </div>
 
@@ -242,7 +266,7 @@ export const AdminSystemScreen: React.FC = () => {
       {activeTab === 'health' && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-in slide-in-from-bottom-4">
             <div className="bg-white rounded-2xl border border-slate-200 p-6">
-                <h3 className="font-black uppercase tracking-wider text-xs mb-6 flex items-center gap-2"><Database className="text-blue-500"/> Database Schema (v12.29)</h3>
+                <h3 className="font-black uppercase tracking-wider text-xs mb-6 flex items-center gap-2"><Database className="text-blue-500"/> Database Schema (v12.39)</h3>
                 <div className="space-y-3 max-h-[400px] overflow-y-auto">
                     {dbTables.map(t => (
                         <div key={t.name} className="flex justify-between p-3 bg-slate-50 rounded-lg border">

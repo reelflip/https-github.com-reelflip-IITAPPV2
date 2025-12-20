@@ -2,6 +2,7 @@ import React, { Component, useState, useEffect, useCallback, ErrorInfo, ReactNod
 import { Navigation, MobileNavigation } from './components/Navigation';
 import { AITutorChat } from './components/AITutorChat';
 import { PublicLayout } from './components/PublicLayout';
+import { SyncStatusBadge, SyncStatus } from './components/SyncStatusBadge';
 import { 
   User, UserProgress, TestAttempt, Goal, MistakeLog, BacklogItem, 
   Flashcard, MemoryHack, BlogPost, Screen, Test, Question, 
@@ -10,7 +11,7 @@ import {
 import { SYLLABUS_DATA } from './lib/syllabusData';
 import { MOCK_TESTS_DATA, generateInitialQuestionBank } from './lib/mockTestsData';
 
-// --- Lazy Loading Screens (v12.37) ---
+// --- Lazy Loading Screens (v12.39) ---
 const AuthScreen = lazy(() => import('./screens/AuthScreen').then(m => ({ default: m.AuthScreen })));
 const DashboardScreen = lazy(() => import('./screens/DashboardScreen').then(m => ({ default: m.DashboardScreen })));
 const AdminDashboardScreen = lazy(() => import('./screens/AdminDashboardScreen').then(m => ({ default: m.AdminDashboardScreen })));
@@ -34,8 +35,6 @@ const AdminSystemScreen = lazy(() => import('./screens/AdminSystemScreen').then(
 const DeploymentScreen = lazy(() => import('./screens/DeploymentScreen').then(m => ({ default: m.DeploymentScreen })));
 const DiagnosticsScreen = lazy(() => import('./screens/DiagnosticsScreen').then(m => ({ default: m.DiagnosticsScreen })));
 const ProfileScreen = lazy(() => import('./screens/ProfileScreen').then(m => ({ default: m.ProfileScreen })));
-
-// Fix: Added missing lazy imports for public screens to resolve "Cannot find name" errors
 const AboutUsScreen = lazy(() => import('./screens/AboutUsScreen').then(m => ({ default: m.AboutUsScreen })));
 const ExamGuideScreen = lazy(() => import('./screens/ExamGuideScreen').then(m => ({ default: m.ExamGuideScreen })));
 const PrivacyPolicyScreen = lazy(() => import('./screens/PrivacyPolicyScreen').then(m => ({ default: m.PrivacyPolicyScreen })));
@@ -60,6 +59,10 @@ const App: React.FC = () => {
     return (saved as Screen) || 'dashboard';
   });
 
+  // Global UI Control for Indicators
+  const [showIndicators, setShowIndicators] = useState(false);
+  const [globalSyncStatus, setGlobalSyncStatus] = useState<SyncStatus>('IDLE');
+
   const [progress, setProgress] = useState<Record<string, UserProgress>>({});
   const [testAttempts, setTestAttempts] = useState<TestAttempt[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
@@ -74,7 +77,6 @@ const App: React.FC = () => {
     setProgress({}); setTestAttempts([]); setGoals([]); setMistakes([]); setBacklogs([]); setTimetable({}); setLinkedData(undefined);
   }, []);
 
-  // v12.37: Correctly map snake_case SQL columns to UserProgress interface
   const mapProgress = (p: any): UserProgress => ({
     topicId: p.topic_id,
     status: p.status,
@@ -84,7 +86,6 @@ const App: React.FC = () => {
     solvedQuestions: p.solved_questions_json ? JSON.parse(p.solved_questions_json) : []
   });
 
-  // v12.37: Correctly map snake_case SQL columns to TestAttempt interface
   const mapAttempt = (a: any): TestAttempt => ({
     id: a.id,
     date: a.date,
@@ -103,6 +104,7 @@ const App: React.FC = () => {
   });
 
   const loadDashboard = useCallback(async (userId: string) => {
+    setGlobalSyncStatus('SYNCING');
     try {
         const res = await fetch(`/api/get_dashboard.php?user_id=${userId}`, { cache: 'no-store' });
         if (res.ok) {
@@ -124,26 +126,31 @@ const App: React.FC = () => {
             if (data.userProfileSync) {
                 const updatedUser = { ...data.userProfileSync, notifications: data.notifications || [] };
                 setUser(updatedUser);
-                if (updatedUser.role === 'PARENT' && updatedUser.linked_student_id) {
-                    const sRes = await fetch(`/api/get_dashboard.php?user_id=${updatedUser.linked_student_id}`);
-                    if (sRes.ok) {
-                        const sData = await sRes.json();
-                        const sProgMap: Record<string, UserProgress> = {};
-                        sData.progress?.forEach((p: any) => { const mapped = mapProgress(p); sProgMap[mapped.topicId] = mapped; });
-                        setLinkedData({ 
-                            progress: sProgMap, 
-                            tests: (sData.attempts || []).map(mapAttempt), 
-                            studentName: sData.userProfileSync?.name || 'Student',
-                            psychReport: sData.psychometric ? JSON.parse(sData.psychometric.report_json) : undefined
-                        });
-                    }
-                }
             }
+            setGlobalSyncStatus('SYNCED');
+        } else {
+            setGlobalSyncStatus('ERROR');
         }
-    } catch (e) { console.error("Persistence Sync Error:", e); }
+    } catch (e) { 
+        console.error("Persistence Sync Error:", e); 
+        setGlobalSyncStatus('ERROR');
+    }
   }, []);
 
-  useEffect(() => { if (user) loadDashboard(user.id); }, [user?.id, loadDashboard]);
+  const loadSettings = async () => {
+    try {
+      const res = await fetch('/api/manage_settings.php?key=show_sync_status');
+      if (res.ok) {
+          const data = await res.json();
+          if (data?.value === '1') setShowIndicators(true);
+      }
+    } catch (e) {}
+  };
+
+  useEffect(() => { 
+      loadSettings();
+      if (user) loadDashboard(user.id); 
+  }, [user?.id, loadDashboard]);
 
   useEffect(() => {
     if (user) localStorage.setItem('user', JSON.stringify(user));
@@ -156,39 +163,34 @@ const App: React.FC = () => {
 
   const handleLogout = () => { setUser(null); clearState(); setScreen('dashboard'); localStorage.clear(); };
 
-  const handleAddTestAttempt = async (attempt: TestAttempt) => {
-    setTestAttempts(prev => [attempt, ...prev]);
-    if (user && !user.id.startsWith('demo_')) {
-        await fetch('/api/save_attempt.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ...attempt, userId: user.id })
-        });
-    }
-  };
-
   const updateProgress = async (topicId: string, updates: Partial<UserProgress>) => {
+    setGlobalSyncStatus('SYNCING');
     const current = progress[topicId] || { topicId, status: 'NOT_STARTED', lastRevised: null, revisionLevel: 0, nextRevisionDate: null, solvedQuestions: [] };
     const updated = { ...current, ...updates };
     setProgress(prev => ({ ...prev, [topicId]: updated }));
-    if (user && !user.id.startsWith('demo_')) {
-        await fetch('/api/sync_progress.php', {
+    try {
+        const res = await fetch('/api/sync_progress.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId: user.id, ...updated })
+            body: JSON.stringify({ userId: user?.id, ...updated })
         });
-    }
+        if (res.ok) setGlobalSyncStatus('SYNCED');
+        else setGlobalSyncStatus('ERROR');
+    } catch (e) { setGlobalSyncStatus('ERROR'); }
   };
 
   const handleSaveTimetable = async (config: TimetableConfig, slots: any[]) => {
+      setGlobalSyncStatus('SYNCING');
       setTimetable({ config, slots });
-      if (user && !user.id.startsWith('demo_')) {
-          await fetch('/api/save_timetable.php', {
+      try {
+          const res = await fetch('/api/save_timetable.php', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ userId: user.id, config, slots })
+              body: JSON.stringify({ userId: user?.id, config, slots })
           });
-      }
+          if (res.ok) setGlobalSyncStatus('SYNCED');
+          else setGlobalSyncStatus('ERROR');
+      } catch (e) { setGlobalSyncStatus('ERROR'); }
   };
 
   const renderContent = () => {
@@ -200,11 +202,11 @@ const App: React.FC = () => {
           ? <AdminDashboardScreen user={user!} onNavigate={setScreen} />
           : <DashboardScreen user={user!} progress={linkedData?.progress || progress} testAttempts={linkedData?.tests || testAttempts} goals={goals} toggleGoal={id => {}} addGoal={t => {}} setScreen={setScreen} viewingStudentName={linkedData?.studentName} linkedPsychReport={linkedData?.psychReport} />;
       case 'syllabus':
-        return <SyllabusScreen user={user!} subjects={SYLLABUS_DATA} progress={linkedData?.progress || progress} onUpdateProgress={updateProgress} questionBank={questionBank} viewingStudentName={linkedData?.studentName} readOnly={user!.role === 'PARENT'} addTestAttempt={handleAddTestAttempt} testAttempts={linkedData?.tests || testAttempts} />;
+        return <SyllabusScreen user={user!} subjects={SYLLABUS_DATA} progress={linkedData?.progress || progress} onUpdateProgress={updateProgress} questionBank={questionBank} viewingStudentName={linkedData?.studentName} readOnly={user!.role === 'PARENT'} addTestAttempt={() => {}} testAttempts={linkedData?.tests || testAttempts} />;
       case 'tests':
         return isAdminRole
           ? <AdminTestManagerScreen questionBank={questionBank} tests={tests} syllabus={SYLLABUS_DATA} onAddQuestion={q => {}} onCreateTest={t => {}} onDeleteQuestion={id => {}} onDeleteTest={id => {}} />
-          : <TestScreen user={user!} addTestAttempt={handleAddTestAttempt} history={linkedData?.tests || testAttempts} availableTests={tests} />;
+          : <TestScreen user={user!} addTestAttempt={() => {}} history={linkedData?.tests || testAttempts} availableTests={tests} />;
       case 'timetable':
         return <TimetableScreen user={user!} savedConfig={timetable.config} savedSlots={timetable.slots} onSave={handleSaveTimetable} progress={progress} />;
       case 'diagnostics': return <DiagnosticsScreen />;
@@ -239,7 +241,11 @@ const App: React.FC = () => {
   return (
     <div className="flex bg-slate-50 min-h-screen font-inter">
       <Navigation currentScreen={currentScreen} setScreen={setScreen} logout={handleLogout} user={user} />
-      <main className="flex-1 md:ml-64 p-4 md:p-8 pb-24 md:pb-8 max-w-[1600px] mx-auto w-full">
+      <main className="flex-1 md:ml-64 p-4 md:p-8 pb-24 md:pb-8 max-w-[1600px] mx-auto w-full relative">
+        {/* Absolute Floating Sync Indicator */}
+        <div className="absolute top-4 right-4 z-50 pointer-events-none">
+            <SyncStatusBadge status={globalSyncStatus} show={showIndicators} />
+        </div>
         <Suspense fallback={<LoadingView />}>{renderContent()}</Suspense>
       </main>
       <MobileNavigation currentScreen={currentScreen} setScreen={setScreen} logout={handleLogout} user={user} />
