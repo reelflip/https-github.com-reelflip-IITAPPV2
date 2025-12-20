@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { User, Role, SocialConfig } from '../lib/types';
 import { COACHING_INSTITUTES, TARGET_YEARS, TARGET_EXAMS } from '../lib/constants';
@@ -101,7 +100,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate }) =
         }
         if (view === 'LOGIN') window.google.accounts.id.prompt();
     }
-  }, [googleConfig, view, role]); // Added role to dependencies so the Google button re-renders with the correct role if needed, though role is passed in callback.
+  }, [googleConfig, view, role]);
 
   const handleGoogleCredentialResponse = async (response: any) => {
       setIsLoading(true); setError('');
@@ -196,7 +195,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate }) =
                 {error && <div className="mb-6 p-4 bg-red-50 text-red-600 text-xs font-bold rounded-xl flex items-center gap-3 border border-red-100"><WifiOff size={16}/> {error}</div>}
                 {successMessage && <div className="mb-6 p-4 bg-green-50 text-green-700 text-xs font-bold rounded-xl flex items-center gap-3 border border-green-100"><CheckCircle2 size={16}/> {successMessage}</div>}
 
-                {/* Role Selector - Visible for both Login and Register views to accommodate Google Sign-In as new user */}
+                {/* Role Selector */}
                 <div className="flex bg-slate-100 p-1 rounded-xl mb-8">
                     <button 
                         type="button"
@@ -459,7 +458,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate }) =
               <button onClick={() => onNavigate('contact')} className="hover:text-blue-600 transition-colors">Contact</button>
               <button onClick={() => onNavigate('privacy')} className="hover:text-blue-600 transition-colors">Privacy Policy</button>
           </div>
-          <p className="text-center mt-6 text-[9px] font-medium text-slate-300 uppercase tracking-[0.3em]">&copy; {new Date().getFullYear()} IITGEEPrep • STABLE v12.25</p>
+          <p className="text-center mt-6 text-[9px] font-medium text-slate-300 uppercase tracking-[0.3em]">&copy; {new Date().getFullYear()} IITGEEPrep • STABLE v12.27</p>
       </footer>
     </div>
   );
