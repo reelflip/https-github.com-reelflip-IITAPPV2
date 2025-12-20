@@ -1,5 +1,6 @@
+
 import React, { useState, useRef, useMemo, useEffect } from 'react';
-import { Brain, ShieldCheck, RefreshCw, Activity, Terminal, Download, HeartPulse, Play, FileJson, AlertTriangle, CheckCircle2, XCircle, Beaker, Shield, UserCheck, Database, Server, Sparkles, Code, FileText, ChevronRight, Lightbulb, AlertCircle, Wrench, FileCode, Layers, ChevronUp, ChevronDown, Send, MessageSquare, Bot, User as UserIcon } from 'lucide-react';
+import { Brain, ShieldCheck, RefreshCw, Activity, Terminal, Download, HeartPulse, Play, FileJson, AlertTriangle, CheckCircle2, XCircle, Beaker, Shield, UserCheck, Database, Server, Sparkles, Code, FileText, ChevronRight, Lightbulb, AlertCircle, Wrench, Layers, ChevronUp, ChevronDown, Send, MessageSquare, Bot, User as UserIcon } from 'lucide-react';
 import { E2ETestRunner, TestResult, AIFixRecommendation } from '../services/testRunnerService';
 import { GoogleGenAI } from "@google/genai";
 
@@ -76,7 +77,7 @@ export const DiagnosticsScreen: React.FC = () => {
         setIsChatLoading(true);
 
         try {
-            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
+            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
             const model = 'gemini-3-flash-preview';
             
             // Build context from current diagnostic results
@@ -432,7 +433,7 @@ export const DiagnosticsScreen: React.FC = () => {
                     
                     <div className="bg-blue-50 p-6 rounded-3xl border border-blue-100 shadow-sm">
                         <h3 className="font-bold text-blue-900 mb-2 flex items-center gap-2 text-sm uppercase tracking-wider">
-                            <ShieldAlert className="w-5 h-5" /> Debug Tip
+                            <ShieldAlert size={20} /> Debug Tip
                         </h3>
                         <p className="text-xs text-blue-700 leading-relaxed font-medium">
                             If you see "Requested entity was not found" in the AI console, your API key may have reached its limit or the session expired. Try scanning again.
@@ -456,4 +457,13 @@ const SyncStatusBadge = ({status, show}: any) => {
 
 const ShieldAlert = ({size}: any) => (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
+);
+
+const FileCode = ({size}: any) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+        <polyline points="14 2 14 8 20 8"/>
+        <path d="m10 13-2 2 2 2"/>
+        <path d="m14 17 2-2-2-2"/>
+    </svg>
 );

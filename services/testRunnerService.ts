@@ -1,3 +1,4 @@
+
 import { GoogleGenAI } from "@google/genai";
 
 export interface TestResult {
@@ -74,7 +75,7 @@ export class E2ETestRunner {
 
     public async getAIDiagnosis(failedTests: TestResult[]): Promise<AIFixRecommendation[]> {
         if (failedTests.length === 0) return [];
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
         const model = 'gemini-3-flash-preview';
 
         const systemPrompt = `You are a world-class Full Stack Debugging Expert. 

@@ -1,3 +1,4 @@
+
 {
   "name": "iit-app",
   "private": true,
@@ -9,6 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@google/genai": "^1.34.0",
     "jszip": "^3.10.1",
     "lucide-react": "^0.344.0",
     "react": "18.2.0",
