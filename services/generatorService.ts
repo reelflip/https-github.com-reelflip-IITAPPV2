@@ -2,7 +2,7 @@ import { SYLLABUS_DATA } from '../lib/syllabusData';
 
 const phpHeader = `<?php
 /**
- * IITGEEPrep Engine v12.41 - Manual Sync Core
+ * IITGEEPrep Engine v12.43 - Command Central Core
  * 100% Complete 38-File Backend Deployment
  */
 error_reporting(E_ALL);
@@ -67,7 +67,7 @@ try {
     {
         name: 'index.php',
         folder: 'deployment/api',
-        content: `<?php echo json_encode(["status" => "active", "version" => "12.41", "files" => 38, "engine" => "Manual Sync Core"]); ?>`
+        content: `<?php echo json_encode(["status" => "active", "version" => "12.43", "files" => 38, "engine" => "Command Central Core"]); ?>`
     },
     {
         name: 'test_db.php',
@@ -86,7 +86,7 @@ try {
         }
         $tables[] = ["name" => $tableName, "rows" => (int)$count, "columns" => $cols];
     }
-    echo json_encode(["status" => "CONNECTED", "db_name" => $db_name, "tables" => $tables, "version" => "12.41"]);
+    echo json_encode(["status" => "CONNECTED", "db_name" => $db_name, "tables" => $tables, "version" => "12.43"]);
 } catch(Exception $e) { echo json_encode(["status" => "error", "message" => $e->getMessage()]); }
 ?>`
     },
@@ -133,7 +133,7 @@ if($check == 0) {
     $conn->exec("INSERT INTO tests (id, title, duration, questions_json, category, difficulty) VALUES ('test_seed_1', 'Initial Diagnostic', 180, '[\"q_p_units_1\"]', 'ADMIN', 'MAINS')");
 }
 
-echo json_encode(["status" => "success", "message" => "Master Schema v12.41 Integrated", "tables_created" => count($tables)]);
+echo json_encode(["status" => "success", "message" => "Master Schema v12.43 Integrated", "tables_created" => count($tables)]);
 ?>`
     },
     {
@@ -163,24 +163,6 @@ echo json_encode(["status" => "success", "user" => ["id" => $id, "name" => getV(
 ?>`
     },
     {
-        name: 'google_login.php',
-        folder: 'deployment/api',
-        content: `${phpHeader}
-$d = getJsonInput();
-echo json_encode(["status" => "error", "message" => "Social authentication requires active Google Client ID configuration."]);
-?>`
-    },
-    {
-        name: 'update_password.php',
-        folder: 'deployment/api',
-        content: `${phpHeader}
-$d = getJsonInput();
-$h = password_hash(getV($d, 'newPassword'), PASSWORD_DEFAULT);
-$conn->prepare("UPDATE users SET password_hash = ? WHERE id = ?")->execute([$h, getV($d, 'id')]);
-echo json_encode(["status" => "success"]);
-?>`
-    },
-    {
         name: 'get_dashboard.php',
         folder: 'deployment/api',
         content: `${phpHeader}
@@ -199,6 +181,10 @@ $t = $conn->prepare("SELECT * FROM timetable WHERE user_id = ?"); $t->execute([$
 $ps = $conn->prepare("SELECT * FROM psychometric_results WHERE user_id = ?"); $ps->execute([$uid]); $res['psychometric'] = $ps->fetch();
 $n = $conn->prepare("SELECT * FROM notifications WHERE to_id = ? ORDER BY date DESC"); $n->execute([$uid]); $res['notifications'] = $n->fetchAll();
 $st = $conn->prepare("SELECT section, is_synced FROM sync_status WHERE user_id = ?"); $st->execute([$uid]); $res['syncStatus'] = $st->fetchAll();
+// Content for App Load
+$res['blogs'] = $conn->query("SELECT * FROM blog_posts ORDER BY date DESC")->fetchAll();
+$res['flashcards'] = $conn->query("SELECT * FROM flashcards")->fetchAll();
+$res['hacks'] = $conn->query("SELECT * FROM memory_hacks")->fetchAll();
 echo json_encode($res);
 ?>`
     },
@@ -216,44 +202,32 @@ echo json_encode(["status" => "success"]);
 ?>`
     },
     {
-        name: 'save_attempt.php',
-        folder: 'deployment/api',
-        content: `${phpHeader}
-$d = getJsonInput();
-if(!$d) { echo json_encode(["error" => "NO_DATA"]); exit; }
-$uid = getV($d, 'userId');
-$sql = "INSERT INTO test_attempts (id, user_id, test_id, title, score, total_marks, accuracy, total_questions, correct_count, incorrect_count, unattempted_count, topic_id, difficulty, detailed_results) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-$s = $conn->prepare($sql);
-$s->execute([getV($d, 'id'), $uid, getV($d, 'testId'), getV($d, 'title'), (int)getV($d, 'score'), (int)getV($d, 'totalMarks'), (int)(getV($d, 'accuracy_percent') ?? getV($d, 'accuracy')), (int)getV($d, 'totalQuestions'), (int)getV($d, 'correctCount'), (int)getV($d, 'incorrectCount'), (int)getV($d, 'unattemptedCount'), getV($d, 'topicId'), getV($d, 'difficulty'), json_encode(getV($d, 'detailedResults') ?? [])]);
-$conn->prepare("INSERT INTO sync_status (user_id, section, is_synced) VALUES (?, 'tests', 1) ON DUPLICATE KEY UPDATE is_synced=1, last_sync=CURRENT_TIMESTAMP")->execute([$uid]);
-echo json_encode(["status" => "success"]);
-?>`
-    },
-    {
-        name: 'save_timetable.php',
-        folder: 'deployment/api',
-        content: `${phpHeader}
-$d = getJsonInput();
-$uid = getV($d, 'userId');
-$s = $conn->prepare("INSERT INTO timetable (user_id, config_json, slots_json) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE config_json=VALUES(config_json), slots_json=VALUES(slots_json)");
-$s->execute([$uid, json_encode(getV($d, 'config')), json_encode(getV($d, 'slots'))]);
-$conn->prepare("INSERT INTO sync_status (user_id, section, is_synced) VALUES (?, 'timetable', 1) ON DUPLICATE KEY UPDATE is_synced=1, last_sync=CURRENT_TIMESTAMP")->execute([$uid]);
-echo json_encode(["status" => "success"]);
-?>`
-    },
-    {
         name: 'manage_users.php',
         folder: 'deployment/api',
         content: `${phpHeader}
+$role_group = $_GET['group'] ?? 'ALL';
 if($_SERVER['REQUEST_METHOD'] === 'GET') {
-    echo json_encode($conn->query("SELECT id, name, email, role, is_verified FROM users")->fetchAll());
+    if($role_group === 'ADMINS') {
+        $sql = "SELECT id, name, email, role, is_verified, created_at FROM users WHERE role LIKE 'ADMIN%'";
+    } else if($role_group === 'USERS') {
+        $sql = "SELECT id, name, email, role, is_verified, created_at FROM users WHERE role NOT LIKE 'ADMIN%'";
+    } else {
+        $sql = "SELECT id, name, email, role, is_verified, created_at FROM users";
+    }
+    echo json_encode($conn->query($sql)->fetchAll());
 } else if($_SERVER['REQUEST_METHOD'] === 'PUT') {
     $d = getJsonInput();
     $s = $conn->prepare("UPDATE users SET is_verified = ? WHERE id = ?");
     $s->execute([getV($d, 'isVerified') ? 1 : 0, getV($d, 'id')]);
     echo json_encode(["status" => "success"]);
 } else if($_SERVER['REQUEST_METHOD'] === 'DELETE') {
-    $conn->prepare("DELETE FROM users WHERE id = ?")->execute([$_GET['id']]);
+    $id = $_GET['id'];
+    if($id === 'admin_root') {
+        http_response_code(403);
+        echo json_encode(["message" => "PROTECTED_ACCOUNT"]);
+        exit;
+    }
+    $conn->prepare("DELETE FROM users WHERE id = ?")->execute([$id]);
     echo json_encode(["status" => "success"]);
 }
 ?>`
@@ -266,13 +240,22 @@ $d = getJsonInput();
 $type = $_GET['type'] ?? 'flashcard';
 if($_SERVER['REQUEST_METHOD'] === 'POST') {
     if($type === 'flashcard') {
-        $conn->prepare("INSERT INTO flashcards (front, back, subject_id) VALUES (?,?,?)")->execute([getV($d, 'front'), getV($d, 'back'), getV($d, 'subjectId')]);
+        $s = $conn->prepare("INSERT INTO flashcards (front, back, subject_id) VALUES (?,?,?)");
+        $s->execute([getV($d, 'front'), getV($d, 'back'), getV($d, 'subjectId')]);
     } else if($type === 'hack') {
-        $conn->prepare("INSERT INTO memory_hacks (title, description, trick, tag) VALUES (?,?,?,?)")->execute([getV($d, 'title'), getV($d, 'description'), getV($d, 'trick'), getV($d, 'tag')]);
+        $s = $conn->prepare("INSERT INTO memory_hacks (title, description, trick, tag) VALUES (?,?,?,?)");
+        $s->execute([getV($d, 'title'), getV($d, 'description'), getV($d, 'trick'), getV($d, 'tag')]);
     } else if($type === 'blog') {
-        $conn->prepare("INSERT INTO blog_posts (title, excerpt, content, author, image_url, category) VALUES (?,?,?,?,?,?)")->execute([getV($d, 'title'), getV($d, 'excerpt'), getV($d, 'content'), getV($d, 'author'), getV($d, 'imageUrl'), getV($d, 'category')]);
+        $id = getV($d, 'id');
+        if($id && is_numeric($id) && $id > 100000000) { // New post check
+             $s = $conn->prepare("INSERT INTO blog_posts (title, excerpt, content, author, image_url, category) VALUES (?,?,?,?,?,?)");
+             $s->execute([getV($d, 'title'), getV($d, 'excerpt'), getV($d, 'content'), getV($d, 'author'), getV($d, 'imageUrl'), getV($d, 'category')]);
+        } else {
+             $s = $conn->prepare("UPDATE blog_posts SET title=?, excerpt=?, content=?, author=?, image_url=?, category=? WHERE id=?");
+             $s->execute([getV($d, 'title'), getV($d, 'excerpt'), getV($d, 'content'), getV($d, 'author'), getV($d, 'imageUrl'), getV($d, 'category'), $id]);
+        }
     }
-    echo json_encode(["status" => "success"]);
+    echo json_encode(["status" => "success", "id" => $conn->lastInsertId()]);
 } else if($_SERVER['REQUEST_METHOD'] === 'DELETE') {
     $table = $type === 'flashcard' ? 'flashcards' : ($type === 'hack' ? 'memory_hacks' : 'blog_posts');
     $conn->prepare("DELETE FROM $table WHERE id = ?")->execute([$_GET['id']]);
@@ -564,7 +547,7 @@ echo json_encode($s->fetchAll());
 ];
 
 export const generateSQLSchema = () => {
-    return `-- IITGEEPrep v12.41 Master Sync Schema
+    return `-- IITGEEPrep v12.43 Master Sync Schema
 -- Total Tables: 26 (Aligned with production environment)
 
 START TRANSACTION;

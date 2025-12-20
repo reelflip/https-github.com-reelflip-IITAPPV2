@@ -11,7 +11,7 @@ import {
 import { SYLLABUS_DATA } from './lib/syllabusData';
 import { MOCK_TESTS_DATA, generateInitialQuestionBank } from './lib/mockTestsData';
 
-// --- Lazy Loading Screens (v12.41) ---
+// --- Lazy Loading Screens (v12.43) ---
 const AuthScreen = lazy(() => import('./screens/AuthScreen').then(m => ({ default: m.AuthScreen })));
 const DashboardScreen = lazy(() => import('./screens/DashboardScreen').then(m => ({ default: m.DashboardScreen })));
 const AdminDashboardScreen = lazy(() => import('./screens/AdminDashboardScreen').then(m => ({ default: m.AdminDashboardScreen })));
@@ -40,11 +40,13 @@ const ExamGuideScreen = lazy(() => import('./screens/ExamGuideScreen').then(m =>
 const PrivacyPolicyScreen = lazy(() => import('./screens/PrivacyPolicyScreen').then(m => ({ default: m.PrivacyPolicyScreen })));
 const ContactUsScreen = lazy(() => import('./screens/ContactUsScreen').then(m => ({ default: m.ContactUsScreen })));
 const FeaturesScreen = lazy(() => import('./screens/FeaturesScreen').then(m => ({ default: m.FeaturesScreen })));
+const ContentManagerScreen = lazy(() => import('./screens/ContentManagerScreen').then(m => ({ default: m.ContentManagerScreen })));
+const AdminBlogScreen = lazy(() => import('./screens/AdminBlogScreen').then(m => ({ default: m.AdminBlogScreen })));
 
 const LoadingView = () => (
   <div className="flex flex-col items-center justify-center min-h-[60vh] text-slate-400">
     <div className="w-10 h-10 border-4 border-slate-200 border-t-blue-600 rounded-full animate-spin mb-4"></div>
-    <p className="text-xs font-bold uppercase tracking-widest">Validating Persistence Alignment...</p>
+    <p className="text-xs font-bold uppercase tracking-widest">Synchronizing Command Interface...</p>
   </div>
 );
 
@@ -59,7 +61,6 @@ const App: React.FC = () => {
     return (saved as Screen) || 'dashboard';
   });
 
-  // Global UI Control for Indicators
   const [showIndicators, setShowIndicators] = useState(false);
   const [globalSyncStatus, setGlobalSyncStatus] = useState<SyncStatus>('IDLE');
 
@@ -69,8 +70,11 @@ const App: React.FC = () => {
   const [mistakes, setMistakes] = useState<MistakeLog[]>([]);
   const [backlogs, setBacklogs] = useState<BacklogItem[]>([]);
   const [timetable, setTimetable] = useState<{config?: TimetableConfig, slots?: any[]}>({});
-  const [questionBank] = useState<Question[]>(generateInitialQuestionBank());
-  const [tests] = useState<Test[]>(MOCK_TESTS_DATA);
+  const [questionBank, setQuestionBank] = useState<Question[]>(generateInitialQuestionBank());
+  const [tests, setTests] = useState<Test[]>(MOCK_TESTS_DATA);
+  const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
+  const [hacks, setHacks] = useState<MemoryHack[]>([]);
+  const [blogs, setBlogs] = useState<BlogPost[]>([]);
   const [linkedData, setLinkedData] = useState<{ progress: Record<string, UserProgress>, tests: TestAttempt[], studentName: string, psychReport?: PsychometricReport } | undefined>();
 
   const clearState = useCallback(() => {
@@ -78,29 +82,7 @@ const App: React.FC = () => {
   }, []);
 
   const mapProgress = (p: any): UserProgress => ({
-    topicId: p.topic_id,
-    status: p.status,
-    lastRevised: p.last_revised,
-    revisionLevel: Number(p.revision_level || 0),
-    nextRevisionDate: p.next_revision_date,
-    solvedQuestions: p.solved_questions_json ? JSON.parse(p.solved_questions_json) : []
-  });
-
-  const mapAttempt = (a: any): TestAttempt => ({
-    id: a.id,
-    date: a.date,
-    title: a.title,
-    score: Number(a.score),
-    totalMarks: Number(a.total_marks),
-    accuracy: Number(a.accuracy_percent),
-    accuracy_percent: Number(a.accuracy_percent),
-    testId: a.test_id,
-    totalQuestions: Number(a.total_questions),
-    correctCount: Number(a.correct_count),
-    incorrectCount: Number(a.incorrect_count),
-    unattemptedCount: Number(a.unattempted_count),
-    topicId: a.topic_id,
-    detailedResults: a.detailed_results ? JSON.parse(a.detailed_results) : []
+    topicId: p.topic_id, status: p.status, lastRevised: p.last_revised, revisionLevel: Number(p.revision_level || 0), nextRevisionDate: p.next_revision_date, solvedQuestions: p.solved_questions_json ? JSON.parse(p.solved_questions_json) : []
   });
 
   const loadDashboard = useCallback(async (userId: string) => {
@@ -114,42 +96,22 @@ const App: React.FC = () => {
                 data.progress.forEach((p: any) => { const mapped = mapProgress(p); progMap[mapped.topicId] = mapped; });
                 setProgress(progMap);
             }
-            if (data.attempts) setTestAttempts(data.attempts.map(mapAttempt));
+            if (data.attempts) setTestAttempts(data.attempts.map((a: any) => ({ ...a, detailedResults: a.detailed_results ? JSON.parse(a.detailed_results) : [] })));
             if (data.goals) setGoals(data.goals.map((g: any) => ({ ...g, completed: g.completed == 1 })));
             if (data.backlogs) setBacklogs(data.backlogs.map((b: any) => ({ ...b, status: b.status || 'PENDING' })));
             if (data.mistakes) setMistakes(data.mistakes.map((m: any) => ({ ...m })));
-            if (data.timetable) setTimetable({
-                config: data.timetable.config_json ? JSON.parse(data.timetable.config_json) : undefined,
-                slots: data.timetable.slots_json ? JSON.parse(data.timetable.slots_json) : []
-            });
-            
-            if (data.userProfileSync) {
-                const updatedUser = { ...data.userProfileSync, notifications: data.notifications || [] };
-                setUser(updatedUser);
-            }
+            if (data.timetable) setTimetable({ config: data.timetable.config_json ? JSON.parse(data.timetable.config_json) : undefined, slots: data.timetable.slots_json ? JSON.parse(data.timetable.slots_json) : [] });
+            if (data.blogs) setBlogs(data.blogs);
+            if (data.flashcards) setFlashcards(data.flashcards);
+            if (data.hacks) setHacks(data.hacks);
+            if (data.userProfileSync) setUser(prev => ({ ...prev!, ...data.userProfileSync, notifications: data.notifications || [] }));
             setGlobalSyncStatus('SYNCED');
-        } else {
-            setGlobalSyncStatus('ERROR');
-        }
-    } catch (e) { 
-        console.error("Persistence Sync Error:", e); 
-        setGlobalSyncStatus('ERROR');
-    }
+        } else { setGlobalSyncStatus('ERROR'); }
+    } catch (e) { setGlobalSyncStatus('ERROR'); }
   }, []);
 
-  const loadSettings = async () => {
-    try {
-      const res = await fetch('/api/manage_settings.php?key=show_sync_status');
-      if (res.ok) {
-          const data = await res.json();
-          if (data?.value === '1') setShowIndicators(true);
-      }
-    } catch (e) {}
-  };
-
-  useEffect(() => { 
-      loadSettings();
-      if (user) loadDashboard(user.id); 
+  useEffect(() => {
+    if (user) loadDashboard(user.id);
   }, [user?.id, loadDashboard]);
 
   useEffect(() => {
@@ -159,38 +121,26 @@ const App: React.FC = () => {
 
   useEffect(() => { localStorage.setItem('last_screen', currentScreen); }, [currentScreen]);
 
-  const handleLogin = (u: User) => { clearState(); setUser(u); setScreen(u.role.includes('ADMIN') ? 'overview' : 'dashboard'); };
-
-  const handleLogout = () => { setUser(null); clearState(); setScreen('dashboard'); localStorage.clear(); };
-
   const updateProgress = async (topicId: string, updates: Partial<UserProgress>) => {
     setGlobalSyncStatus('SYNCING');
-    const current = progress[topicId] || { topicId, status: 'NOT_STARTED', lastRevised: null, revisionLevel: 0, nextRevisionDate: null, solvedQuestions: [] };
-    const updated = { ...current, ...updates };
+    const updated = { ...(progress[topicId] || { topicId, status: 'NOT_STARTED', lastRevised: null, revisionLevel: 0, nextRevisionDate: null, solvedQuestions: [] }), ...updates };
     setProgress(prev => ({ ...prev, [topicId]: updated }));
     try {
-        const res = await fetch('/api/sync_progress.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId: user?.id, ...updated })
-        });
-        if (res.ok) setGlobalSyncStatus('SYNCED');
-        else setGlobalSyncStatus('ERROR');
+        const res = await fetch('/api/sync_progress.php', { method: 'POST', body: JSON.stringify({ userId: user?.id, ...updated }) });
+        if (res.ok) setGlobalSyncStatus('SYNCED'); else setGlobalSyncStatus('ERROR');
     } catch (e) { setGlobalSyncStatus('ERROR'); }
   };
 
-  const handleSaveTimetable = async (config: TimetableConfig, slots: any[]) => {
-      setGlobalSyncStatus('SYNCING');
-      setTimetable({ config, slots });
-      try {
-          const res = await fetch('/api/save_timetable.php', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ userId: user?.id, config, slots })
-          });
-          if (res.ok) setGlobalSyncStatus('SYNCED');
-          else setGlobalSyncStatus('ERROR');
-      } catch (e) { setGlobalSyncStatus('ERROR'); }
+  const handleAddBlog = async (blog: BlogPost) => {
+    setGlobalSyncStatus('SYNCING');
+    try {
+      const res = await fetch('/api/manage_content.php?type=blog', { method: 'POST', body: JSON.stringify(blog) });
+      if (res.ok) {
+          const data = await res.json();
+          setBlogs(prev => [{ ...blog, id: data.id || blog.id }, ...prev.filter(b => b.id !== blog.id)]);
+          setGlobalSyncStatus('SYNCED');
+      }
+    } catch (e) { setGlobalSyncStatus('ERROR'); }
   };
 
   const renderContent = () => {
@@ -205,10 +155,10 @@ const App: React.FC = () => {
         return <SyllabusScreen user={user!} subjects={SYLLABUS_DATA} progress={linkedData?.progress || progress} onUpdateProgress={updateProgress} questionBank={questionBank} viewingStudentName={linkedData?.studentName} readOnly={user!.role === 'PARENT'} addTestAttempt={() => {}} testAttempts={linkedData?.tests || testAttempts} syncStatus={globalSyncStatus} showIndicators={showIndicators} />;
       case 'tests':
         return isAdminRole
-          ? <AdminTestManagerScreen questionBank={questionBank} tests={tests} syllabus={SYLLABUS_DATA} onAddQuestion={q => {}} onCreateTest={t => {}} onDeleteQuestion={id => {}} onDeleteTest={id => {}} />
+          ? <AdminTestManagerScreen questionBank={questionBank} tests={tests} syllabus={SYLLABUS_DATA} onAddQuestion={q => setQuestionBank([...questionBank, q])} onCreateTest={t => setTests([...tests, t])} onDeleteQuestion={id => setQuestionBank(questionBank.filter(q => q.id !== id))} onDeleteTest={id => setTests(tests.filter(t => t.id !== id))} />
           : <TestScreen user={user!} addTestAttempt={() => {}} history={linkedData?.tests || testAttempts} availableTests={tests} />;
       case 'timetable':
-        return <TimetableScreen user={user!} savedConfig={timetable.config} savedSlots={timetable.slots} onSave={handleSaveTimetable} progress={progress} />;
+        return <TimetableScreen user={user!} savedConfig={timetable.config} savedSlots={timetable.slots} onSave={(c, s) => {}} progress={progress} />;
       case 'diagnostics': return <DiagnosticsScreen />;
       case 'deployment': return <DeploymentScreen />;
       case 'profile': return <ProfileScreen user={user!} onAcceptRequest={id => {}} onUpdateUser={upd => setUser({...user!, ...upd})} />;
@@ -216,6 +166,14 @@ const App: React.FC = () => {
       case 'mistakes': return <MistakesScreen mistakes={mistakes} addMistake={m => {}} />;
       case 'psychometric': return <PsychometricScreen user={user!} />;
       case 'analytics': return <AnalyticsScreen user={user!} progress={linkedData?.progress || progress} testAttempts={linkedData?.tests || testAttempts} viewingStudentName={linkedData?.studentName} />;
+      case 'inbox': return <AdminInboxScreen />;
+      case 'users': return <AdminUserManagementScreen />;
+      case 'content': return <ContentManagerScreen flashcards={flashcards} hacks={hacks} blogs={blogs} onAddFlashcard={c => {}} onAddHack={h => {}} onAddBlog={handleAddBlog} onDelete={(t, id) => {}} />;
+      case 'blog_admin': return <AdminBlogScreen blogs={blogs} onAddBlog={handleAddBlog} onUpdateBlog={handleAddBlog} onDeleteBlog={id => {}} />;
+      case 'syllabus_admin': return <AdminSyllabusScreen syllabus={SYLLABUS_DATA} onAddTopic={() => {}} onDeleteTopic={() => {}} />;
+      case 'system': return <AdminSystemScreen />;
+      case 'flashcards': return <FlashcardScreen flashcards={flashcards} />;
+      case 'hacks': return <HacksScreen hacks={hacks} />;
       default: return <DashboardScreen user={user!} progress={progress} testAttempts={testAttempts} goals={[]} toggleGoal={id => {}} addGoal={t => {}} setScreen={setScreen} />;
     }
   };
@@ -235,20 +193,19 @@ const App: React.FC = () => {
               </Suspense>
           );
       }
-      return <Suspense fallback={<LoadingView />}><AuthScreen onLogin={handleLogin} onNavigate={p => setScreen(p as Screen)} /></Suspense>;
+      return <Suspense fallback={<LoadingView />}><AuthScreen onLogin={u => { setUser(u); setScreen(u.role.includes('ADMIN') ? 'overview' : 'dashboard'); }} onNavigate={p => setScreen(p as Screen)} /></Suspense>;
   }
 
   return (
     <div className="flex bg-slate-50 min-h-screen font-inter">
-      <Navigation currentScreen={currentScreen} setScreen={setScreen} logout={handleLogout} user={user} />
+      <Navigation currentScreen={currentScreen} setScreen={setScreen} logout={() => { setUser(null); clearState(); setScreen('dashboard'); localStorage.clear(); }} user={user} />
       <main className="flex-1 md:ml-64 p-4 md:p-8 pb-24 md:pb-8 max-w-[1600px] mx-auto w-full relative">
-        {/* Absolute Floating Sync Indicator */}
         <div className="absolute top-4 right-4 z-50 pointer-events-none">
             <SyncStatusBadge status={globalSyncStatus} show={showIndicators} />
         </div>
         <Suspense fallback={<LoadingView />}>{renderContent()}</Suspense>
       </main>
-      <MobileNavigation currentScreen={currentScreen} setScreen={setScreen} logout={handleLogout} user={user} />
+      <MobileNavigation currentScreen={currentScreen} setScreen={setScreen} logout={() => { setUser(null); clearState(); setScreen('dashboard'); localStorage.clear(); }} user={user} />
       {user.role === 'STUDENT' && currentScreen !== 'ai-tutor' && <AITutorChat />}
     </div>
   );
