@@ -87,12 +87,35 @@ const App: React.FC = () => {
         const res = await fetch(`/api/get_dashboard.php?user_id=${userId}`, { cache: 'no-store' });
         if (res.ok) {
             const data = await res.json();
+            
+            // Map Progress
             if (data.progress) {
                 const progMap: Record<string, UserProgress> = {};
                 data.progress.forEach((p: any) => { const mapped = mapProgress(p); progMap[mapped.topicId] = mapped; });
                 setProgress(progMap);
             }
-            if (data.attempts) setTestAttempts(data.attempts.map((a: any) => ({ ...a, accuracy: Number(a.accuracy_percent || a.accuracy || 0), detailedResults: a.detailed_results ? JSON.parse(a.detailed_results) : [] })));
+            
+            // Critical Map: Snake to Camel Case for Test Attempts
+            if (data.attempts) {
+                setTestAttempts(data.attempts.map((a: any) => ({
+                    id: a.id,
+                    date: a.date,
+                    title: a.title,
+                    score: Number(a.score),
+                    totalMarks: Number(a.total_marks || a.totalMarks),
+                    accuracy: Number(a.accuracy),
+                    accuracy_percent: Number(a.accuracy),
+                    testId: a.test_id || a.testId,
+                    totalQuestions: Number(a.total_questions || a.totalQuestions),
+                    correctCount: Number(a.correct_count || a.correctCount),
+                    incorrectCount: Number(a.incorrect_count || a.incorrectCount),
+                    unattemptedCount: Number(a.unattempted_count || a.unattemptedCount),
+                    topicId: a.topic_id || a.topicId,
+                    difficulty: a.difficulty,
+                    detailedResults: a.detailed_results ? JSON.parse(a.detailed_results) : []
+                })));
+            }
+
             if (data.goals) setGoals(data.goals.map((g: any) => ({ ...g, completed: g.completed == 1 })));
             if (data.backlogs) setBacklogs(data.backlogs.map((b: any) => ({ ...b, status: b.status || 'PENDING' })));
             if (data.mistakes) setMistakes(data.mistakes.map((m: any) => ({ ...m })));
