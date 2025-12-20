@@ -1,10 +1,11 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { UserProgress, TopicStatus, Topic, User, VideoLesson, ChapterNote, Question, TestAttempt } from '../lib/types';
 import { BookReader } from '../components/BookReader';
+import { SyncStatusBadge, SyncStatus } from '../components/SyncStatusBadge';
 import { 
   Search, ChevronDown, CheckCircle2, LayoutGrid, BookOpen, 
   Save, Loader2, PlayCircle, X, Youtube, Filter, Info, StickyNote, 
-  ArrowLeft, List, CheckSquare, Target, BarChart2, Video, FileText, Check, AlertCircle, AlertTriangle, Clock, Trophy, ChevronRight, Play, ExternalLink, Send, Sparkles
+  ArrowLeft, List, CheckSquare, Target, BarChart2, Video, FileText, Check, AlertCircle, AlertTriangle, Clock, Trophy, ChevronRight, Play, ExternalLink, Send, Sparkles, RefreshCw
 } from 'lucide-react';
 
 interface SyllabusTrackerProps {
@@ -21,6 +22,8 @@ interface SyllabusTrackerProps {
   onToggleQuestion?: (topicId: string, questionId: string) => void;
   addTestAttempt?: (attempt: TestAttempt) => void;
   testAttempts?: TestAttempt[];
+  showIndicators?: boolean;
+  syncStatus?: SyncStatus;
 }
 
 const statusColors: Record<TopicStatus, string> = {
@@ -56,16 +59,26 @@ const TopicDetailView: React.FC<{
   currentResultsVisible: Record<string, boolean>;
   currentTime: number;
   onAnswerQuestion: (qId: string, optionIdx: number, correctIdx: number) => void;
-  /* Fix: Removed duplicate onUpdateTestAnswer property definitions to resolve TypeScript errors */
   onUpdateTestAnswer: (qId: string, optionIdx: number) => void;
   onOpenNoteReader: (title: string, pages: string[]) => void;
+  syncStatus: SyncStatus;
+  showIndicators: boolean;
 }> = ({ 
   topic, onClose, topicData, topicQuestions, videoLesson, chapterNote, 
   readOnly, onUpdateProgress, addTestAttempt, currentAnswers, 
-  currentResultsVisible, currentTime, onAnswerQuestion, onUpdateTestAnswer, onOpenNoteReader 
+  currentResultsVisible, currentTime, onAnswerQuestion, onUpdateTestAnswer, onOpenNoteReader,
+  syncStatus, showIndicators
 }) => {
   const [activeTab, setActiveTab] = useState<'NOTES' | 'VIDEOS' | 'PRACTICE' | 'TEST'>('PRACTICE');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Local state for explicit saving
+  const [localStatus, setLocalStatus] = useState<TopicStatus>(topicData.status);
+  const isDirty = localStatus !== topicData.status;
+
+  const handleManualSave = async () => {
+    onUpdateProgress(topic.id, { status: localStatus });
+  };
 
   const handleSubmitChapterTest = async () => {
     const answeredCount = Object.keys(currentAnswers).length;
@@ -135,6 +148,12 @@ const TopicDetailView: React.FC<{
                         <span>{topic.subject}</span>
                         <ChevronRight className="w-3 h-3" />
                         <span>{topic.chapter}</span>
+                        {showIndicators && (
+                            <>
+                                <span className="mx-1 text-slate-200">|</span>
+                                <SyncStatusBadge status={isDirty ? 'ERROR' : syncStatus} show={true} />
+                            </>
+                        )}
                     </div>
                     <h2 className="text-xl font-black text-slate-900 leading-tight">{topic.name}</h2>
                 </div>
@@ -151,16 +170,25 @@ const TopicDetailView: React.FC<{
 
             {!readOnly && activeTab !== 'TEST' && (
                 <div className="flex items-center gap-3">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider hidden md:block">Update Status</span>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider hidden md:block">Preparation Status</span>
                   <select 
-                      value={topicData.status}
-                      onChange={(e) => onUpdateProgress(topic.id, { status: e.target.value as TopicStatus })}
-                      className={`px-4 py-2 rounded-xl text-xs font-bold border outline-none transition-all ${statusColors[topicData.status || 'NOT_STARTED']}`}
+                      value={localStatus}
+                      onChange={(e) => setLocalStatus(e.target.value as TopicStatus)}
+                      className={`px-4 py-2 rounded-xl text-xs font-bold border outline-none transition-all ${statusColors[localStatus || 'NOT_STARTED']}`}
                   >
                       {Object.entries(statusLabels).map(([val, label]) => (
                           <option key={val} value={val} className="bg-white text-slate-800">{label}</option>
                       ))}
                   </select>
+
+                  {isDirty && (
+                      <button 
+                        onClick={handleManualSave}
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-blue-200 animate-in zoom-in-95 flex items-center gap-2"
+                      >
+                         <Save size={14} /> Save Chapter Progress
+                      </button>
+                  )}
                 </div>
             )}
         </div>
@@ -194,7 +222,6 @@ const TopicDetailView: React.FC<{
                                       : `Explore ${topicQuestions.length} practice problems to build confidence.`}
                                 </p>
                             </div>
-                            {/* Fix: Added Sparkles to lucide-react imports above to resolve error */}
                             {activeTab === 'TEST' && <Sparkles className="text-amber-400 animate-pulse" />}
                          </div>
 
@@ -314,7 +341,7 @@ const TopicDetailView: React.FC<{
 
 export const SyllabusScreen: React.FC<SyllabusTrackerProps> = ({ 
   user, viewingStudentName, subjects, progress, onUpdateProgress, readOnly = false, summaryOnly = false,
-  videoMap = {}, chapterNotes = {}, questionBank = [], addTestAttempt, testAttempts = []
+  videoMap = {}, chapterNotes = {}, questionBank = [], addTestAttempt, testAttempts = [], showIndicators = false, syncStatus = 'IDLE'
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeSubjectFilter, setActiveSubjectFilter] = useState<string>('ALL');
@@ -436,19 +463,24 @@ export const SyllabusScreen: React.FC<SyllabusTrackerProps> = ({
             onAnswerQuestion={(qId, opt, corr) => handleAnswerQuestion(activeTopic.id, qId, opt, corr)}
             onUpdateTestAnswer={(qId, opt) => handleUpdateTestAnswer(activeTopic.id, qId, opt)}
             onOpenNoteReader={(title, pages) => setActiveNote({ title, pages })}
+            syncStatus={syncStatus}
+            showIndicators={showIndicators}
           />
       )}
       {activeNote && <BookReader title={activeNote.title} pages={activeNote.pages} onClose={() => setActiveNote(null)} />}
 
       <div className="bg-gradient-to-r from-blue-600 to-cyan-600 rounded-2xl p-8 text-white shadow-xl relative overflow-hidden">
-          <div className="relative z-10">
-              <div className="flex items-center space-x-3 mb-2">
-                 <BookOpen className="w-8 h-8 text-white" />
-                 <h1 className="text-3xl font-bold">{summaryOnly ? 'Syllabus Summary' : 'Detailed Syllabus Tracker'}</h1>
+          <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+              <div>
+                  <div className="flex items-center space-x-3 mb-2">
+                    <BookOpen className="w-8 h-8 text-white" />
+                    <h1 className="text-3xl font-bold">{summaryOnly ? 'Syllabus Summary' : 'Detailed Syllabus Tracker'}</h1>
+                  </div>
+                  <p className="text-blue-100 text-lg opacity-90 max-w-2xl">
+                      {summaryOnly ? `Reviewing current preparation depth for ${viewingStudentName || user.name}.` : 'Track completion, watch lectures, and solve chapter-wise problems.'}
+                  </p>
               </div>
-              <p className="text-blue-100 text-lg opacity-90 max-w-2xl">
-                  {summaryOnly ? `Reviewing current preparation depth for ${viewingStudentName || user.name}.` : 'Track completion, watch lectures, and solve chapter-wise problems.'}
-              </p>
+              <SyncStatusBadge status={syncStatus} show={showIndicators} />
           </div>
           <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 rounded-full bg-white opacity-10"></div>
       </div>

@@ -2,7 +2,7 @@ import { SYLLABUS_DATA } from '../lib/syllabusData';
 
 const phpHeader = `<?php
 /**
- * IITGEEPrep Engine v12.39 - Sync Status Core
+ * IITGEEPrep Engine v12.41 - Manual Sync Core
  * 100% Complete 38-File Backend Deployment
  */
 error_reporting(E_ALL);
@@ -67,7 +67,7 @@ try {
     {
         name: 'index.php',
         folder: 'deployment/api',
-        content: `<?php echo json_encode(["status" => "active", "version" => "12.39", "files" => 38, "engine" => "Sync Status Core"]); ?>`
+        content: `<?php echo json_encode(["status" => "active", "version" => "12.41", "files" => 38, "engine" => "Manual Sync Core"]); ?>`
     },
     {
         name: 'test_db.php',
@@ -86,7 +86,7 @@ try {
         }
         $tables[] = ["name" => $tableName, "rows" => (int)$count, "columns" => $cols];
     }
-    echo json_encode(["status" => "CONNECTED", "db_name" => $db_name, "tables" => $tables, "version" => "12.39"]);
+    echo json_encode(["status" => "CONNECTED", "db_name" => $db_name, "tables" => $tables, "version" => "12.41"]);
 } catch(Exception $e) { echo json_encode(["status" => "error", "message" => $e->getMessage()]); }
 ?>`
     },
@@ -95,13 +95,14 @@ try {
         folder: 'deployment/api',
         content: `${phpHeader}
 $tables = [
-    'users' => "(id VARCHAR(255) PRIMARY KEY, name VARCHAR(255), email VARCHAR(255) UNIQUE, password_hash VARCHAR(255), role VARCHAR(50), school VARCHAR(255), target_year INT, target_exam VARCHAR(255), phone VARCHAR(20), avatar_url TEXT, is_verified TINYINT(1) DEFAULT 1, parent_id VARCHAR(255), linked_student_id VARCHAR(255), dob DATE, gender VARCHAR(20), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
-    'user_progress' => "(id INT AUTO_INCREMENT PRIMARY KEY, user_id VARCHAR(255), topic_id VARCHAR(255), status VARCHAR(50), last_revised TIMESTAMP NULL, revision_level INT DEFAULT 0, next_revision_date TIMESTAMP NULL, solved_questions_json TEXT, ex1_solved INT, ex1_total INT)",
+    'users' => "(id VARCHAR(255) PRIMARY KEY, name VARCHAR(255), email VARCHAR(255) UNIQUE, password_hash VARCHAR(255), role VARCHAR(50), school VARCHAR(255), target_year INT, target_exam VARCHAR(255), phone VARCHAR(20), avatar_url TEXT, is_verified TINYINT(1) DEFAULT 1, parent_id VARCHAR(255), linked_student_id VARCHAR(255), dob DATE, gender VARCHAR(20), google_id VARCHAR(255), security_question TEXT, security_answer TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
+    'user_progress' => "(id INT AUTO_INCREMENT PRIMARY KEY, user_id VARCHAR(255), topic_id VARCHAR(255), status VARCHAR(50), last_revised TIMESTAMP NULL, revision_level INT DEFAULT 0, next_revision_date TIMESTAMP NULL, solved_questions_json TEXT, ex1_solved INT, ex1_total INT, UNIQUE KEY user_topic (user_id, topic_id))",
     'topic_progress' => "(user_id VARCHAR(255), topic_id VARCHAR(255), progress_pct INT, PRIMARY KEY(user_id, topic_id))",
     'test_attempts' => "(id VARCHAR(255) PRIMARY KEY, user_id VARCHAR(255), test_id VARCHAR(255), title VARCHAR(255), score INT, total_marks INT, accuracy INT, total_questions INT, correct_count INT, incorrect_count INT, unattempted_count INT, topic_id VARCHAR(255), difficulty VARCHAR(50), detailed_results LONGTEXT, date TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
     'attempt_details' => "(id INT AUTO_INCREMENT PRIMARY KEY, attempt_id VARCHAR(255), question_id VARCHAR(255), status VARCHAR(20), selected_option INT)",
     'timetable' => "(user_id VARCHAR(255) PRIMARY KEY, config_json LONGTEXT, slots_json LONGTEXT, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP)",
     'timetable_configs' => "(user_id VARCHAR(255) PRIMARY KEY, config_json LONGTEXT)",
+    'sync_status' => "(user_id VARCHAR(255), section VARCHAR(50), is_synced TINYINT(1) DEFAULT 1, last_sync TIMESTAMP DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY(user_id, section))",
     'goals' => "(id VARCHAR(255) PRIMARY KEY, user_id VARCHAR(255), text TEXT, completed TINYINT(1) DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
     'backlogs' => "(id VARCHAR(255) PRIMARY KEY, user_id VARCHAR(255), title VARCHAR(255), subject VARCHAR(50), subject_id VARCHAR(50), priority VARCHAR(20), status VARCHAR(20), deadline DATE, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
     'mistake_logs' => "(id VARCHAR(255) PRIMARY KEY, user_id VARCHAR(255), question TEXT, subject VARCHAR(50), note TEXT, date TIMESTAMP)",
@@ -124,7 +125,15 @@ $tables = [
     'content' => "(id INT AUTO_INCREMENT PRIMARY KEY, type VARCHAR(50), title VARCHAR(255), content_json LONGTEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"
 ];
 foreach($tables as $name => $def) { $conn->exec("CREATE TABLE IF NOT EXISTS $name $def ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"); }
-echo json_encode(["status" => "success", "message" => "Master Schema v12.39 Unified", "tables_created" => count($tables)]);
+
+$check = $conn->query("SELECT count(*) FROM topics")->fetchColumn();
+if($check == 0) {
+    $conn->exec("INSERT INTO topics (id, name, chapter, subject) VALUES ('p-units', 'Units & Dimensions', 'Units and Measurements', 'Physics')");
+    $conn->exec("INSERT INTO questions (id, subject_id, topic_id, text, options_json, correct_idx, source, year, difficulty) VALUES ('q_p_units_1', 'phys', 'p-units', 'Dim of Planck Constant?', '[\"[ML2T-1]\",\"[ML2T-2]\",\"[MLT-1]\",\"[MLT-2]\"]', 0, 'Seed', '2024', 'EASY')");
+    $conn->exec("INSERT INTO tests (id, title, duration, questions_json, category, difficulty) VALUES ('test_seed_1', 'Initial Diagnostic', 180, '[\"q_p_units_1\"]', 'ADMIN', 'MAINS')");
+}
+
+echo json_encode(["status" => "success", "message" => "Master Schema v12.41 Integrated", "tables_created" => count($tables)]);
 ?>`
     },
     {
@@ -180,13 +189,16 @@ if(!$uid) { echo json_encode(["error" => "Missing user_id"]); exit; }
 $res = [];
 $u = $conn->prepare("SELECT * FROM users WHERE id = ?"); $u->execute([$uid]); $res['userProfileSync'] = $u->fetch();
 $p = $conn->prepare("SELECT * FROM user_progress WHERE user_id = ?"); $p->execute([$uid]); $res['progress'] = $p->fetchAll();
-$a = $conn->prepare("SELECT * FROM test_attempts WHERE user_id = ? ORDER BY date DESC"); $a->execute([$uid]); $res['attempts'] = $a->fetchAll();
+$a = $conn->prepare("SELECT id, date, title, score, total_marks, accuracy as accuracy_percent, total_questions, correct_count, incorrect_count, unattempted_count, topic_id, difficulty, detailed_results FROM test_attempts WHERE user_id = ? ORDER BY date DESC"); 
+$a->execute([$uid]); 
+$res['attempts'] = $a->fetchAll();
 $g = $conn->prepare("SELECT * FROM goals WHERE user_id = ?"); $g->execute([$uid]); $res['goals'] = $g->fetchAll();
 $b = $conn->prepare("SELECT * FROM backlogs WHERE user_id = ?"); $b->execute([$uid]); $res['backlogs'] = $b->fetchAll();
 $m = $conn->prepare("SELECT * FROM mistake_logs WHERE user_id = ?"); $m->execute([$uid]); $res['mistakes'] = $m->fetchAll();
 $t = $conn->prepare("SELECT * FROM timetable WHERE user_id = ?"); $t->execute([$uid]); $res['timetable'] = $t->fetch();
 $ps = $conn->prepare("SELECT * FROM psychometric_results WHERE user_id = ?"); $ps->execute([$uid]); $res['psychometric'] = $ps->fetch();
 $n = $conn->prepare("SELECT * FROM notifications WHERE to_id = ? ORDER BY date DESC"); $n->execute([$uid]); $res['notifications'] = $n->fetchAll();
+$st = $conn->prepare("SELECT section, is_synced FROM sync_status WHERE user_id = ?"); $st->execute([$uid]); $res['syncStatus'] = $st->fetchAll();
 echo json_encode($res);
 ?>`
     },
@@ -195,9 +207,11 @@ echo json_encode($res);
         folder: 'deployment/api',
         content: `${phpHeader}
 $d = getJsonInput();
+$uid = getV($d, 'userId');
 $sql = "INSERT INTO user_progress (user_id, topic_id, status, last_revised, revision_level, next_revision_date, solved_questions_json) VALUES (?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE status=VALUES(status), last_revised=VALUES(last_revised), revision_level=VALUES(revision_level), next_revision_date=VALUES(next_revision_date), solved_questions_json=VALUES(solved_questions_json)";
 $s = $conn->prepare($sql);
-$s->execute([getV($d, 'userId'), getV($d, 'topicId'), getV($d, 'status'), getV($d, 'lastRevised'), getV($d, 'revisionLevel') ?? 0, getV($d, 'nextRevisionDate'), json_encode(getV($d, 'solvedQuestions') ?? [])]);
+$s->execute([$uid, getV($d, 'topicId'), getV($d, 'status'), getV($d, 'lastRevised'), getV($d, 'revisionLevel') ?? 0, getV($d, 'nextRevisionDate'), json_encode(getV($d, 'solvedQuestions') ?? [])]);
+$conn->prepare("INSERT INTO sync_status (user_id, section, is_synced) VALUES (?, 'syllabus', 1) ON DUPLICATE KEY UPDATE is_synced=1, last_sync=CURRENT_TIMESTAMP")->execute([$uid]);
 echo json_encode(["status" => "success"]);
 ?>`
     },
@@ -206,9 +220,12 @@ echo json_encode(["status" => "success"]);
         folder: 'deployment/api',
         content: `${phpHeader}
 $d = getJsonInput();
+if(!$d) { echo json_encode(["error" => "NO_DATA"]); exit; }
+$uid = getV($d, 'userId');
 $sql = "INSERT INTO test_attempts (id, user_id, test_id, title, score, total_marks, accuracy, total_questions, correct_count, incorrect_count, unattempted_count, topic_id, difficulty, detailed_results) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 $s = $conn->prepare($sql);
-$s->execute([getV($d, 'id'), getV($d, 'userId'), getV($d, 'testId'), getV($d, 'title'), getV($d, 'score'), getV($d, 'totalMarks'), getV($d, 'accuracy_percent') ?? getV($d, 'accuracy'), getV($d, 'totalQuestions'), getV($d, 'correctCount'), getV($d, 'incorrectCount'), getV($d, 'unattemptedCount'), getV($d, 'topicId'), getV($d, 'difficulty'), json_encode(getV($d, 'detailedResults') ?? [])]);
+$s->execute([getV($d, 'id'), $uid, getV($d, 'testId'), getV($d, 'title'), (int)getV($d, 'score'), (int)getV($d, 'totalMarks'), (int)(getV($d, 'accuracy_percent') ?? getV($d, 'accuracy')), (int)getV($d, 'totalQuestions'), (int)getV($d, 'correctCount'), (int)getV($d, 'incorrectCount'), (int)getV($d, 'unattemptedCount'), getV($d, 'topicId'), getV($d, 'difficulty'), json_encode(getV($d, 'detailedResults') ?? [])]);
+$conn->prepare("INSERT INTO sync_status (user_id, section, is_synced) VALUES (?, 'tests', 1) ON DUPLICATE KEY UPDATE is_synced=1, last_sync=CURRENT_TIMESTAMP")->execute([$uid]);
 echo json_encode(["status" => "success"]);
 ?>`
     },
@@ -217,8 +234,10 @@ echo json_encode(["status" => "success"]);
         folder: 'deployment/api',
         content: `${phpHeader}
 $d = getJsonInput();
+$uid = getV($d, 'userId');
 $s = $conn->prepare("INSERT INTO timetable (user_id, config_json, slots_json) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE config_json=VALUES(config_json), slots_json=VALUES(slots_json)");
-$s->execute([getV($d, 'userId'), json_encode(getV($d, 'config')), json_encode(getV($d, 'slots'))]);
+$s->execute([$uid, json_encode(getV($d, 'config')), json_encode(getV($d, 'slots'))]);
+$conn->prepare("INSERT INTO sync_status (user_id, section, is_synced) VALUES (?, 'timetable', 1) ON DUPLICATE KEY UPDATE is_synced=1, last_sync=CURRENT_TIMESTAMP")->execute([$uid]);
 echo json_encode(["status" => "success"]);
 ?>`
     },
@@ -383,6 +402,11 @@ if($_SERVER['REQUEST_METHOD'] === 'POST') {
         content: `${phpHeader}
 if($_SERVER['REQUEST_METHOD'] === 'GET') {
     echo json_encode($conn->query("SELECT * FROM contact_messages ORDER BY created_at DESC")->fetchAll());
+} else if($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $d = getJsonInput();
+    $s = $conn->prepare("INSERT INTO contact_messages (name, email, subject, message) VALUES (?,?,?,?)");
+    $s->execute([getV($d, 'name'), getV($d, 'email'), getV($d, 'subject'), getV($d, 'message')]);
+    echo json_encode(["status" => "success"]);
 } else if($_SERVER['REQUEST_METHOD'] === 'DELETE') {
     $conn->prepare("DELETE FROM contact_messages WHERE id = ?")->execute([$_GET['id']]);
     echo json_encode(["status" => "success"]);
@@ -390,12 +414,14 @@ if($_SERVER['REQUEST_METHOD'] === 'GET') {
 ?>`
     },
     {
-        name: 'contact.php',
+        name: 'save_sync_status.php',
         folder: 'deployment/api',
         content: `${phpHeader}
 $d = getJsonInput();
-$s = $conn->prepare("INSERT INTO contact_messages (name, email, subject, message) VALUES (?,?,?,?)");
-$s->execute([getV($d, 'name'), getV($d, 'email'), getV($d, 'subject'), getV($d, 'message')]);
+$uid = getV($d, 'userId');
+$section = getV($d, 'section');
+$s = $conn->prepare("INSERT INTO sync_status (user_id, section, is_synced) VALUES (?, ?, 1) ON DUPLICATE KEY UPDATE is_synced=1, last_sync=CURRENT_TIMESTAMP");
+$s->execute([$uid, $section]);
 echo json_encode(["status" => "success"]);
 ?>`
     },
@@ -473,8 +499,10 @@ echo json_encode(["status" => "success"]);
         content: `${phpHeader}
 $d = getJsonInput();
 if(getV($d, 'action') === 'accept') {
-    $conn->prepare("UPDATE users SET linked_student_id = ? WHERE id = ?")->execute([getV($studentId), getV($parentId)]);
-    $conn->prepare("UPDATE users SET parent_id = ? WHERE id = ?")->execute([getV($parentId), getV($studentId)]);
+    $sId = getV($d, 'studentId');
+    $pId = getV($d, 'parentId');
+    $conn->prepare("UPDATE users SET linked_student_id = ? WHERE id = ?")->execute([$sId, $pId]);
+    $conn->prepare("UPDATE users SET parent_id = ? WHERE id = ?")->execute([$pId, $sId]);
 }
 $conn->prepare("DELETE FROM notifications WHERE id = ?")->execute([getV($d, 'notifId')]);
 echo json_encode(["status" => "success"]);
@@ -532,26 +560,18 @@ $s = $conn->prepare("SELECT * FROM attempt_details WHERE attempt_id = ?");
 $s->execute([$_GET['attempt_id']]);
 echo json_encode($s->fetchAll());
 ?>`
-    },
-    {
-        name: 'manage_chapter_test.php',
-        folder: 'deployment/api',
-        content: `${phpHeader}
-// Placeholder for custom logic related to chapter-specific randomized tests
-echo json_encode(["status" => "ready"]);
-?>`
     }
 ];
 
 export const generateSQLSchema = () => {
-    return `-- IITGEEPrep v12.39 Master Sync Schema
+    return `-- IITGEEPrep v12.41 Master Sync Schema
 -- Total Tables: 26 (Aligned with production environment)
 
 START TRANSACTION;
 
 CREATE TABLE IF NOT EXISTS users (id VARCHAR(255) PRIMARY KEY, name VARCHAR(255), email VARCHAR(255) UNIQUE, password_hash VARCHAR(255), role VARCHAR(50), school VARCHAR(255), target_year INT, target_exam VARCHAR(255), phone VARCHAR(20), avatar_url TEXT, is_verified TINYINT(1) DEFAULT 1, parent_id VARCHAR(255), linked_student_id VARCHAR(255), dob DATE, gender VARCHAR(20), google_id VARCHAR(255), security_question TEXT, security_answer TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB;
 
-CREATE TABLE IF NOT EXISTS user_progress (id INT AUTO_INCREMENT PRIMARY KEY, user_id VARCHAR(255), topic_id VARCHAR(255), status VARCHAR(50), last_revised TIMESTAMP NULL, revision_level INT DEFAULT 0, next_revision_date TIMESTAMP NULL, solved_questions_json TEXT, ex1_solved INT, ex1_total INT, INDEX(user_id), INDEX(topic_id)) ENGINE=InnoDB;
+CREATE TABLE IF NOT EXISTS user_progress (id INT AUTO_INCREMENT PRIMARY KEY, user_id VARCHAR(255), topic_id VARCHAR(255), status VARCHAR(50), last_revised TIMESTAMP NULL, revision_level INT DEFAULT 0, next_revision_date TIMESTAMP NULL, solved_questions_json TEXT, ex1_solved INT, ex1_total INT, UNIQUE KEY user_topic (user_id, topic_id), INDEX(user_id), INDEX(topic_id)) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS topic_progress (user_id VARCHAR(255), topic_id VARCHAR(255), progress_pct INT, PRIMARY KEY(user_id, topic_id)) ENGINE=InnoDB;
 
@@ -562,6 +582,8 @@ CREATE TABLE IF NOT EXISTS attempt_details (id INT AUTO_INCREMENT PRIMARY KEY, a
 CREATE TABLE IF NOT EXISTS timetable (user_id VARCHAR(255) PRIMARY KEY, config_json LONGTEXT, slots_json LONGTEXT, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS timetable_configs (user_id VARCHAR(255) PRIMARY KEY, config_json LONGTEXT) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS sync_status (user_id VARCHAR(255), section VARCHAR(50), is_synced TINYINT(1) DEFAULT 1, last_sync TIMESTAMP DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY(user_id, section)) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS goals (id VARCHAR(255) PRIMARY KEY, user_id VARCHAR(255), text TEXT, completed TINYINT(1) DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, INDEX(user_id)) ENGINE=InnoDB;
 

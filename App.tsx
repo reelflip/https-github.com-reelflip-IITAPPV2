@@ -11,7 +11,7 @@ import {
 import { SYLLABUS_DATA } from './lib/syllabusData';
 import { MOCK_TESTS_DATA, generateInitialQuestionBank } from './lib/mockTestsData';
 
-// --- Lazy Loading Screens (v12.39) ---
+// --- Lazy Loading Screens (v12.41) ---
 const AuthScreen = lazy(() => import('./screens/AuthScreen').then(m => ({ default: m.AuthScreen })));
 const DashboardScreen = lazy(() => import('./screens/DashboardScreen').then(m => ({ default: m.DashboardScreen })));
 const AdminDashboardScreen = lazy(() => import('./screens/AdminDashboardScreen').then(m => ({ default: m.AdminDashboardScreen })));
@@ -202,7 +202,7 @@ const App: React.FC = () => {
           ? <AdminDashboardScreen user={user!} onNavigate={setScreen} />
           : <DashboardScreen user={user!} progress={linkedData?.progress || progress} testAttempts={linkedData?.tests || testAttempts} goals={goals} toggleGoal={id => {}} addGoal={t => {}} setScreen={setScreen} viewingStudentName={linkedData?.studentName} linkedPsychReport={linkedData?.psychReport} />;
       case 'syllabus':
-        return <SyllabusScreen user={user!} subjects={SYLLABUS_DATA} progress={linkedData?.progress || progress} onUpdateProgress={updateProgress} questionBank={questionBank} viewingStudentName={linkedData?.studentName} readOnly={user!.role === 'PARENT'} addTestAttempt={() => {}} testAttempts={linkedData?.tests || testAttempts} />;
+        return <SyllabusScreen user={user!} subjects={SYLLABUS_DATA} progress={linkedData?.progress || progress} onUpdateProgress={updateProgress} questionBank={questionBank} viewingStudentName={linkedData?.studentName} readOnly={user!.role === 'PARENT'} addTestAttempt={() => {}} testAttempts={linkedData?.tests || testAttempts} syncStatus={globalSyncStatus} showIndicators={showIndicators} />;
       case 'tests':
         return isAdminRole
           ? <AdminTestManagerScreen questionBank={questionBank} tests={tests} syllabus={SYLLABUS_DATA} onAddQuestion={q => {}} onCreateTest={t => {}} onDeleteQuestion={id => {}} onDeleteTest={id => {}} />
