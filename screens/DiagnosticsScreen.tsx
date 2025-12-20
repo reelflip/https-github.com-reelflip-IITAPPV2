@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useMemo } from 'react';
 import { ShieldCheck, RefreshCw, Activity, Terminal, Download, HeartPulse, Play, FileJson, AlertTriangle, CheckCircle2, XCircle, Beaker, Shield, UserCheck, Database, Server } from 'lucide-react';
 import { E2ETestRunner, TestResult } from '../services/testRunnerService';
@@ -41,14 +40,14 @@ export const DiagnosticsScreen: React.FC = () => {
             'System Health': [],
             'Functional E2E': [],
             'Advanced Prep Tools': [],
-            'Accessibility': []
+            'Security & Roles': []
         };
         results.forEach(r => {
             const stepNum = parseInt(r.step.split('.')[1]);
             if (r.step.startsWith('H.')) groups['System Health'].push(r);
             else if (r.step.startsWith('E.')) {
                 if (stepNum >= 40 && stepNum <= 43) groups['Advanced Prep Tools'].push(r);
-                else if (stepNum === 44) groups['Accessibility'].push(r);
+                else if (stepNum === 51) groups['Security & Roles'].push(r);
                 else groups['Functional E2E'].push(r);
             }
         });
@@ -62,7 +61,7 @@ export const DiagnosticsScreen: React.FC = () => {
                     <div className="flex-1">
                         <div className="flex items-center gap-3 mb-2">
                             <Beaker className="w-8 h-8 text-blue-400" />
-                            <h2 className="text-3xl font-black tracking-tight uppercase">Integrity Audit v12.25</h2>
+                            <h2 className="text-3xl font-black tracking-tight uppercase">Integrity Audit v12.26</h2>
                         </div>
                         <p className="text-slate-400 text-sm max-w-xl">
                             Comprehensive points scan verifying server reliability, database schema compliance, advanced tool persistence, and cross-role screen accessibility.
@@ -111,7 +110,7 @@ export const DiagnosticsScreen: React.FC = () => {
                         <div className="space-y-3">
                             <div className="flex justify-between items-center p-3 bg-slate-50 rounded-xl">
                                 <span className="text-sm font-medium text-slate-600">Runtime Version</span>
-                                <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-bold rounded uppercase">12.25</span>
+                                <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-bold rounded uppercase">12.26</span>
                             </div>
                             <div className="flex justify-between items-center p-3 bg-slate-50 rounded-xl">
                                 <span className="text-sm font-medium text-slate-600">Database</span>

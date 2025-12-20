@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-/* Fix: Removed non-existent export generateHtaccess from generatorService import to resolve TypeScript error */
 import { getBackendFiles, generateSQLSchema } from '../services/generatorService';
 import { Download, Server, BookOpen, Package, FileText, Folder, ArrowRight, ShieldCheck, Database, Layout, Activity, PlugZap, CheckCircle2, XCircle, Lock, AlertTriangle, RefreshCw } from 'lucide-react';
 import JSZip from 'jszip';
@@ -68,7 +67,7 @@ export const DeploymentScreen: React.FC = () => {
         setRepairing(true);
         try {
             const res = await fetch('/api/migrate_db.php');
-            if(res.ok) alert("v12.25 Schema Repair Successful!");
+            if(res.ok) alert("v12.26 Schema Repair Successful!");
             else throw new Error(`HTTP ${res.status}`);
         } catch(e: any) { alert("Repair Failed: " + e.message); }
         finally { setRepairing(false); }
@@ -88,7 +87,7 @@ export const DeploymentScreen: React.FC = () => {
             const content = await zip.generateAsync({ type: "blob" });
             const url = URL.createObjectURL(content);
             const link = document.createElement('a');
-            link.href = url; link.download = "IITGEEPrep_Bundle_v12_25.zip";
+            link.href = url; link.download = "IITGEEPrep_Bundle_v12_26.zip";
             link.click();
         } catch (error) { console.error(error); alert("Error creating zip file."); }
         setIsZipping(false);
@@ -101,7 +100,7 @@ export const DeploymentScreen: React.FC = () => {
                     <div>
                         <div className="flex items-center gap-3 mb-2">
                             <h2 className="text-3xl font-bold">Deployment Center</h2>
-                            <span className="px-2 py-1 rounded-md bg-slate-700 border border-slate-600 text-xs font-mono text-cyan-400">v12.25 (Latest)</span>
+                            <span className="px-2 py-1 rounded-md bg-slate-700 border border-slate-600 text-xs font-mono text-cyan-400">v12.26 (Latest)</span>
                         </div>
                         <p className="text-slate-400 text-lg">Download the complete backend kit for production rollout.</p>
                     </div>
@@ -140,7 +139,7 @@ export const DeploymentScreen: React.FC = () => {
                     <div className="lg:col-span-2 bg-white p-8 rounded-2xl border border-slate-200 shadow-sm space-y-6">
                         <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2"><Package className="text-blue-600"/> Update Instructions</h3>
                         <ol className="space-y-4 text-slate-600 text-sm list-decimal pl-5">
-                            <li>Download the <strong>v12.25</strong> Bundle using the sidebar action.</li>
+                            <li>Download the <strong>v12.26</strong> Bundle using the sidebar action.</li>
                             <li>Extract and upload <strong>deployment/api/*</strong> to your server's <code>/api</code> folder.</li>
                             <li>Use the <strong>Repair DB</strong> tool above to synchronize any new schema changes.</li>
                             <li>Clear browser cache to see the latest frontend updates.</li>
@@ -149,9 +148,9 @@ export const DeploymentScreen: React.FC = () => {
                     <div className="lg:col-span-1 space-y-6">
                         <div className="bg-slate-900 rounded-2xl p-6 text-white shadow-xl relative overflow-hidden">
                             <h3 className="text-xl font-bold mb-2">Get Bundle</h3>
-                            <p className="text-slate-400 text-sm mb-6">Complete v12.25 backend kit including PHP APIs and SQL.</p>
-                            <button onClick={downloadAllZip} disabled={isZipping} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl flex items-center justify-center transition-all disabled:opacity-50">
-                                {isZipping ? <RefreshCw className="animate-spin mr-2"/> : <Download className="mr-2"/>} Download v12.25 .zip
+                            <p className="text-slate-400 text-sm mb-6">Complete v12.26 backend kit including PHP APIs and SQL.</p>
+                            <button onClick={downloadAllZip} disabled={isZipping} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl flex items-center justify-center transition-all disabled:opacity-50">
+                                {isZipping ? <RefreshCw className="animate-spin mr-2"/> : <Download className="mr-2"/>} Download v12.26 .zip
                             </button>
                         </div>
                     </div>
