@@ -29,7 +29,6 @@ const STUDENT_MENU: {id: Screen, icon: any, label: string}[] = [
   { id: 'analytics', icon: BarChart2, label: "Analytics" },
   { id: 'timetable', icon: Calendar, label: "Timetable" },
   { id: 'revision', icon: RotateCw, label: "Revision" },
-  { id: 'exams', icon: GraduationCap, label: "Exam Guide" },
   { id: 'mistakes', icon: AlertCircle, label: "Mistakes" },
   { id: 'flashcards', icon: Layers, label: "Cards" },
   { id: 'backlogs', icon: ListTodo, label: "Backlogs" },

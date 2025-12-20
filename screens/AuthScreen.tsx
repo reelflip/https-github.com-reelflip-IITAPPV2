@@ -453,7 +453,6 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate }) =
           <div className="max-w-4xl mx-auto flex flex-wrap justify-center gap-x-8 gap-y-4 text-[11px] font-bold text-slate-400 uppercase tracking-widest">
               <button onClick={() => onNavigate('about')} className="hover:text-blue-600 transition-colors">About Us</button>
               <button onClick={() => onNavigate('features')} className="hover:text-blue-600 transition-colors">Features</button>
-              <button onClick={() => onNavigate('exams')} className="hover:text-blue-600 transition-colors">Exam Guide</button>
               <button onClick={() => onNavigate('blog')} className="hover:text-blue-600 transition-colors">Blog</button>
               <button onClick={() => onNavigate('contact')} className="hover:text-blue-600 transition-colors">Contact</button>
               <button onClick={() => onNavigate('privacy')} className="hover:text-blue-600 transition-colors">Privacy Policy</button>

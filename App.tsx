@@ -1,4 +1,4 @@
-import React, { Component, useState, useEffect, useCallback, ErrorInfo, ReactNode, Suspense, lazy } from 'react';
+import React, { Component, useState, useEffect, useCallback, Suspense, lazy } from 'react';
 import { Navigation, MobileNavigation } from './components/Navigation';
 import { AITutorChat } from './components/AITutorChat';
 import { PublicLayout } from './components/PublicLayout';
@@ -6,12 +6,13 @@ import { SyncStatusBadge, SyncStatus } from './components/SyncStatusBadge';
 import { 
   User, UserProgress, TestAttempt, Goal, MistakeLog, BacklogItem, 
   Flashcard, MemoryHack, BlogPost, Screen, Test, Question, 
-  Topic, TimetableConfig, ChapterNote, VideoLesson, PsychometricReport 
+  Topic, TimetableConfig, ChapterNote, VideoLesson 
 } from './lib/types';
 import { SYLLABUS_DATA } from './lib/syllabusData';
 import { MOCK_TESTS_DATA, generateInitialQuestionBank } from './lib/mockTestsData';
+import { calculateNextRevision } from './lib/utils';
 
-// --- Lazy Loading Screens (v12.43) ---
+// --- Lazy Loading Screens (v12.45 Stability) ---
 const AuthScreen = lazy(() => import('./screens/AuthScreen').then(m => ({ default: m.AuthScreen })));
 const DashboardScreen = lazy(() => import('./screens/DashboardScreen').then(m => ({ default: m.DashboardScreen })));
 const AdminDashboardScreen = lazy(() => import('./screens/AdminDashboardScreen').then(m => ({ default: m.AdminDashboardScreen })));
@@ -19,6 +20,7 @@ const SyllabusScreen = lazy(() => import('./screens/SyllabusScreen').then(m => (
 const RevisionScreen = lazy(() => import('./screens/RevisionScreen').then(m => ({ default: m.RevisionScreen })));
 const TimetableScreen = lazy(() => import('./screens/TimetableScreen').then(m => ({ default: m.TimetableScreen })));
 const TestScreen = lazy(() => import('./screens/TestScreen').then(m => ({ default: m.TestScreen })));
+const FocusScreen = lazy(() => import('./screens/FocusScreen').then(m => ({ default: m.FocusScreen })));
 const FlashcardScreen = lazy(() => import('./screens/FlashcardScreen').then(m => ({ default: m.FlashcardScreen })));
 const MistakesScreen = lazy(() => import('./screens/MistakesScreen').then(m => ({ default: m.MistakesScreen })));
 const AnalyticsScreen = lazy(() => import('./screens/AnalyticsScreen').then(m => ({ default: m.AnalyticsScreen })));
@@ -30,7 +32,6 @@ const AdminUserManagementScreen = lazy(() => import('./screens/AdminUserManageme
 const AdminInboxScreen = lazy(() => import('./screens/AdminInboxScreen').then(m => ({ default: m.AdminInboxScreen })));
 const AdminSyllabusScreen = lazy(() => import('./screens/AdminSyllabusScreen').then(m => ({ default: m.AdminSyllabusScreen })));
 const AdminTestManagerScreen = lazy(() => import('./screens/AdminTestManagerScreen').then(m => ({ default: m.AdminTestManagerScreen })));
-const AdminAnalyticsScreen = lazy(() => import('./screens/AdminAnalyticsScreen').then(m => ({ default: m.AdminAnalyticsScreen })));
 const AdminSystemScreen = lazy(() => import('./screens/AdminSystemScreen').then(m => ({ default: m.AdminSystemScreen })));
 const DeploymentScreen = lazy(() => import('./screens/DeploymentScreen').then(m => ({ default: m.DeploymentScreen })));
 const DiagnosticsScreen = lazy(() => import('./screens/DiagnosticsScreen').then(m => ({ default: m.DiagnosticsScreen })));
@@ -46,7 +47,7 @@ const AdminBlogScreen = lazy(() => import('./screens/AdminBlogScreen').then(m =>
 const LoadingView = () => (
   <div className="flex flex-col items-center justify-center min-h-[60vh] text-slate-400">
     <div className="w-10 h-10 border-4 border-slate-200 border-t-blue-600 rounded-full animate-spin mb-4"></div>
-    <p className="text-xs font-bold uppercase tracking-widest">Synchronizing Command Interface...</p>
+    <p className="text-xs font-bold uppercase tracking-widest text-slate-500">Synchronizing v12.45 Core...</p>
   </div>
 );
 
@@ -61,9 +62,7 @@ const App: React.FC = () => {
     return (saved as Screen) || 'dashboard';
   });
 
-  const [showIndicators, setShowIndicators] = useState(false);
   const [globalSyncStatus, setGlobalSyncStatus] = useState<SyncStatus>('IDLE');
-
   const [progress, setProgress] = useState<Record<string, UserProgress>>({});
   const [testAttempts, setTestAttempts] = useState<TestAttempt[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
@@ -75,11 +74,6 @@ const App: React.FC = () => {
   const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
   const [hacks, setHacks] = useState<MemoryHack[]>([]);
   const [blogs, setBlogs] = useState<BlogPost[]>([]);
-  const [linkedData, setLinkedData] = useState<{ progress: Record<string, UserProgress>, tests: TestAttempt[], studentName: string, psychReport?: PsychometricReport } | undefined>();
-
-  const clearState = useCallback(() => {
-    setProgress({}); setTestAttempts([]); setGoals([]); setMistakes([]); setBacklogs([]); setTimetable({}); setLinkedData(undefined);
-  }, []);
 
   const mapProgress = (p: any): UserProgress => ({
     topicId: p.topic_id, status: p.status, lastRevised: p.last_revised, revisionLevel: Number(p.revision_level || 0), nextRevisionDate: p.next_revision_date, solvedQuestions: p.solved_questions_json ? JSON.parse(p.solved_questions_json) : []
@@ -96,7 +90,7 @@ const App: React.FC = () => {
                 data.progress.forEach((p: any) => { const mapped = mapProgress(p); progMap[mapped.topicId] = mapped; });
                 setProgress(progMap);
             }
-            if (data.attempts) setTestAttempts(data.attempts.map((a: any) => ({ ...a, detailedResults: a.detailed_results ? JSON.parse(a.detailed_results) : [] })));
+            if (data.attempts) setTestAttempts(data.attempts.map((a: any) => ({ ...a, accuracy: Number(a.accuracy_percent || a.accuracy || 0), detailedResults: a.detailed_results ? JSON.parse(a.detailed_results) : [] })));
             if (data.goals) setGoals(data.goals.map((g: any) => ({ ...g, completed: g.completed == 1 })));
             if (data.backlogs) setBacklogs(data.backlogs.map((b: any) => ({ ...b, status: b.status || 'PENDING' })));
             if (data.mistakes) setMistakes(data.mistakes.map((m: any) => ({ ...m })));
@@ -110,15 +104,8 @@ const App: React.FC = () => {
     } catch (e) { setGlobalSyncStatus('ERROR'); }
   }, []);
 
-  useEffect(() => {
-    if (user) loadDashboard(user.id);
-  }, [user?.id, loadDashboard]);
-
-  useEffect(() => {
-    if (user) localStorage.setItem('user', JSON.stringify(user));
-    else localStorage.removeItem('user');
-  }, [user]);
-
+  useEffect(() => { if (user) loadDashboard(user.id); }, [user?.id, loadDashboard]);
+  useEffect(() => { if (user) localStorage.setItem('user', JSON.stringify(user)); else localStorage.removeItem('user'); }, [user]);
   useEffect(() => { localStorage.setItem('last_screen', currentScreen); }, [currentScreen]);
 
   const updateProgress = async (topicId: string, updates: Partial<UserProgress>) => {
@@ -131,50 +118,85 @@ const App: React.FC = () => {
     } catch (e) { setGlobalSyncStatus('ERROR'); }
   };
 
-  const handleAddBlog = async (blog: BlogPost) => {
+  const handleRevisionComplete = (topicId: string) => {
+    const current = progress[topicId];
+    if (!current) return;
+    const newLevel = current.revisionLevel + 1;
+    const nextDate = calculateNextRevision(newLevel, new Date().toISOString());
+    updateProgress(topicId, { lastRevised: new Date().toISOString(), revisionLevel: newLevel, nextRevisionDate: nextDate });
+  };
+
+  const addTestAttempt = async (attempt: TestAttempt) => {
     setGlobalSyncStatus('SYNCING');
+    setTestAttempts(prev => [...prev, attempt]);
     try {
-      const res = await fetch('/api/manage_content.php?type=blog', { method: 'POST', body: JSON.stringify(blog) });
-      if (res.ok) {
-          const data = await res.json();
-          setBlogs(prev => [{ ...blog, id: data.id || blog.id }, ...prev.filter(b => b.id !== blog.id)]);
-          setGlobalSyncStatus('SYNCED');
-      }
+        const res = await fetch('/api/save_attempt.php', { method: 'POST', body: JSON.stringify({ ...attempt, userId: user?.id }) });
+        if (res.ok) setGlobalSyncStatus('SYNCED'); else setGlobalSyncStatus('ERROR');
     } catch (e) { setGlobalSyncStatus('ERROR'); }
   };
 
   const renderContent = () => {
     const isAdminRole = user?.role === 'ADMIN' || user?.role === 'ADMIN_EXECUTIVE';
+    
+    // Safety check for role-based access
+    if (isAdminRole && ['ai-tutor', 'focus', 'revision', 'wellness', 'backlogs'].includes(currentScreen)) {
+        return <AdminDashboardScreen user={user!} onNavigate={setScreen} />;
+    }
+
     switch (currentScreen) {
       case 'dashboard':
       case 'overview':
         return isAdminRole 
           ? <AdminDashboardScreen user={user!} onNavigate={setScreen} />
-          : <DashboardScreen user={user!} progress={linkedData?.progress || progress} testAttempts={linkedData?.tests || testAttempts} goals={goals} toggleGoal={id => {}} addGoal={t => {}} setScreen={setScreen} viewingStudentName={linkedData?.studentName} linkedPsychReport={linkedData?.psychReport} />;
+          : <DashboardScreen user={user!} progress={progress} testAttempts={testAttempts} goals={goals} toggleGoal={id => {}} addGoal={t => {}} setScreen={setScreen} />;
       case 'syllabus':
-        return <SyllabusScreen user={user!} subjects={SYLLABUS_DATA} progress={linkedData?.progress || progress} onUpdateProgress={updateProgress} questionBank={questionBank} viewingStudentName={linkedData?.studentName} readOnly={user!.role === 'PARENT'} addTestAttempt={() => {}} testAttempts={linkedData?.tests || testAttempts} syncStatus={globalSyncStatus} showIndicators={showIndicators} />;
+        return <SyllabusScreen user={user!} subjects={SYLLABUS_DATA} progress={progress} onUpdateProgress={updateProgress} questionBank={questionBank} addTestAttempt={addTestAttempt} testAttempts={testAttempts} syncStatus={globalSyncStatus} />;
+      case 'ai-tutor':
+        return <AITutorChat isFullScreen={true} />;
+      case 'focus':
+        return <FocusScreen />;
+      case 'revision':
+        return <RevisionScreen progress={progress} handleRevisionComplete={handleRevisionComplete} />;
       case 'tests':
         return isAdminRole
           ? <AdminTestManagerScreen questionBank={questionBank} tests={tests} syllabus={SYLLABUS_DATA} onAddQuestion={q => setQuestionBank([...questionBank, q])} onCreateTest={t => setTests([...tests, t])} onDeleteQuestion={id => setQuestionBank(questionBank.filter(q => q.id !== id))} onDeleteTest={id => setTests(tests.filter(t => t.id !== id))} />
-          : <TestScreen user={user!} addTestAttempt={() => {}} history={linkedData?.tests || testAttempts} availableTests={tests} />;
+          : <TestScreen user={user!} addTestAttempt={addTestAttempt} history={testAttempts} availableTests={tests} />;
       case 'timetable':
-        return <TimetableScreen user={user!} savedConfig={timetable.config} savedSlots={timetable.slots} onSave={(c, s) => {}} progress={progress} />;
-      case 'diagnostics': return <DiagnosticsScreen />;
-      case 'deployment': return <DeploymentScreen />;
-      case 'profile': return <ProfileScreen user={user!} onAcceptRequest={id => {}} onUpdateUser={upd => setUser({...user!, ...upd})} />;
-      case 'backlogs': return <BacklogScreen backlogs={backlogs} onAddBacklog={i => {}} onDeleteBacklog={i => {}} onToggleBacklog={i => {}} />;
-      case 'mistakes': return <MistakesScreen mistakes={mistakes} addMistake={m => {}} />;
-      case 'psychometric': return <PsychometricScreen user={user!} />;
-      case 'analytics': return <AnalyticsScreen user={user!} progress={linkedData?.progress || progress} testAttempts={linkedData?.tests || testAttempts} viewingStudentName={linkedData?.studentName} />;
-      case 'inbox': return <AdminInboxScreen />;
-      case 'users': return <AdminUserManagementScreen />;
-      case 'content': return <ContentManagerScreen flashcards={flashcards} hacks={hacks} blogs={blogs} onAddFlashcard={c => {}} onAddHack={h => {}} onAddBlog={handleAddBlog} onDelete={(t, id) => {}} />;
-      case 'blog_admin': return <AdminBlogScreen blogs={blogs} onAddBlog={handleAddBlog} onUpdateBlog={handleAddBlog} onDeleteBlog={id => {}} />;
-      case 'syllabus_admin': return <AdminSyllabusScreen syllabus={SYLLABUS_DATA} onAddTopic={() => {}} onDeleteTopic={() => {}} />;
-      case 'system': return <AdminSystemScreen />;
-      case 'flashcards': return <FlashcardScreen flashcards={flashcards} />;
-      case 'hacks': return <HacksScreen hacks={hacks} />;
-      default: return <DashboardScreen user={user!} progress={progress} testAttempts={testAttempts} goals={[]} toggleGoal={id => {}} addGoal={t => {}} setScreen={setScreen} />;
+        return <TimetableScreen user={user!} savedConfig={timetable.config} savedSlots={timetable.slots} onSave={(c, s) => setTimetable({config: c, slots: s})} progress={progress} />;
+      case 'analytics':
+        return <AnalyticsScreen user={user!} progress={progress} testAttempts={testAttempts} />;
+      case 'mistakes':
+        return <MistakesScreen mistakes={mistakes} addMistake={m => {}} />;
+      case 'backlogs':
+        return <BacklogScreen backlogs={backlogs} onAddBacklog={b => {}} onToggleBacklog={id => {}} onDeleteBacklog={id => {}} />;
+      case 'psychometric': 
+        return <PsychometricScreen user={user!} />;
+      case 'wellness': 
+        return <WellnessScreen />;
+      case 'flashcards': 
+        return <FlashcardScreen flashcards={flashcards} />;
+      case 'hacks': 
+        return <HacksScreen hacks={hacks} />;
+      case 'profile': 
+        return <ProfileScreen user={user!} onAcceptRequest={() => {}} onUpdateUser={upd => setUser({...user!, ...upd})} />;
+      case 'inbox': 
+        return <AdminInboxScreen />;
+      case 'users': 
+        return <AdminUserManagementScreen />;
+      case 'content': 
+        return <ContentManagerScreen flashcards={flashcards} hacks={hacks} blogs={blogs} onAddFlashcard={()=>{}} onAddHack={()=>{}} onAddBlog={()=>{}} onDelete={()=>{}} />;
+      case 'blog_admin': 
+        return <AdminBlogScreen blogs={blogs} />;
+      case 'syllabus_admin': 
+        return <AdminSyllabusScreen syllabus={SYLLABUS_DATA} onAddTopic={()=>{}} onDeleteTopic={()=>{}} />;
+      case 'system': 
+        return <AdminSystemScreen />;
+      case 'deployment': 
+        return <DeploymentScreen />;
+      case 'diagnostics': 
+        return <DiagnosticsScreen />;
+      default: 
+        return <DashboardScreen user={user!} progress={progress} testAttempts={testAttempts} goals={goals} toggleGoal={()=>{}} addGoal={()=>{}} setScreen={setScreen} />;
     }
   };
 
@@ -198,15 +220,15 @@ const App: React.FC = () => {
 
   return (
     <div className="flex bg-slate-50 min-h-screen font-inter">
-      <Navigation currentScreen={currentScreen} setScreen={setScreen} logout={() => { setUser(null); clearState(); setScreen('dashboard'); localStorage.clear(); }} user={user} />
+      <Navigation currentScreen={currentScreen} setScreen={setScreen} logout={() => { setUser(null); setScreen('dashboard'); localStorage.clear(); }} user={user} />
       <main className="flex-1 md:ml-64 p-4 md:p-8 pb-24 md:pb-8 max-w-[1600px] mx-auto w-full relative">
         <div className="absolute top-4 right-4 z-50 pointer-events-none">
-            <SyncStatusBadge status={globalSyncStatus} show={showIndicators} />
+            <SyncStatusBadge status={globalSyncStatus} show={true} />
         </div>
         <Suspense fallback={<LoadingView />}>{renderContent()}</Suspense>
       </main>
-      <MobileNavigation currentScreen={currentScreen} setScreen={setScreen} logout={() => { setUser(null); clearState(); setScreen('dashboard'); localStorage.clear(); }} user={user} />
-      {user.role === 'STUDENT' && currentScreen !== 'ai-tutor' && <AITutorChat />}
+      <MobileNavigation currentScreen={currentScreen} setScreen={setScreen} logout={() => { setUser(null); setScreen('dashboard'); localStorage.clear(); }} user={user} />
+      {user.role === 'STUDENT' && !['ai-tutor', 'tests', 'focus'].includes(currentScreen) && <AITutorChat />}
     </div>
   );
 };
