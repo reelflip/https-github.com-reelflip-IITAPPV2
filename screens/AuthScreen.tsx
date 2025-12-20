@@ -79,13 +79,19 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate }) =
         
         const data = await response.json();
         
-        if (!response.ok) throw new Error(data.message || 'Authentication failed.');
+        if (!response.ok) {
+            throw new Error(data.message || 'Authentication failed.');
+        }
         
         if (view === 'REGISTER') { 
             setView('LOGIN'); 
             setSuccessMessage("Account created successfully! Please log in with your credentials."); 
             window.scrollTo({ top: 0, behavior: 'smooth' });
         } else { 
+            if (!data.user) {
+                throw new Error("Server returned success but no user data found.");
+            }
+            
             onLogin({ 
                 ...data.user, 
                 id: String(data.user.id), 
@@ -178,7 +184,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate }) =
                     <TrendingUp className="w-8 h-8 text-blue-600" strokeWidth={3} />
                     <h1 className="text-3xl font-black text-slate-900 tracking-tighter uppercase">IIT<span className="text-blue-600">GEE</span>Prep</h1>
                 </div>
-                <p className="text-[10px] font-black text-slate-400 tracking-[0.2em] uppercase">v13.0 Ultimate Sync Core</p>
+                <p className="text-[10px] font-black text-slate-400 tracking-[0.2em] uppercase">v13.5 Ultimate Sync Core</p>
             </div>
 
             <div className="bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 p-8 md:p-12 animate-in fade-in zoom-in-95 duration-500">
@@ -346,7 +352,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate }) =
                     )}
 
                     <button type="submit" disabled={isLoading} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-5 rounded-2xl shadow-xl transition-all flex items-center justify-center gap-3 disabled:opacity-50 active:scale-95">
-                        {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <>{view === 'REGISTER' ? 'Initialize v13.0 Account' : 'Secure Entry'} <ArrowRight size={18} /></>}
+                        {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <>{view === 'REGISTER' ? 'Initialize v13.5 Account' : 'Secure Entry'} <ArrowRight size={18} /></>}
                     </button>
                 </form>
 
@@ -381,7 +387,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onNavigate }) =
 
       <footer className="w-full border-t border-slate-200 bg-white p-6 mt-auto">
           <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
-            <p className="text-[9px] font-bold text-slate-300 uppercase tracking-[0.3em]">&copy; {new Date().getFullYear()} IITGEEPrep • ULTIMATE v13.0 MASTER SYNC</p>
+            <p className="text-[9px] font-bold text-slate-300 uppercase tracking-[0.3em]">&copy; {new Date().getFullYear()} IITGEEPrep • ULTIMATE v13.5 MASTER SYNC</p>
             <div className="flex gap-6">
               <button onClick={() => onNavigate('privacy')} className="text-[9px] font-black uppercase tracking-widest text-slate-400 hover:text-blue-600">Privacy Policy</button>
               <span className="text-slate-200">|</span>
