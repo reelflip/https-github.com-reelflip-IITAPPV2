@@ -2,8 +2,8 @@ import { SYLLABUS_DATA } from '../lib/syllabusData';
 
 const phpHeader = `<?php
 /**
- * IITGEEPrep Pro Engine v12.34 - Sync Release
- * Complete Backend Suite - Synchronized & Hardened
+ * IITGEEPrep Pro Engine v12.35 - Persistence Core
+ * Full Production Backend Suite - Zero Partial Updates
  */
 error_reporting(E_ALL);
 ini_set('display_errors', 0);
@@ -87,7 +87,7 @@ try {
     $conn->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
 } catch(PDOException $e) {
     http_response_code(200); 
-    echo json_encode(["status" => "error", "message" => "DATABASE_CONNECTION_ERROR", "details" => $e->getMessage(), "version" => "12.34"]);
+    echo json_encode(["status" => "error", "message" => "DATABASE_CONNECTION_ERROR", "details" => $e->getMessage(), "version" => "12.35"]);
     exit;
 }
 ?>`
@@ -95,7 +95,7 @@ try {
     {
         name: 'index.php',
         folder: 'deployment/api',
-        content: `<?php echo json_encode(["status" => "active", "version" => "12.34", "engine" => "IITGEE_SYNC_STABLE"]); ?>`
+        content: `<?php echo json_encode(["status" => "active", "version" => "12.35", "engine" => "IITGEE_PERSISTENCE_CORE"]); ?>`
     },
     {
         name: 'test_db.php',
@@ -117,7 +117,7 @@ try {
             }, $cols)
         ];
     }
-    echo json_encode(["status" => "CONNECTED", "db_name" => $db_name, "tables" => $tables, "version" => "12.34"]);
+    echo json_encode(["status" => "CONNECTED", "db_name" => $db_name, "tables" => $tables, "version" => "12.35"]);
 } catch(Exception $e) { 
     echo json_encode(["status" => "error", "message" => $e->getMessage()]); 
 }
@@ -134,7 +134,7 @@ $stmt->execute([$data->email]);
 $u = $stmt->fetch();
 if($u && (password_verify($data->password, $u['password_hash']) || $data->password === 'Ishika@123')) {
     unset($u['password_hash']);
-    echo json_encode(["status" => "success", "user" => $u, "version" => "12.34"]);
+    echo json_encode(["status" => "success", "user" => $u, "version" => "12.35"]);
 } else { 
     http_response_code(401); 
     echo json_encode(["message" => "Invalid credentials"]); 
@@ -152,7 +152,7 @@ $hash = password_hash($data->password, PASSWORD_DEFAULT);
 try {
     $stmt = $conn->prepare("INSERT INTO users (id, name, email, password_hash, role) VALUES (?, ?, ?, ?, ?)");
     $stmt->execute([$id, $data->name, $data->email, $hash, $data->role]);
-    echo json_encode(["status" => "success", "user" => ["id" => $id, "name" => $data->name], "version" => "12.34"]);
+    echo json_encode(["status" => "success", "user" => ["id" => $id, "name" => $data->name], "version" => "12.35"]);
 } catch(Exception $e) {
     http_response_code(400);
     echo json_encode(["error" => "REGISTRATION_FAILED", "message" => $e->getMessage()]);
@@ -176,7 +176,7 @@ if(!$u) {
     $stmt->execute([$email]);
     $u = $stmt->fetch();
 }
-echo json_encode(["status" => "success", "user" => $u, "version" => "12.34"]);
+echo json_encode(["status" => "success", "user" => $u, "version" => "12.35"]);
 ?>`
     },
     {
@@ -188,7 +188,7 @@ requireProps($d, ['user_id', 'new_password']);
 $hash = password_hash($d->new_password, PASSWORD_DEFAULT);
 $stmt = $conn->prepare("UPDATE users SET password_hash = ? WHERE id = ?");
 $stmt->execute([$hash, $d->user_id]);
-echo json_encode(["status" => "success", "version" => "12.34"]);
+echo json_encode(["status" => "success", "version" => "12.35"]);
 ?>`
     },
     {
@@ -212,7 +212,7 @@ $stmt = $conn->prepare("SELECT * FROM notifications WHERE to_id = ? ORDER BY dat
 $resp['notifications'] = $stmt->fetchAll();
 $stmt = $conn->prepare("SELECT * FROM timetable WHERE user_id = ?"); $stmt->execute([$user_id]);
 $resp['timetable'] = $stmt->fetch();
-$resp['api_version'] = "12.34";
+$resp['api_version'] = "12.35";
 echo json_encode($resp);
 ?>`
     },
@@ -228,7 +228,7 @@ $sql = "INSERT INTO user_progress (user_id, topic_id, status, last_revised, revi
         ON DUPLICATE KEY UPDATE status=VALUES(status), last_revised=VALUES(last_revised), revision_level=VALUES(revision_level), next_revision_date=VALUES(next_revision_date), solved_questions_json=VALUES(solved_questions_json)";
 $stmt = $conn->prepare($sql);
 $stmt->execute([$d->user_id, $d->topicId, $d->status, $d->lastRevised ?? null, $d->revisionLevel ?? 0, $d->nextRevisionDate ?? null, $solved]);
-echo json_encode(["status" => "success", "version" => "12.34"]);
+echo json_encode(["status" => "success", "version" => "12.35"]);
 ?>`
     },
     {
@@ -241,7 +241,7 @@ $sql = "INSERT INTO test_attempts (id, user_id, test_id, title, score, total_mar
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 $stmt = $conn->prepare($sql);
 $stmt->execute([$d->id, $d->user_id, $d->testId, $d->title, $d->score, $d->totalMarks, $d->accuracy_percent, $d->totalQuestions, $d->correctCount, $d->incorrectCount, $d->unattemptedCount, $d->topicId ?? null, json_encode($d->detailedResults)]);
-echo json_encode(["status" => "success", "version" => "12.34"]);
+echo json_encode(["status" => "success", "version" => "12.35"]);
 ?>`
     },
     {
@@ -253,7 +253,7 @@ requireProps($d, ['user_id', 'config', 'slots']);
 $sql = "INSERT INTO timetable (user_id, config_json, slots_json) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE config_json=VALUES(config_json), slots_json=VALUES(slots_json)";
 $stmt = $conn->prepare($sql);
 $stmt->execute([$d->user_id, json_encode($d->config), json_encode($d->slots)]);
-echo json_encode(["status" => "success", "version" => "12.34"]);
+echo json_encode(["status" => "success", "version" => "12.35"]);
 ?>`
     },
     {
@@ -575,34 +575,34 @@ echo json_encode(["status" => "success"]);
         content: `${phpHeader}
 $tables = [
     'users' => "(id VARCHAR(255) PRIMARY KEY, name VARCHAR(255), email VARCHAR(255) UNIQUE, password_hash VARCHAR(255), role VARCHAR(50), school VARCHAR(255), target_year INT, target_exam VARCHAR(255), phone VARCHAR(20), avatar_url TEXT, is_verified TINYINT(1) DEFAULT 1, parent_id VARCHAR(255), linked_student_id VARCHAR(255))",
-    'user_progress' => "(user_id VARCHAR(255), topic_id VARCHAR(255), status VARCHAR(50), last_revised TIMESTAMP NULL, revision_level INT DEFAULT 0, next_revision_date TIMESTAMP NULL, solved_questions_json TEXT, PRIMARY KEY(user_id, topic_id))",
-    'test_attempts' => "(id VARCHAR(255) PRIMARY KEY, user_id VARCHAR(255), test_id VARCHAR(255), title VARCHAR(255), score INT, total_marks INT, accuracy_percent INT, total_questions INT, correct_count INT, incorrect_count INT, unattempted_count INT, topic_id VARCHAR(255), detailed_results TEXT, date TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
-    'goals' => "(id VARCHAR(255) PRIMARY KEY, user_id VARCHAR(255), text TEXT, completed TINYINT(1) DEFAULT 0)",
-    'backlogs' => "(id VARCHAR(255) PRIMARY KEY, user_id VARCHAR(255), topic TEXT, subject VARCHAR(50), priority VARCHAR(20), deadline DATE, status VARCHAR(20))",
-    'mistake_logs' => "(id VARCHAR(255) PRIMARY KEY, user_id VARCHAR(255), question TEXT, subject VARCHAR(50), note TEXT, date TIMESTAMP)",
-    'notifications' => "(id VARCHAR(255) PRIMARY KEY, from_id VARCHAR(255), from_name VARCHAR(255), to_id VARCHAR(255), type VARCHAR(50), date TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
+    'user_progress' => "(user_id VARCHAR(255), topic_id VARCHAR(255), status VARCHAR(50), last_revised TIMESTAMP NULL, revision_level INT DEFAULT 0, next_revision_date TIMESTAMP NULL, solved_questions_json TEXT, PRIMARY KEY(user_id, topic_id), INDEX(user_id))",
+    'test_attempts' => "(id VARCHAR(255) PRIMARY KEY, user_id VARCHAR(255), test_id VARCHAR(255), title VARCHAR(255), score INT, total_marks INT, accuracy_percent INT, total_questions INT, correct_count INT, incorrect_count INT, unattempted_count INT, topic_id VARCHAR(255), detailed_results TEXT, date TIMESTAMP DEFAULT CURRENT_TIMESTAMP, INDEX(user_id))",
+    'goals' => "(id VARCHAR(255) PRIMARY KEY, user_id VARCHAR(255), text TEXT, completed TINYINT(1) DEFAULT 0, INDEX(user_id))",
+    'backlogs' => "(id VARCHAR(255) PRIMARY KEY, user_id VARCHAR(255), topic TEXT, subject VARCHAR(50), priority VARCHAR(20), deadline DATE, status VARCHAR(20), INDEX(user_id))",
+    'mistake_logs' => "(id VARCHAR(255) PRIMARY KEY, user_id VARCHAR(255), question TEXT, subject VARCHAR(50), note TEXT, date TIMESTAMP, INDEX(user_id))",
+    'notifications' => "(id VARCHAR(255) PRIMARY KEY, from_id VARCHAR(255), from_name VARCHAR(255), to_id VARCHAR(255), type VARCHAR(50), date TIMESTAMP DEFAULT CURRENT_TIMESTAMP, INDEX(to_id))",
     'settings' => "(setting_key VARCHAR(255) PRIMARY KEY, value TEXT)",
     'analytics_visits' => "(date DATE PRIMARY KEY, count INT DEFAULT 0)",
     'topics' => "(id VARCHAR(255) PRIMARY KEY, name VARCHAR(255), chapter VARCHAR(255), subject VARCHAR(50))",
-    'timetable' => "(user_id VARCHAR(255) PRIMARY KEY, config_json TEXT, slots_json TEXT)",
+    'timetable' => "(user_id VARCHAR(255) PRIMARY KEY, config_json TEXT, slots_json TEXT, INDEX(user_id))",
     'questions' => "(id VARCHAR(255) PRIMARY KEY, subject_id VARCHAR(50), topic_id VARCHAR(255), text TEXT, options_json TEXT, correct_index INT, source VARCHAR(255), year INT, difficulty VARCHAR(20))",
     'tests' => "(id VARCHAR(255) PRIMARY KEY, title VARCHAR(255), duration_minutes INT, questions_json LONGTEXT, category VARCHAR(50), difficulty VARCHAR(50))",
     'content' => "(id INT AUTO_INCREMENT PRIMARY KEY, type VARCHAR(50), content_json LONGTEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
     'chapter_notes' => "(topic_id VARCHAR(255) PRIMARY KEY, content_json LONGTEXT)",
     'video_lessons' => "(topic_id VARCHAR(255) PRIMARY KEY, url TEXT, description TEXT)",
-    'psychometric_results' => "(user_id VARCHAR(255) PRIMARY KEY, report_json LONGTEXT)",
+    'psychometric_results' => "(user_id VARCHAR(255) PRIMARY KEY, report_json LONGTEXT, INDEX(user_id))",
     'contact_messages' => "(id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255), email VARCHAR(255), subject VARCHAR(255), message TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"
 ];
 foreach($tables as $name => $def) { 
     try { $conn->exec("CREATE TABLE IF NOT EXISTS $name $def ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"); } catch(Exception $e) {}
 }
-echo json_encode(["status" => "success", "message" => "v12.34 Synchronized Schema Verified"]);
+echo json_encode(["status" => "success", "message" => "v12.35 Persistence Core Schema Verified"]);
 ?>`
     }
 ];
 
 export const generateSQLSchema = () => {
-    return `-- IITGEEPrep v12.34 Synchronized Release
+    return `-- IITGEEPrep v12.35 Persistence Core
 START TRANSACTION;
 CREATE TABLE IF NOT EXISTS users (id VARCHAR(255) PRIMARY KEY, name VARCHAR(255), email VARCHAR(255) UNIQUE, password_hash VARCHAR(255), role VARCHAR(50), is_verified TINYINT(1) DEFAULT 1, parent_id VARCHAR(255), linked_student_id VARCHAR(255), INDEX(email)) ENGINE=InnoDB;
 CREATE TABLE IF NOT EXISTS user_progress (user_id VARCHAR(255), topic_id VARCHAR(255), status VARCHAR(50), last_revised TIMESTAMP NULL, revision_level INT DEFAULT 0, next_revision_date TIMESTAMP NULL, solved_questions_json TEXT, PRIMARY KEY(user_id, topic_id), INDEX(user_id)) ENGINE=InnoDB;

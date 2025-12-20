@@ -11,7 +11,7 @@ import { SYLLABUS_DATA } from './lib/syllabusData';
 import { calculateNextRevision } from './lib/utils';
 import { MOCK_TESTS_DATA, generateInitialQuestionBank } from './lib/mockTestsData';
 
-// --- Lazy Loading Screens for Bundle Separation (v12.25) ---
+// --- Lazy Loading Screens (v12.35) ---
 const AuthScreen = lazy(() => import('./screens/AuthScreen').then(m => ({ default: m.AuthScreen })));
 const DashboardScreen = lazy(() => import('./screens/DashboardScreen').then(m => ({ default: m.DashboardScreen })));
 const AdminDashboardScreen = lazy(() => import('./screens/AdminDashboardScreen').then(m => ({ default: m.AdminDashboardScreen })));
@@ -45,37 +45,17 @@ const FeaturesScreen = lazy(() => import('./screens/FeaturesScreen').then(m => (
 const ParentFamilyScreen = lazy(() => import('./screens/ParentFamilyScreen').then(m => ({ default: m.ParentFamilyScreen })));
 const ProfileScreen = lazy(() => import('./screens/ProfileScreen').then(m => ({ default: m.ProfileScreen })));
 
-interface ErrorBoundaryProps {
-  children?: ReactNode;
-}
-
-interface ErrorBoundaryState {
-  hasError: boolean;
-}
-
+interface ErrorBoundaryProps { children?: ReactNode; }
+interface ErrorBoundaryState { hasError: boolean; }
 class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  public props: ErrorBoundaryProps;
   public state: ErrorBoundaryState = { hasError: false };
-
-  constructor(props: ErrorBoundaryProps) {
-    super(props);
-    this.props = props;
-  }
-
-  static getDerivedStateFromError(_error: Error) { return { hasError: true }; }
-  
-  componentDidCatch(error: Error, errorInfo: ErrorInfo) { console.error("App Crash:", error, errorInfo); }
-  
+  static getDerivedStateFromError() { return { hasError: true }; }
   render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen flex flex-col items-center justify-center p-4 text-center bg-slate-50">
-          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4 text-red-600">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-          </div>
-          <h1 className="text-2xl font-bold text-slate-800 mb-2">Something went wrong.</h1>
-          <p className="text-slate-500 mb-6">The application crashed. Please refresh to try again.</p>
-          <button onClick={() => window.location.reload()} className="bg-blue-600 text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-blue-200">Refresh App</button>
+        <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-slate-50">
+          <h1 className="text-2xl font-bold text-slate-800 mb-6">Persistence Sync Error</h1>
+          <button onClick={() => window.location.reload()} className="bg-blue-600 text-white px-8 py-3 rounded-xl font-bold">Restart App</button>
         </div>
       );
     }
@@ -86,7 +66,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
 const LoadingView = () => (
   <div className="flex flex-col items-center justify-center min-h-[60vh] text-slate-400">
     <div className="w-10 h-10 border-4 border-slate-200 border-t-blue-600 rounded-full animate-spin mb-4"></div>
-    <p className="text-xs font-bold uppercase tracking-widest">Loading Module...</p>
+    <p className="text-xs font-bold uppercase tracking-widest">Synchronizing Persistence...</p>
   </div>
 );
 
@@ -117,44 +97,16 @@ const App: React.FC = () => {
   const [linkedData, setLinkedData] = useState<{ progress: Record<string, UserProgress>, tests: TestAttempt[], studentName: string, psychReport?: PsychometricReport } | undefined>();
 
   const clearState = useCallback(() => {
-    setProgress({});
-    setTestAttempts([]);
-    setGoals([]);
-    setMistakes([]);
-    setBacklogs([]);
-    setTimetable({});
-    setLinkedData(undefined);
+    setProgress({}); setTestAttempts([]); setGoals([]); setMistakes([]); setBacklogs([]); setTimetable({}); setLinkedData(undefined);
   }, []);
 
-  useEffect(() => {
-    if (user) {
-        const isAdmin = user.role === 'ADMIN' || user.role === 'ADMIN_EXECUTIVE';
-        if (isAdmin && currentScreen === 'dashboard') {
-            setScreen('overview');
-        } else if (user.role === 'STUDENT' && currentScreen === 'overview') {
-            setScreen('dashboard');
-        } else if (user.role === 'PARENT' && currentScreen === 'overview') {
-            setScreen('dashboard');
-        }
-    }
-  }, [user?.role, currentScreen]);
-
-  useEffect(() => {
-    if (user) localStorage.setItem('user', JSON.stringify(user));
-    else localStorage.removeItem('user');
-  }, [user]);
-
-  useEffect(() => {
-    localStorage.setItem('last_screen', currentScreen);
-  }, [currentScreen]);
-
   const mapProgress = (p: any): UserProgress => ({
-    topicId: p.topicId || p.topic_id,
+    topicId: p.topic_id || p.topicId,
     status: p.status,
-    lastRevised: p.lastRevised || p.last_revised,
-    revisionLevel: (p.revisionLevel !== undefined ? p.revisionLevel : p.revision_level) || 0,
-    nextRevisionDate: p.nextRevisionDate || p.next_revision_date,
-    solvedQuestions: p.solvedQuestions || (p.solved_questions_json ? JSON.parse(p.solved_questions_json) : [])
+    lastRevised: p.last_revised || p.lastRevised,
+    revisionLevel: Number(p.revision_level || p.revisionLevel || 0),
+    nextRevisionDate: p.next_revision_date || p.nextRevisionDate,
+    solvedQuestions: p.solved_questions_json ? JSON.parse(p.solved_questions_json) : (p.solvedQuestions || [])
   });
 
   const mapAttempt = (a: any): TestAttempt => ({
@@ -162,198 +114,127 @@ const App: React.FC = () => {
     date: a.date,
     title: a.title || 'Mock Test',
     score: Number(a.score),
-    totalMarks: Number(a.totalMarks || a.total_marks),
-    accuracy: Number(a.accuracy),
+    totalMarks: Number(a.total_marks || a.totalMarks),
+    accuracy: Number(a.accuracy || a.accuracy_percent),
     accuracy_percent: Number(a.accuracy_percent || a.accuracy),
-    testId: a.testId || a.test_id,
-    totalQuestions: Number(a.totalQuestions || a.total_questions),
-    correctCount: Number(a.correctCount || a.correct_count),
-    incorrectCount: Number(a.incorrectCount || a.incorrect_count),
-    unattemptedCount: Number(a.unattemptedCount || a.unattempted_count),
-    topicId: a.topicId || a.topic_id,
+    testId: a.test_id || a.testId,
+    totalQuestions: Number(a.total_questions || a.totalQuestions),
+    correctCount: Number(a.correct_count || a.correctCount),
+    incorrectCount: Number(a.incorrect_count || a.incorrectCount),
+    unattemptedCount: Number(a.unattempted_count || a.unattemptedCount),
+    topicId: a.topic_id || a.topicId,
     difficulty: a.difficulty,
-    detailedResults: a.detailedResults || (a.detailed_results ? JSON.parse(a.detailed_results) : [])
+    detailedResults: a.detailed_results ? JSON.parse(a.detailed_results) : (a.detailedResults || [])
   });
 
   const loadDashboard = useCallback(async (userId: string) => {
     try {
-        const res = await fetch(`/api/get_dashboard.php?user_id=${userId}`);
+        const res = await fetch(`/api/get_dashboard.php?user_id=${userId}`, { cache: 'no-store' });
         if (res.ok) {
             const data = await res.json();
-            clearState();
-
             if (data.progress) {
                 const progMap: Record<string, UserProgress> = {};
-                data.progress.forEach((p: any) => {
-                    const mapped = mapProgress(p);
-                    progMap[mapped.topicId] = mapped;
-                });
+                data.progress.forEach((p: any) => { const mapped = mapProgress(p); progMap[mapped.topicId] = mapped; });
                 setProgress(progMap);
             }
             if (data.attempts) setTestAttempts(data.attempts.map(mapAttempt));
             if (data.goals) setGoals(data.goals.map((g: any) => ({ ...g, completed: g.completed == 1 })));
-            if (data.mistakes) setMistakes(data.mistakes);
-            if (data.backlogs) setBacklogs(data.backlogs);
-            if (data.timetable) setTimetable(data.timetable);
-            if (data.notifications && data.userProfileSync) {
-                const updatedUser = { ...data.userProfileSync, notifications: data.notifications };
+            if (data.timetable) setTimetable({
+                config: data.timetable.config_json ? JSON.parse(data.timetable.config_json) : undefined,
+                slots: data.timetable.slots_json ? JSON.parse(data.timetable.slots_json) : []
+            });
+            
+            if (data.userProfileSync) {
+                const updatedUser = { ...data.userProfileSync, notifications: data.notifications || [] };
                 setUser(updatedUser);
-
                 if (updatedUser.role === 'PARENT' && updatedUser.linkedStudentId) {
                     const sRes = await fetch(`/api/get_dashboard.php?user_id=${updatedUser.linkedStudentId}`);
-                    const psychRes = await fetch(`/api/get_psychometric.php?user_id=${updatedUser.linkedStudentId}`);
-                    
                     if (sRes.ok) {
                         const sData = await sRes.json();
                         const sProgMap: Record<string, UserProgress> = {};
-                        sData.progress?.forEach((p: any) => {
-                           const mapped = mapProgress(p);
-                           sProgMap[mapped.topicId] = mapped;
-                        });
-                        
-                        let psychReport;
-                        if (psychRes.ok) {
-                            const pData = await psychRes.json();
-                            psychReport = pData.report;
-                        }
-
-                        setLinkedData({
-                            progress: sProgMap,
-                            tests: (sData.attempts || []).map(mapAttempt),
-                            studentName: sData.userProfileSync?.name || 'Student',
-                            psychReport
-                        });
+                        sData.progress?.forEach((p: any) => { const mapped = mapProgress(p); sProgMap[mapped.topicId] = mapped; });
+                        setLinkedData({ progress: sProgMap, tests: (sData.attempts || []).map(mapAttempt), studentName: sData.userProfileSync?.name || 'Student' });
                     }
                 }
             }
         }
-    } catch (e) { console.error(e); }
-  }, [clearState]);
+    } catch (e) { console.error("Persistence Sync Failed:", e); }
+  }, []);
 
   useEffect(() => {
-    if (user) {
-        loadDashboard(user.id);
-        window.setCurrentScreen = (s: Screen) => setScreen(s);
-    }
+    if (user) { loadDashboard(user.id); window.setCurrentScreen = (s: Screen) => setScreen(s); }
   }, [user?.id, loadDashboard]);
 
   useEffect(() => {
-      const loadGlobalContent = async () => {
-          try {
-              const [bRes, fRes, hRes, nRes] = await Promise.all([
-                  fetch('/api/manage_content.php?type=blog'),
-                  fetch('/api/manage_content.php?type=flashcard'),
-                  fetch('/api/manage_content.php?type=hack'),
-                  fetch('/api/manage_notes.php')
-              ]);
-              if(bRes.ok) setBlogs((await bRes.json()).map((b: any) => ({ ...JSON.parse(b.content_json), id: b.id, date: b.created_at })));
-              if(fRes.ok) setFlashcards((await fRes.json()).map((f: any) => ({ ...JSON.parse(f.content_json), id: f.id })));
-              if(hRes.ok) setHacks((await hRes.json()).map((h: any) => ({ ...JSON.parse(h.content_json), id: h.id })));
-              if(nRes.ok) setChapterNotes(await nRes.json());
-          } catch(e) {}
-      };
-      loadGlobalContent();
-  }, []);
+    if (user) localStorage.setItem('user', JSON.stringify(user));
+    else localStorage.removeItem('user');
+  }, [user]);
+
+  useEffect(() => { localStorage.setItem('last_screen', currentScreen); }, [currentScreen]);
 
   const handleLogin = (u: User) => {
     clearState();
     setUser(u);
-    const isAdmin = u.role === 'ADMIN' || u.role === 'ADMIN_EXECUTIVE';
-    setScreen(isAdmin ? 'overview' : 'dashboard');
+    setScreen(u.role.includes('ADMIN') ? 'overview' : 'dashboard');
   };
 
-  const handleLogout = () => {
-    setUser(null);
-    clearState();
-    setScreen('dashboard');
-    localStorage.clear();
-  };
-
-  const handleAcceptRequest = async (notificationId: string) => {
-    if (!user) return;
-    try {
-        const res = await fetch('/api/respond_request.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ notification_id: notificationId, action: 'ACCEPT' })
-        });
-        if (res.ok) {
-            loadDashboard(user.id);
-            alert("Request Accepted! Account is now linked.");
-        }
-    } catch (e) {
-        alert("Failed to respond to request.");
-    }
-  };
+  const handleLogout = () => { setUser(null); clearState(); setScreen('dashboard'); localStorage.clear(); };
 
   const handleAddTestAttempt = async (attempt: TestAttempt) => {
     setTestAttempts(prev => [attempt, ...prev]);
     if (user && !user.id.startsWith('demo_')) {
-        try {
-            await fetch('/api/save_attempt.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ...attempt, user_id: user.id })
-            });
-        } catch (e) {}
+        await fetch('/api/save_attempt.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...attempt, user_id: user.id })
+        });
     }
   };
 
   const updateProgress = async (topicId: string, updates: Partial<UserProgress>) => {
     const current = progress[topicId] || { topicId, status: 'NOT_STARTED', lastRevised: null, revisionLevel: 0, nextRevisionDate: null, solvedQuestions: [] };
     const updated = { ...current, ...updates };
-    if (updates.status === 'COMPLETED' && !updated.nextRevisionDate) {
-        updated.lastRevised = new Date().toISOString();
-        updated.nextRevisionDate = calculateNextRevision(0, updated.lastRevised);
-    }
     setProgress(prev => ({ ...prev, [topicId]: updated }));
     if (user && !user.id.startsWith('demo_')) {
-        try {
-            await fetch('/api/sync_progress.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ user_id: user.id, ...updated })
-            });
-        } catch (e) {}
-    }
-  };
-
-  const handleRevisionComplete = (topicId: string) => {
-    const current = progress[topicId];
-    if (!current) return;
-    const nextLevel = Math.min(current.revisionLevel + 1, 4);
-    const lastRevised = new Date().toISOString();
-    const nextRevisionDate = calculateNextRevision(nextLevel, lastRevised);
-    updateProgress(topicId, { revisionLevel: nextLevel, lastRevised, nextRevisionDate });
-  };
-
-  const toggleGoal = async (id: string) => {
-    const goal = goals.find(g => g.id === id);
-    if (!goal) return;
-    const newState = !goal.completed;
-    setGoals(goals.map(g => g.id === id ? { ...g, completed: newState } : g));
-    try { await fetch('/api/manage_goals.php', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, completed: newState }) }); } catch(e) {}
-  };
-
-  const addGoal = async (text: string) => {
-    const newGoal: Goal = { id: `g_${Date.now()}`, text, completed: false };
-    setGoals([...goals, newGoal]);
-    if (user) {
-        try { await fetch('/api/manage_goals.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...newGoal, user_id: user.id }) }); } catch(e) {}
-    }
-  };
-
-  const handleSendRequest = async (studentId: string) => {
-    if (!user) return { success: false, message: 'Not logged in' };
-    try {
-        const res = await fetch('/api/send_request.php', {
+        await fetch('/api/sync_progress.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ from_id: user.id, from_name: user.name, to_id: studentId })
+            body: JSON.stringify({ user_id: user.id, ...updated })
         });
-        return await res.json();
-    } catch (e) {
-        return { success: false, message: 'Connection Error' };
+    }
+  };
+
+  const handleSaveTimetable = async (config: TimetableConfig, slots: any[]) => {
+      setTimetable({ config, slots });
+      if (user && !user.id.startsWith('demo_')) {
+          await fetch('/api/save_timetable.php', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ user_id: user.id, config, slots })
+          });
+      }
+  };
+
+  const renderContent = () => {
+    const isAdminRole = user?.role === 'ADMIN' || user?.role === 'ADMIN_EXECUTIVE';
+    switch (currentScreen) {
+      case 'dashboard':
+      case 'overview':
+        return isAdminRole 
+          ? <AdminDashboardScreen user={user!} onNavigate={setScreen} />
+          : <DashboardScreen user={user!} progress={linkedData?.progress || progress} testAttempts={linkedData?.tests || testAttempts} goals={goals} toggleGoal={id => {}} addGoal={t => {}} setScreen={setScreen} viewingStudentName={linkedData?.studentName} />;
+      case 'syllabus':
+        return <SyllabusScreen user={user!} subjects={SYLLABUS_DATA} progress={linkedData?.progress || progress} onUpdateProgress={updateProgress} chapterNotes={chapterNotes} videoMap={videoMap} questionBank={questionBank} viewingStudentName={linkedData?.studentName} readOnly={user!.role === 'PARENT'} addTestAttempt={handleAddTestAttempt} testAttempts={linkedData?.tests || testAttempts} />;
+      case 'tests':
+        return isAdminRole
+          ? <AdminTestManagerScreen questionBank={questionBank} tests={tests} syllabus={SYLLABUS_DATA} onAddQuestion={q => {}} onCreateTest={t => {}} onDeleteQuestion={id => {}} onDeleteTest={id => {}} />
+          : <TestScreen user={user!} addTestAttempt={handleAddTestAttempt} history={linkedData?.tests || testAttempts} availableTests={tests} />;
+      case 'timetable':
+        return <TimetableScreen user={user!} savedConfig={timetable.config} savedSlots={timetable.slots} onSave={handleSaveTimetable} progress={progress} />;
+      case 'diagnostics': return <DiagnosticsScreen />;
+      case 'deployment': return <DeploymentScreen />;
+      case 'profile': return <ProfileScreen user={user!} onAcceptRequest={id => {}} onUpdateUser={upd => setUser({...user!, ...upd})} />;
+      default: return <DashboardScreen user={user!} progress={progress} testAttempts={testAttempts} goals={[]} toggleGoal={id => {}} addGoal={t => {}} setScreen={setScreen} />;
     }
   };
 
@@ -362,8 +243,7 @@ const App: React.FC = () => {
       if (publicScreens.includes(currentScreen)) {
           return (
               <Suspense fallback={<LoadingView />}>
-                {/* Fix: Wrapped setScreen call with explicit cast to Screen to resolve Type incompatibility error with onNavigate */}
-                <PublicLayout onNavigate={(p) => setScreen(p as Screen)} currentScreen={currentScreen}>
+                <PublicLayout onNavigate={p => setScreen(p as Screen)} currentScreen={currentScreen}>
                     {currentScreen === 'about' && <AboutUsScreen />}
                     {currentScreen === 'blog' && <PublicBlogScreen blogs={blogs} onBack={() => setScreen('dashboard')} />}
                     {currentScreen === 'exams' && <ExamGuideScreen />}
@@ -374,81 +254,18 @@ const App: React.FC = () => {
               </Suspense>
           );
       }
-      {/* Fix: Wrapped setScreen call with explicit cast to Screen to resolve Type incompatibility error with onNavigate */}
-      return <Suspense fallback={<LoadingView />}><AuthScreen onLogin={handleLogin} onNavigate={(p) => setScreen(p as Screen)} /></Suspense>;
+      return <Suspense fallback={<LoadingView />}><AuthScreen onLogin={handleLogin} onNavigate={p => setScreen(p as Screen)} /></Suspense>;
   }
-
-  const isAdminRole = user.role === 'ADMIN' || user.role === 'ADMIN_EXECUTIVE';
-
-  const renderContent = () => {
-    switch (currentScreen) {
-      case 'dashboard':
-      case 'overview':
-        return isAdminRole 
-          ? <AdminDashboardScreen user={user} onNavigate={setScreen} messageCount={0} />
-          : <DashboardScreen user={user} progress={linkedData?.progress || progress} testAttempts={linkedData?.tests || testAttempts} goals={goals} toggleGoal={goal => toggleGoal(goal)} addGoal={addGoal} setScreen={setScreen} viewingStudentName={linkedData?.studentName} linkedPsychReport={linkedData?.psychReport} />;
-      case 'syllabus':
-        return <SyllabusScreen user={user} subjects={SYLLABUS_DATA} progress={linkedData?.progress || progress} onUpdateProgress={updateProgress} chapterNotes={chapterNotes} videoMap={videoMap} questionBank={questionBank} viewingStudentName={linkedData?.studentName} readOnly={user.role === 'PARENT'} addTestAttempt={handleAddTestAttempt} testAttempts={linkedData?.tests || testAttempts} />;
-      case 'tests':
-        return isAdminRole
-          ? <AdminTestManagerScreen questionBank={questionBank} tests={tests} syllabus={SYLLABUS_DATA} onAddQuestion={(q) => setQuestionBank([...questionBank, q])} onCreateTest={(t) => setTests([...tests, t])} onDeleteQuestion={(id) => setQuestionBank(questionBank.filter(q => q.id !== id))} onDeleteTest={(id) => setTests(tests.filter(t => t.id !== id))} />
-          : <TestScreen user={user} addTestAttempt={handleAddTestAttempt} history={linkedData?.tests || testAttempts} availableTests={tests} />;
-      case 'analytics':
-        return isAdminRole ? <AdminAnalyticsScreen /> : <AnalyticsScreen user={user} progress={linkedData?.progress || progress} testAttempts={linkedData?.tests || testAttempts} viewingStudentName={linkedData?.studentName} />;
-      case 'timetable':
-        return <TimetableScreen user={user} savedConfig={timetable.config} savedSlots={timetable.slots} onSave={(c, s) => setTimetable({ config: c, slots: s })} />;
-      case 'revision':
-        return <RevisionScreen progress={progress} handleRevisionComplete={handleRevisionComplete} />;
-      case 'mistakes':
-        return <MistakesScreen mistakes={mistakes} addMistake={(m) => setMistakes([...mistakes, { ...m, id: `m_${Date.now()}`, date: new Date().toISOString() }])} />;
-      case 'flashcards':
-        return <FlashcardScreen flashcards={flashcards} />;
-      case 'backlogs':
-        return <BacklogScreen backlogs={backlogs} onAddBacklog={(b) => setBacklogs([...backlogs, { ...b, id: `b_${Date.now()}`, status: 'PENDING' }])} onToggleBacklog={(id) => setBacklogs(backlogs.map(b => b.id === id ? { ...b, status: b.status === 'PENDING' ? 'COMPLETED' : 'PENDING' } : b))} onDeleteBacklog={(id) => setBacklogs(backlogs.filter(b => b.id !== id))} />;
-      case 'hacks':
-        return <HacksScreen hacks={hacks} />;
-      case 'wellness':
-        return <WellnessScreen />;
-      case 'profile':
-        return <ProfileScreen user={user} onAcceptRequest={handleAcceptRequest} onUpdateUser={(upd) => setUser({ ...user, ...upd })} linkedStudentName={linkedData?.studentName} />;
-      case 'psychometric':
-        return <PsychometricScreen user={user} />;
-      case 'family':
-        return <ParentFamilyScreen user={user} onSendRequest={handleSendRequest} linkedData={linkedData} />;
-      case 'users':
-        return <AdminUserManagementScreen />;
-      case 'inbox':
-        return <AdminInboxScreen />;
-      case 'syllabus_admin':
-        return <AdminSyllabusScreen syllabus={SYLLABUS_DATA} onAddTopic={() => {}} onDeleteTopic={() => {}} chapterNotes={chapterNotes} onUpdateNotes={(id, p) => setChapterNotes({...chapterNotes, [id]: { id: 0, topicId: id, pages: p, lastUpdated: new Date().toISOString() }})} />;
-      case 'content':
-        return <ContentManagerScreen flashcards={flashcards} hacks={hacks} blogs={blogs} onAddFlashcard={(c) => setFlashcards([...flashcards, { ...c, id: Date.now() }])} onAddHack={(h) => setHacks([...hacks, { ...h, id: Date.now() }])} onAddBlog={(b) => setBlogs([...blogs, { ...b, id: Date.now(), date: new Date().toISOString() }])} onDelete={() => {}} />;
-      case 'blog_admin':
-        return <AdminBlogScreen blogs={blogs} onAddBlog={(b) => setBlogs([...blogs, b])} onDeleteBlog={(id) => setBlogs(blogs.filter(b => b.id !== id))} />;
-      case 'diagnostics':
-        return <DiagnosticsScreen />;
-      case 'deployment':
-        return <DeploymentScreen />;
-      case 'system':
-        return <AdminSystemScreen />;
-      case 'ai-tutor':
-        return <AITutorChat isFullScreen={true} />;
-      default:
-        return isAdminRole ? <AdminDashboardScreen user={user} onNavigate={setScreen} /> : <DashboardScreen user={user} progress={progress} testAttempts={testAttempts} goals={goals} toggleGoal={goal => toggleGoal(goal)} addGoal={addGoal} setScreen={setScreen} />;
-    }
-  };
 
   return (
     <ErrorBoundary>
       <div className="flex bg-slate-50 min-h-screen font-inter">
         <Navigation currentScreen={currentScreen} setScreen={setScreen} logout={handleLogout} user={user} />
         <main className="flex-1 md:ml-64 p-4 md:p-8 pb-24 md:pb-8 max-w-[1600px] mx-auto w-full">
-          <Suspense fallback={<LoadingView />}>
-            {user && renderContent()}
-          </Suspense>
+          <Suspense fallback={<LoadingView />}>{renderContent()}</Suspense>
         </main>
-        <MobileNavigation currentScreen={currentScreen} setScreen={setScreen} logout={handleLogout} user={user!} />
-        {user && user.role === 'STUDENT' && currentScreen !== 'ai-tutor' && <AITutorChat />}
+        <MobileNavigation currentScreen={currentScreen} setScreen={setScreen} logout={handleLogout} user={user} />
+        {user.role === 'STUDENT' && currentScreen !== 'ai-tutor' && <AITutorChat />}
       </div>
     </ErrorBoundary>
   );
