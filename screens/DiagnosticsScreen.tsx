@@ -61,10 +61,10 @@ export const DiagnosticsScreen: React.FC = () => {
                     <div className="flex-1">
                         <div className="flex items-center gap-3 mb-2">
                             <Beaker className="w-8 h-8 text-blue-400" />
-                            <h2 className="text-3xl font-black tracking-tight uppercase">Integrity Audit v12.27</h2>
+                            <h2 className="text-3xl font-black tracking-tight uppercase">Integrity Audit v12.28</h2>
                         </div>
                         <p className="text-slate-400 text-sm max-w-xl">
-                            Comprehensive points scan verifying server reliability, 38-endpoint API logic, database schema compliance, and cross-role security.
+                            Comprehensive points scan verifying server reliability, 38-endpoint API logic, database schema compliance, and hardened input security.
                         </p>
                     </div>
                     <div className="flex gap-3 shrink-0">
@@ -110,7 +110,7 @@ export const DiagnosticsScreen: React.FC = () => {
                         <div className="space-y-3">
                             <div className="flex justify-between items-center p-3 bg-slate-50 rounded-xl">
                                 <span className="text-sm font-medium text-slate-600">Runtime Version</span>
-                                <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-bold rounded uppercase">12.27</span>
+                                <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-bold rounded uppercase">12.28</span>
                             </div>
                             <div className="flex justify-between items-center p-3 bg-slate-50 rounded-xl">
                                 <span className="text-sm font-medium text-slate-600">Database</span>

@@ -67,7 +67,7 @@ export const DeploymentScreen: React.FC = () => {
         setRepairing(true);
         try {
             const res = await fetch('/api/migrate_db.php');
-            if(res.ok) alert("v12.27 Schema Repair Successful!");
+            if(res.ok) alert("v12.28 Hardened Schema Repair Successful!");
             else throw new Error(`HTTP ${res.status}`);
         } catch(e: any) { alert("Repair Failed: " + e.message); }
         finally { setRepairing(false); }
@@ -87,7 +87,7 @@ export const DeploymentScreen: React.FC = () => {
             const content = await zip.generateAsync({ type: "blob" });
             const url = URL.createObjectURL(content);
             const link = document.createElement('a');
-            link.href = url; link.download = "IITGEEPrep_Bundle_v12_27.zip";
+            link.href = url; link.download = "IITGEEPrep_Bundle_v12_28.zip";
             link.click();
         } catch (error) { console.error(error); alert("Error creating zip file."); }
         setIsZipping(false);
@@ -100,9 +100,9 @@ export const DeploymentScreen: React.FC = () => {
                     <div>
                         <div className="flex items-center gap-3 mb-2">
                             <h2 className="text-3xl font-bold">Deployment Center</h2>
-                            <span className="px-2 py-1 rounded-md bg-slate-700 border border-slate-600 text-xs font-mono text-cyan-400">v12.27 (Latest)</span>
+                            <span className="px-2 py-1 rounded-md bg-slate-700 border border-slate-600 text-xs font-mono text-cyan-400">v12.28 (Latest)</span>
                         </div>
-                        <p className="text-slate-400 text-lg">Download the complete 38-endpoint backend kit for production rollout.</p>
+                        <p className="text-slate-400 text-lg">Download the complete 38-endpoint hardened backend kit.</p>
                     </div>
                     <div className="flex bg-slate-700/50 p-1 rounded-xl border border-slate-600/50">
                         <button onClick={() => setActiveTab('guide')} className={`px-6 py-2 rounded-lg text-sm font-bold ${activeTab === 'guide' ? 'bg-blue-600 text-white' : 'text-slate-400'}`}>Guide</button>
@@ -139,7 +139,7 @@ export const DeploymentScreen: React.FC = () => {
                     <div className="lg:col-span-2 bg-white p-8 rounded-2xl border border-slate-200 shadow-sm space-y-6">
                         <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2"><Package className="text-blue-600"/> Update Instructions</h3>
                         <ol className="space-y-4 text-slate-600 text-sm list-decimal pl-5">
-                            <li>Download the <strong>v12.27</strong> Bundle using the sidebar action.</li>
+                            <li>Download the <strong>v12.28</strong> Bundle using the sidebar action.</li>
                             <li>Extract and upload <strong>deployment/api/*</strong> to your server's <code>/api</code> folder.</li>
                             <li>Use the <strong>Repair DB</strong> tool above to synchronize any new schema changes.</li>
                             <li>Clear browser cache to see the latest frontend updates.</li>
@@ -148,9 +148,9 @@ export const DeploymentScreen: React.FC = () => {
                     <div className="lg:col-span-1 space-y-6">
                         <div className="bg-slate-900 rounded-2xl p-6 text-white shadow-xl relative overflow-hidden">
                             <h3 className="text-xl font-bold mb-2">Get Bundle</h3>
-                            <p className="text-slate-400 text-sm mb-6">Complete v12.27 backend kit including all 38 PHP APIs and SQL.</p>
+                            <p className="text-slate-400 text-sm mb-6">Complete v12.28 hardened backend kit including all 38 PHP APIs and SQL.</p>
                             <button onClick={downloadAllZip} disabled={isZipping} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl flex items-center justify-center transition-all disabled:opacity-50">
-                                {isZipping ? <RefreshCw className="animate-spin mr-2"/> : <Download className="mr-2"/>} Download v12.27 .zip
+                                {isZipping ? <RefreshCw className="animate-spin mr-2"/> : <Download className="mr-2"/>} Download v12.28 .zip
                             </button>
                         </div>
                     </div>
