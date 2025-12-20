@@ -1,3 +1,4 @@
+
 import React, { Component, useState, useEffect, useCallback, Suspense, lazy } from 'react';
 import { Navigation, MobileNavigation } from './components/Navigation';
 import { AITutorChat } from './components/AITutorChat';
@@ -12,7 +13,7 @@ import { SYLLABUS_DATA } from './lib/syllabusData';
 import { MOCK_TESTS_DATA, generateInitialQuestionBank } from './lib/mockTestsData';
 import { calculateNextRevision } from './lib/utils';
 
-// --- Lazy Loading Screens (v12.45 Stability) ---
+// --- Lazy Loading Screens ---
 const AuthScreen = lazy(() => import('./screens/AuthScreen').then(m => ({ default: m.AuthScreen })));
 const DashboardScreen = lazy(() => import('./screens/DashboardScreen').then(m => ({ default: m.DashboardScreen })));
 const AdminDashboardScreen = lazy(() => import('./screens/AdminDashboardScreen').then(m => ({ default: m.AdminDashboardScreen })));
@@ -43,11 +44,12 @@ const ContactUsScreen = lazy(() => import('./screens/ContactUsScreen').then(m =>
 const FeaturesScreen = lazy(() => import('./screens/FeaturesScreen').then(m => ({ default: m.FeaturesScreen })));
 const ContentManagerScreen = lazy(() => import('./screens/ContentManagerScreen').then(m => ({ default: m.ContentManagerScreen })));
 const AdminBlogScreen = lazy(() => import('./screens/AdminBlogScreen').then(m => ({ default: m.AdminBlogScreen })));
+const PublicBlogScreen = lazy(() => import('./screens/PublicBlogScreen').then(m => ({ default: m.PublicBlogScreen })));
 
 const LoadingView = () => (
   <div className="flex flex-col items-center justify-center min-h-[60vh] text-slate-400">
     <div className="w-10 h-10 border-4 border-slate-200 border-t-blue-600 rounded-full animate-spin mb-4"></div>
-    <p className="text-xs font-bold uppercase tracking-widest text-slate-500">Synchronizing v12.45 Core...</p>
+    <p className="text-xs font-bold uppercase tracking-widest text-slate-500">Synchronizing v13.0 Core...</p>
   </div>
 );
 
@@ -137,12 +139,9 @@ const App: React.FC = () => {
 
   const renderContent = () => {
     const isAdminRole = user?.role === 'ADMIN' || user?.role === 'ADMIN_EXECUTIVE';
-    
-    // Safety check for role-based access
     if (isAdminRole && ['ai-tutor', 'focus', 'revision', 'wellness', 'backlogs'].includes(currentScreen)) {
         return <AdminDashboardScreen user={user!} onNavigate={setScreen} />;
     }
-
     switch (currentScreen) {
       case 'dashboard':
       case 'overview':
@@ -201,7 +200,7 @@ const App: React.FC = () => {
   };
 
   if (!user) {
-      const publicScreens: Screen[] = ['about', 'exams', 'privacy', 'contact', 'features'];
+      const publicScreens: Screen[] = ['about', 'exams', 'privacy', 'contact', 'features', 'blog', 'public-blog'];
       if (publicScreens.includes(currentScreen)) {
           return (
               <Suspense fallback={<LoadingView />}>
@@ -211,6 +210,7 @@ const App: React.FC = () => {
                     {currentScreen === 'privacy' && <PrivacyPolicyScreen />}
                     {currentScreen === 'contact' && <ContactUsScreen />}
                     {currentScreen === 'features' && <FeaturesScreen />}
+                    {(currentScreen === 'blog' || currentScreen === 'public-blog') && <PublicBlogScreen blogs={blogs} onBack={() => setScreen('dashboard')} />}
                 </PublicLayout>
               </Suspense>
           );
