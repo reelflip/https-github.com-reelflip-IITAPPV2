@@ -1,25 +1,42 @@
 import React, { useState, useRef, useMemo } from 'react';
-import { ShieldCheck, RefreshCw, Activity, Terminal, Download, HeartPulse, Play, FileJson, AlertTriangle, CheckCircle2, XCircle, Beaker, Shield, UserCheck, Database, Server } from 'lucide-react';
-import { E2ETestRunner, TestResult } from '../services/testRunnerService';
+/* Fix: Added Brain to lucide-react imports to resolve "Cannot find name 'Brain'" error */
+import { Brain, ShieldCheck, RefreshCw, Activity, Terminal, Download, HeartPulse, Play, FileJson, AlertTriangle, CheckCircle2, XCircle, Beaker, Shield, UserCheck, Database, Server, Sparkles, Code, FileText, ChevronRight, Lightbulb, AlertCircle, Wrench } from 'lucide-react';
+import { E2ETestRunner, TestResult, AIFixRecommendation } from '../services/testRunnerService';
 
 export const DiagnosticsScreen: React.FC = () => {
     const [isRunning, setIsRunning] = useState(false);
+    const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [results, setResults] = useState<TestResult[]>([]);
+    const [aiFixes, setAiFixes] = useState<AIFixRecommendation[]>([]);
     const runnerRef = useRef<E2ETestRunner | null>(null);
 
     const initRunner = () => {
         if (!runnerRef.current) {
-            runnerRef.current = new E2ETestRunner((newResults) => setResults(newResults));
+            runnerRef.current = new E2ETestRunner((newResults) => setResults(newResults as TestResult[]));
         }
         return runnerRef.current;
     };
 
     const runFullAudit = async () => {
         setResults([]);
+        setAiFixes([]);
         setIsRunning(true);
         const runner = initRunner();
         await runner.runFullAudit();
         setIsRunning(false);
+    };
+
+    const runAIDiagnosis = async () => {
+        const failedTests = results.filter(r => r.status === 'FAIL');
+        if (failedTests.length === 0) {
+            alert("No failures detected to analyze!");
+            return;
+        }
+        setIsAnalyzing(true);
+        const runner = initRunner();
+        const fixes = await runner.getAIDiagnosis(failedTests);
+        setAiFixes(fixes);
+        setIsAnalyzing(false);
     };
 
     const downloadReport = () => {
@@ -31,43 +48,26 @@ export const DiagnosticsScreen: React.FC = () => {
         total: results.length,
         passed: results.filter(r => r.status === 'PASS').length,
         failed: results.filter(r => r.status === 'FAIL').length,
-        skipped: results.filter(r => r.status === 'SKIPPED').length,
         running: results.filter(r => r.status === 'RUNNING').length
     }), [results]);
 
-    const groupedResults = useMemo(() => {
-        const groups: Record<string, TestResult[]> = {
-            'System Health': [],
-            'Functional E2E': [],
-            'Identity & Roles': [],
-            'Security Architecture': []
-        };
-        results.forEach(r => {
-            const stepNum = parseInt(r.step.split('.')[1]);
-            if (r.step.startsWith('H.')) groups['System Health'].push(r);
-            else if (r.step.startsWith('E.')) {
-                if (stepNum >= 40 && stepNum <= 43) groups['Identity & Roles'].push(r);
-                else if (stepNum === 51) groups['Security Architecture'].push(r);
-                else groups['Functional E2E'].push(r);
-            }
-        });
-        return groups;
-    }, [results]);
+    const failedSteps = useMemo(() => results.filter(r => r.status === 'FAIL'), [results]);
 
     return (
-        <div className="space-y-6 max-w-6xl mx-auto pb-12 animate-in fade-in">
+        <div className="space-y-6 max-w-6xl mx-auto pb-24 animate-in fade-in">
+            {/* Master Header */}
             <div className="bg-slate-900 text-white p-8 rounded-3xl shadow-2xl border border-slate-800 relative overflow-hidden">
                 <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                     <div className="flex-1">
                         <div className="flex items-center gap-3 mb-2">
-                            <Beaker className="w-8 h-8 text-blue-400" />
-                            <h2 className="text-3xl font-black tracking-tight uppercase">Integrity Audit v12.42</h2>
+                            <Wrench className="w-8 h-8 text-blue-400" />
+                            <h2 className="text-3xl font-black tracking-tight uppercase">Platform Diagnostic Suite</h2>
                         </div>
                         <p className="text-slate-400 text-sm max-w-xl font-medium">
-                            Role Isolation Suite enabled. Verifying logical separation between Aspirant data and System Administration privileges.
+                            Self-repair engine v12.45. Identify PHP crashes, DB mismatches, and structural UI errors in one click.
                         </p>
                     </div>
-                    <div className="flex gap-3 shrink-0">
+                    <div className="flex flex-wrap gap-3 shrink-0">
                         {results.length > 0 && (
                             <button onClick={downloadReport} className="bg-slate-800 hover:bg-slate-700 text-slate-200 px-6 py-3 rounded-xl font-bold text-sm flex items-center gap-2 transition-all border border-slate-700 active:scale-95">
                                 <Download size={18} /> Export Log
@@ -75,91 +75,192 @@ export const DiagnosticsScreen: React.FC = () => {
                         )}
                         <button onClick={runFullAudit} disabled={isRunning} className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-3 rounded-xl font-bold text-sm flex items-center gap-2 transition-all shadow-lg shadow-blue-900/40 disabled:opacity-50 active:scale-95">
                             {isRunning ? <RefreshCw className="animate-spin" size={18} /> : <Play size={18} />}
-                            {isRunning ? 'Auditing Identity Core...' : 'Execute v12.42 Audit'}
+                            {isRunning ? 'Auditing System...' : 'Run New System Scan'}
                         </button>
                     </div>
                 </div>
                 {results.length > 0 && (
-                    <div className="mt-8 grid grid-cols-2 md:grid-cols-5 gap-4 animate-in slide-in-from-top-4">
-                        <div className="bg-white/5 border border-white/10 p-4 rounded-2xl text-center">
-                            <span className="text-slate-400 text-[10px] font-black uppercase tracking-widest block">Total Scan</span>
-                            <span className="text-2xl font-bold text-white">{stats.total} / 51</span>
+                    <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-4 animate-in slide-in-from-top-4">
+                        <div className="bg-white/5 border border-white/10 p-4 rounded-2xl">
+                            <span className="text-slate-400 text-[10px] font-black uppercase tracking-widest block mb-1">Pass Rate</span>
+                            <span className="text-2xl font-bold text-white">{Math.round((stats.passed / (stats.total || 1)) * 100)}%</span>
                         </div>
-                        <div className="bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-2xl text-center">
-                            <span className="text-emerald-400 text-[10px] font-black uppercase tracking-widest block">Passed</span>
-                            <span className="text-2xl font-bold text-emerald-400">{stats.passed}</span>
+                        <div className="bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-2xl">
+                            <span className="text-emerald-400 text-[10px] font-black uppercase tracking-widest block mb-1">Healthy</span>
+                            <span className="text-2xl font-bold text-emerald-400">{stats.passed} Nodes</span>
                         </div>
-                        <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-2xl text-center">
-                            <span className="text-red-400 text-[10px] font-black uppercase tracking-widest block">Failed</span>
-                            <span className="text-2xl font-bold text-red-400">{stats.failed}</span>
+                        <div className="bg-rose-500/10 border border-rose-500/20 p-4 rounded-2xl">
+                            <span className="text-red-400 text-[10px] font-black uppercase tracking-widest block mb-1">Critical</span>
+                            <span className="text-2xl font-bold text-red-400">{stats.failed} Failures</span>
                         </div>
-                        <div className="bg-blue-500/10 border border-blue-500/20 p-4 rounded-2xl text-center">
-                            <span className="text-blue-400 text-[10px] font-black uppercase tracking-widest block">Health</span>
-                            <span className="text-2xl font-bold text-blue-400">{stats.total > 0 ? Math.round((stats.passed / stats.total) * 100) : 0}%</span>
+                        <div className="bg-blue-500/10 border border-blue-500/20 p-4 rounded-2xl">
+                            <span className="text-blue-400 text-[10px] font-black uppercase tracking-widest block mb-1">Latency</span>
+                            <span className="text-2xl font-bold text-blue-400">Avg {Math.round(results.reduce((acc, r) => acc + (r.latency || 0), 0) / (results.length || 1))}ms</span>
                         </div>
                     </div>
                 )}
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* AI Advisor Panel */}
+            {failedSteps.length > 0 && !isRunning && (
+                <div className="bg-gradient-to-br from-indigo-600 to-violet-700 p-8 rounded-3xl shadow-xl text-white animate-in zoom-in-95">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                        <div>
+                            <div className="flex items-center gap-2 mb-2">
+                                <Sparkles className="w-6 h-6 text-amber-300 animate-pulse" />
+                                <h3 className="text-xl font-black uppercase tracking-tight">AI Repair Advisor</h3>
+                            </div>
+                            <p className="text-indigo-100 text-sm font-medium">Analyze {failedSteps.length} failures to get specific file-by-file fix recommendations.</p>
+                        </div>
+                        <button 
+                            onClick={runAIDiagnosis} 
+                            disabled={isAnalyzing}
+                            className="bg-white text-indigo-700 px-8 py-3 rounded-xl font-black text-sm flex items-center gap-2 hover:bg-indigo-50 transition-all shadow-lg active:scale-95 disabled:opacity-50"
+                        >
+                            {isAnalyzing ? <RefreshCw className="animate-spin" size={18} /> : <Brain size={18} />}
+                            {isAnalyzing ? 'Analyzing Failure Patterns...' : 'Consult AI Fix Advisor'}
+                        </button>
+                    </div>
+
+                    {aiFixes.length > 0 && (
+                        <div className="mt-8 space-y-4">
+                            {aiFixes.map((fix, idx) => (
+                                <div key={idx} className="bg-white/10 backdrop-blur-md rounded-2xl border border-white/20 overflow-hidden">
+                                    <div className="p-5 border-b border-white/10 flex justify-between items-center">
+                                        <div className="flex items-center gap-3">
+                                            <span className="bg-white/20 px-2 py-1 rounded text-[10px] font-black">{fix.stepId}</span>
+                                            <h4 className="font-bold text-white">{fix.problem}</h4>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-[10px] font-bold text-white/50">Confidence</span>
+                                            <div className="w-20 h-1.5 bg-white/10 rounded-full overflow-hidden">
+                                                <div className="h-full bg-emerald-400" style={{ width: `${fix.confidence * 100}%` }}></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="p-5 space-y-6">
+                                        {fix.filesToModify.map((file, fIdx) => (
+                                            <div key={fIdx} className="space-y-3">
+                                                <div className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-indigo-200">
+                                                    <FileCode size={14} /> {file.path}
+                                                </div>
+                                                <div className="p-4 bg-slate-900/50 rounded-xl border border-white/10 text-sm">
+                                                    <div className="flex items-center gap-2 text-amber-300 mb-2 font-bold">
+                                                        <Activity size={14} /> Action: {file.action}
+                                                    </div>
+                                                    {file.codeSnippet && (
+                                                        <pre className="text-[11px] font-mono text-slate-300 overflow-x-auto p-3 bg-black/30 rounded-lg">
+                                                            {file.codeSnippet}
+                                                        </pre>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                {/* System Status Sidebar */}
                 <div className="lg:col-span-1 space-y-6">
                     <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
-                        <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
-                            <Activity className="w-5 h-5 text-blue-600" /> System Engine
+                        <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2 text-sm uppercase tracking-wider">
+                            <Activity className="w-5 h-5 text-blue-600" /> Live Telemetry
                         </h3>
                         <div className="space-y-3">
                             <div className="flex justify-between items-center p-3 bg-slate-50 rounded-xl">
-                                <span className="text-sm font-medium text-slate-600">Revision Code</span>
-                                <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-bold rounded uppercase tracking-tighter">12.42-CORE</span>
+                                <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Version</span>
+                                <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-black rounded">v12.45-STABLE</span>
                             </div>
                             <div className="flex justify-between items-center p-3 bg-slate-50 rounded-xl">
-                                <span className="text-sm font-medium text-slate-600">Identity Layer</span>
-                                <span className="px-2 py-0.5 bg-green-100 text-green-700 text-[10px] font-bold rounded uppercase">Isolated</span>
+                                <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Environment</span>
+                                <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-black rounded uppercase">Production</span>
+                            </div>
+                            <div className="flex justify-between items-center p-3 bg-slate-50 rounded-xl">
+                                <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Cloud Sync</span>
+                                <span className="flex items-center gap-1.5 px-2 py-0.5 bg-slate-200 text-slate-600 text-[10px] font-black rounded uppercase">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div> Linked
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+                        <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2 text-sm uppercase tracking-wider">
+                            <AlertCircle className="w-5 h-5 text-amber-500" /> Troubleshooting Tips
+                        </h3>
+                        <div className="space-y-4">
+                            <div className="flex gap-3">
+                                <div className="p-1.5 bg-slate-100 rounded text-slate-500 h-fit"><Database size={14}/></div>
+                                <div>
+                                    <p className="text-xs font-bold text-slate-700 mb-1">500 DB Errors</p>
+                                    <p className="text-[10px] text-slate-500 leading-relaxed">Check if 'accuracy_percent' column was added to 'test_attempts' via migrate_db.php.</p>
+                                </div>
+                            </div>
+                            <div className="flex gap-3">
+                                <div className="p-1.5 bg-slate-100 rounded text-slate-500 h-fit"><FileText size={14}/></div>
+                                <div>
+                                    <p className="text-xs font-bold text-slate-700 mb-1">Missing Files</p>
+                                    <p className="text-[10px] text-slate-500 leading-relaxed">Ensure the 'api/' folder contains all 38 PHP endpoints from the build bundle.</p>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
 
+                {/* Audit Stream */}
                 <div className="lg:col-span-2 bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col min-h-[600px]">
                     <div className="p-5 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center sticky top-0 z-10 backdrop-blur-sm">
                         <h3 className="font-bold text-slate-700 flex items-center gap-2 text-sm uppercase tracking-wider">
-                            <Terminal className="w-4 h-4 text-slate-400" /> Diagnostic Stream
+                            <Terminal className="w-4 h-4 text-slate-400" /> Core Audit Feed
                         </h3>
                     </div>
                     <div className="flex-1 overflow-y-auto custom-scrollbar">
                         {results.length === 0 ? (
                             <div className="h-full flex flex-col items-center justify-center text-center p-20 text-slate-400">
-                                <Activity className="w-16 h-16 mb-4 opacity-5" />
-                                <p className="font-bold text-slate-500">Suite Ready</p>
-                                <p className="text-xs mt-2 font-medium">Verify role isolation and permission tiers now.</p>
+                                <Shield className="w-16 h-16 mb-4 opacity-5" />
+                                <p className="font-bold text-slate-500 uppercase tracking-widest text-xs">Ready to Scan</p>
+                                <p className="text-[11px] mt-2 font-medium max-w-[200px]">Execute a system audit to verify backend-frontend synchronization.</p>
                             </div>
                         ) : (
-                            <div className="divide-y divide-slate-100 pb-8">
-                                {Object.entries(groupedResults).map(([group, groupLogs]) => (groupLogs as TestResult[]).length > 0 && (
-                                    <React.Fragment key={group}>
-                                        <div className="bg-slate-50 px-5 py-2.5 text-[10px] font-black text-slate-400 uppercase tracking-widest border-y border-slate-100">{group}</div>
-                                        {(groupLogs as TestResult[]).map((r) => (
-                                            <div key={r.step} className="p-5 flex items-center justify-between hover:bg-slate-50/50 transition-colors">
-                                                <div className="flex gap-4 items-start">
-                                                    <div className={`mt-1 p-1 rounded-lg ${
-                                                        r.status === 'PASS' ? 'bg-emerald-50 text-emerald-600' : 
-                                                        r.status === 'FAIL' ? 'bg-red-50 text-red-600' : 
-                                                        r.status === 'RUNNING' ? 'bg-blue-50 text-blue-600 animate-pulse' :
-                                                        'bg-slate-50 text-slate-300'
-                                                    }`}>
-                                                        {r.status === 'PASS' ? <CheckCircle2 size={16} /> : 
-                                                         r.status === 'FAIL' ? <XCircle size={16} /> : <Activity size={16} />}
-                                                    </div>
-                                                    <div>
-                                                        <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{r.step}</div>
-                                                        <div className="font-bold text-slate-800 text-sm">{r.description}</div>
-                                                        {r.details && <p className="text-xs mt-0.5 text-slate-500 font-medium">{r.details}</p>}
-                                                    </div>
-                                                </div>
-                                                {r.latency && <div className="text-[9px] font-mono text-slate-300">{r.latency}ms</div>}
+                            <div className="divide-y divide-slate-100 pb-20">
+                                {results.map((r) => (
+                                    <div key={r.step} className={`p-5 flex items-start justify-between transition-colors ${r.status === 'FAIL' ? 'bg-rose-50/30' : 'hover:bg-slate-50/50'}`}>
+                                        <div className="flex gap-4 items-start">
+                                            <div className={`mt-1 p-2 rounded-xl border ${
+                                                r.status === 'PASS' ? 'bg-emerald-50 border-emerald-100 text-emerald-600' : 
+                                                r.status === 'FAIL' ? 'bg-rose-50 border-rose-100 text-rose-600' : 
+                                                r.status === 'RUNNING' ? 'bg-blue-50 border-blue-100 text-blue-600 animate-pulse' :
+                                                'bg-slate-50 border-slate-100 text-slate-300'
+                                            }`}>
+                                                {r.status === 'PASS' ? <CheckCircle2 size={18} /> : 
+                                                 r.status === 'FAIL' ? <XCircle size={18} /> : <Activity size={18} />}
                                             </div>
-                                        ))}
-                                    </React.Fragment>
+                                            <div>
+                                                <div className="flex items-center gap-2 mb-0.5">
+                                                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{r.step}</span>
+                                                    {r.status === 'FAIL' && <span className="px-1.5 py-0.5 bg-rose-600 text-white text-[8px] font-black rounded uppercase">Critical</span>}
+                                                </div>
+                                                <div className="font-black text-slate-800 text-sm">{r.description}</div>
+                                                <p className={`text-xs mt-1 font-medium ${r.status === 'FAIL' ? 'text-rose-700' : 'text-slate-500'}`}>{r.details}</p>
+                                                
+                                                {r.status === 'FAIL' && r.metadata?.rawResponse && (
+                                                    <div className="mt-3 p-3 bg-slate-900 rounded-xl text-[10px] font-mono text-rose-400 overflow-x-auto max-w-md border border-slate-800 shadow-inner">
+                                                        <div className="flex justify-between items-center mb-1 text-slate-500">
+                                                            <span>SERVER_RESPONSE</span>
+                                                            <span>{r.metadata.httpCode}</span>
+                                                        </div>
+                                                        {r.metadata.rawResponse.slice(0, 200)}...
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                        {r.latency && <div className="text-[10px] font-mono font-bold text-slate-300">{r.latency}ms</div>}
+                                    </div>
                                 ))}
                             </div>
                         )}
@@ -169,3 +270,7 @@ export const DiagnosticsScreen: React.FC = () => {
         </div>
     );
 };
+
+const FileCode = ({size}: any) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><path d="m10 13-2 2 2 2"/><path d="m14 17 2-2-2-2"/></svg>
+);
