@@ -1,7 +1,11 @@
 import { SYLLABUS_DATA } from '../lib/syllabusData';
 
 const phpHeader = `<?php
-// CRITICAL: Disable error display to client, log to file instead
+/**
+ * IITGEEPrep Pro Engine v12.25
+ * Production Grade API Component
+ */
+// CRITICAL: Disable error display to client for security
 ini_set('display_errors', 0);
 ini_set('log_errors', 1);
 error_reporting(E_ALL);
@@ -53,7 +57,7 @@ try {
     {
         name: 'index.php',
         folder: 'deployment/api',
-        content: `<?php echo json_encode(["status" => "active", "version" => "12.25", "engine" => "IITGEE_PROD_READY"]); ?>`
+        content: `<?php echo json_encode(["status" => "active", "version" => "12.25", "engine" => "IITGEE_PROD_READY", "service" => "API_GATEWAY"]); ?>`
     },
     {
         name: 'test_db.php',
@@ -255,6 +259,27 @@ echo json_encode(["status" => "success"]);
 ?>`
     },
     {
+        name: 'manage_users.php',
+        folder: 'deployment/api',
+        content: `${phpHeader}
+$method = $_SERVER['REQUEST_METHOD'];
+if($method === 'GET') {
+    $stmt = $conn->prepare("SELECT id, name, email, role, is_verified, created_at FROM users ORDER BY created_at DESC");
+    $stmt->execute();
+    echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
+} else if($method === 'PUT') {
+    $data = json_decode(file_get_contents('php://input'));
+    $stmt = $conn->prepare("UPDATE users SET is_verified = ? WHERE id = ?");
+    $stmt->execute([$data->isVerified ? 1 : 0, $data->id]);
+    echo json_encode(["status" => "success"]);
+} else if($method === 'DELETE') {
+    $stmt = $conn->prepare("DELETE FROM users WHERE id = ?");
+    $stmt->execute([$_GET['id']]);
+    echo json_encode(["status" => "success"]);
+}
+?>`
+    },
+    {
         name: 'manage_content.php',
         folder: 'deployment/api',
         content: `${phpHeader}
@@ -271,6 +296,71 @@ if($method === 'GET') {
     echo json_encode(["status" => "success", "id" => $conn->lastInsertId()]);
 } else if($method === 'DELETE') {
     $stmt = $conn->prepare("DELETE FROM content WHERE id = ?");
+    $stmt->execute([$_GET['id']]);
+    echo json_encode(["status" => "success"]);
+}
+?>`
+    },
+    {
+        name: 'manage_notes.php',
+        folder: 'deployment/api',
+        content: `${phpHeader}
+$method = $_SERVER['REQUEST_METHOD'];
+if($method === 'GET') {
+    $stmt = $conn->prepare("SELECT * FROM chapter_notes");
+    $stmt->execute();
+    $notes = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $response = [];
+    foreach($notes as $n) {
+        $response[$n['topic_id']] = [
+            'id' => $n['id'],
+            'topicId' => $n['topic_id'],
+            'pages' => json_decode($n['content_json']),
+            'lastUpdated' => $n['updated_at']
+        ];
+    }
+    echo json_encode($response);
+} else if($method === 'POST') {
+    $data = json_decode(file_get_contents('php://input'));
+    $stmt = $conn->prepare("INSERT INTO chapter_notes (topic_id, content_json) VALUES (?, ?) ON DUPLICATE KEY UPDATE content_json = VALUES(content_json), updated_at = CURRENT_TIMESTAMP");
+    $stmt->execute([$data->topicId, json_encode($data->pages)]);
+    echo json_encode(["status" => "success"]);
+}
+?>`
+    },
+    {
+        name: 'manage_videos.php',
+        folder: 'deployment/api',
+        content: `${phpHeader}
+$method = $_SERVER['REQUEST_METHOD'];
+if($method === 'GET') {
+    $stmt = $conn->prepare("SELECT * FROM video_lessons");
+    $stmt->execute();
+    $vids = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $response = [];
+    foreach($vids as $v) {
+        $response[$v['topic_id']] = ['topicId' => $v['topic_id'], 'videoUrl' => $v['url'], 'description' => $v['description']];
+    }
+    echo json_encode($response);
+} else if($method === 'POST') {
+    $data = json_decode(file_get_contents('php://input'));
+    $stmt = $conn->prepare("INSERT INTO video_lessons (topic_id, url, description) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE url = VALUES(url), description = VALUES(description)");
+    $stmt->execute([$data->topicId, $data->url, $data->description]);
+    echo json_encode(["status" => "success"]);
+}
+?>`
+    },
+    {
+        name: 'manage_contact.php',
+        folder: 'deployment/api',
+        content: `${phpHeader}
+$method = $_SERVER['REQUEST_METHOD'];
+if($method === 'GET') {
+    $stmt = $conn->prepare("SELECT * FROM contact_messages ORDER BY created_at DESC");
+    $stmt->execute();
+    echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
+} else if($method === 'DELETE') {
+    $stmt = $conn->prepare("DELETE FROM contact_messages WHERE id = ?");
     $stmt->execute([$_GET['id']]);
     echo json_encode(["status" => "success"]);
 }
@@ -346,6 +436,19 @@ if(!empty($data->user_id)) {
 ?>`
     },
     {
+        name: 'get_admin_stats.php',
+        folder: 'deployment/api',
+        content: `${phpHeader}
+$stmt = $conn->query("SELECT COUNT(*) FROM users");
+$totalUsers = $stmt->fetchColumn();
+$stmt = $conn->query("SELECT SUM(count) FROM analytics_visits");
+$totalVisits = $stmt->fetchColumn() ?: 0;
+$stmt = $conn->query("SELECT date, count as visits FROM analytics_visits ORDER BY date DESC LIMIT 7");
+$dailyTraffic = array_reverse($stmt->fetchAll(PDO::FETCH_ASSOC));
+echo json_encode(["totalUsers" => (int)$totalUsers, "totalVisits" => (int)$totalVisits, "dailyTraffic" => $dailyTraffic]);
+?>`
+    },
+    {
         name: 'migrate_db.php',
         folder: 'deployment/api',
         content: `${phpHeader}
@@ -359,17 +462,16 @@ $schema = [
     'mistake_logs' => "(id VARCHAR(255) PRIMARY KEY, user_id VARCHAR(255), question TEXT, subject VARCHAR(50), note TEXT, date DATETIME)",
     'content' => "(id INT AUTO_INCREMENT PRIMARY KEY, type VARCHAR(50), title VARCHAR(255), content_json LONGTEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
     'notifications' => "(id VARCHAR(255) PRIMARY KEY, from_id VARCHAR(255), from_name VARCHAR(255), to_id VARCHAR(255), type VARCHAR(50), message TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
-    'questions' => "(id VARCHAR(255) PRIMARY KEY, subject_id VARCHAR(50), topic_id VARCHAR(255), text TEXT, options_json TEXT, correct_idx INT, difficulty VARCHAR(20), source VARCHAR(100), year INT)",
-    'tests' => "(id VARCHAR(255) PRIMARY KEY, title VARCHAR(255), duration INT, category VARCHAR(50), difficulty VARCHAR(50), exam_type VARCHAR(50), questions_json LONGTEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
     'settings' => "(setting_key VARCHAR(255) PRIMARY KEY, value TEXT)",
     'chapter_notes' => "(id INT AUTO_INCREMENT PRIMARY KEY, topic_id VARCHAR(255) UNIQUE, content_json LONGTEXT, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
     'video_lessons' => "(id INT AUTO_INCREMENT PRIMARY KEY, topic_id VARCHAR(255) UNIQUE, url VARCHAR(500), description TEXT)",
     'analytics_visits' => "(date DATE PRIMARY KEY, count INT DEFAULT 0)",
-    'psychometric_results' => "(id INT AUTO_INCREMENT PRIMARY KEY, user_id VARCHAR(255) UNIQUE, report_json LONGTEXT, date TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"
+    'psychometric_results' => "(id INT AUTO_INCREMENT PRIMARY KEY, user_id VARCHAR(255) UNIQUE, report_json LONGTEXT, date TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
+    'contact_messages' => "(id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255), email VARCHAR(255), subject VARCHAR(255), message TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"
 ];
 try {
     foreach ($schema as $table => $def) { $conn->exec("CREATE TABLE IF NOT EXISTS $table $def"); }
-    echo json_encode(["status" => "success", "message" => "Schema synchronized."]);
+    echo json_encode(["status" => "success", "message" => "Schema synchronized to v12.25."]);
 } catch(Exception $e) { http_response_code(500); echo json_encode(["status" => "error", "message" => $e->getMessage()]); }
 ?>`
     }
@@ -377,20 +479,25 @@ try {
 
 export const generateSQLSchema = () => {
     let sql = `-- IITGEEPrep Complete Database Export v12.25\n`;
+    sql += `-- Generated on: ${new Date().toISOString()}\n`;
     sql += `SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO"; START TRANSACTION; SET time_zone = "+00:00";\n\n`;
     
     const tables = [
-        `CREATE TABLE IF NOT EXISTS users (id VARCHAR(255) PRIMARY KEY, name VARCHAR(255), email VARCHAR(255) UNIQUE, password_hash VARCHAR(255), role VARCHAR(50) DEFAULT 'STUDENT', target_exam VARCHAR(100), target_year INT, institute VARCHAR(255), gender VARCHAR(50), dob DATE, is_verified TINYINT(1) DEFAULT 1, parent_id VARCHAR(255), linked_student_id VARCHAR(255), school VARCHAR(255), phone VARCHAR(50), avatar_url VARCHAR(500), security_question TEXT, security_answer TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
-        `CREATE TABLE IF NOT EXISTS test_attempts (id VARCHAR(255) PRIMARY KEY, user_id VARCHAR(255), test_id VARCHAR(255), title VARCHAR(255), score INT, total_marks INT, accuracy FLOAT, accuracy_percent INT, detailed_results LONGTEXT, topic_id VARCHAR(255), difficulty VARCHAR(50), total_questions INT DEFAULT 0, correct_count INT DEFAULT 0, incorrect_count INT DEFAULT 0, unattempted_count INT DEFAULT 0, date TIMESTAMP DEFAULT CURRENT_TIMESTAMP, INDEX(user_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
-        `CREATE TABLE IF NOT EXISTS user_progress (id INT AUTO_INCREMENT PRIMARY KEY, user_id VARCHAR(255), topic_id VARCHAR(255), status VARCHAR(50), last_revised DATETIME, revision_level INT, next_revision_date DATETIME, solved_questions_json LONGTEXT, UNIQUE KEY (user_id, topic_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
-        `CREATE TABLE IF NOT EXISTS timetable (user_id VARCHAR(255) PRIMARY KEY, config_json LONGTEXT, slots_json LONGTEXT, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
-        `CREATE TABLE IF NOT EXISTS backlogs (id VARCHAR(255) PRIMARY KEY, user_id VARCHAR(255), topic VARCHAR(255), subject VARCHAR(50), priority VARCHAR(50), status VARCHAR(50), deadline DATE, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
-        `CREATE TABLE IF NOT EXISTS goals (id VARCHAR(255) PRIMARY KEY, user_id VARCHAR(255), text VARCHAR(255), completed TINYINT(1) DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
-        `CREATE TABLE IF NOT EXISTS mistake_logs (id VARCHAR(255) PRIMARY KEY, user_id VARCHAR(255), question TEXT, subject VARCHAR(50), note TEXT, date DATETIME) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
-        `CREATE TABLE IF NOT EXISTS content (id INT AUTO_INCREMENT PRIMARY KEY, type VARCHAR(50), title VARCHAR(255), content_json LONGTEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
-        `CREATE TABLE IF NOT EXISTS notifications (id VARCHAR(255) PRIMARY KEY, from_id VARCHAR(255), from_name VARCHAR(255), to_id VARCHAR(255), type VARCHAR(50), message TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
-        `CREATE TABLE IF NOT EXISTS settings (setting_key VARCHAR(255) PRIMARY KEY, value TEXT) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
-        `CREATE TABLE IF NOT EXISTS psychometric_results (id INT AUTO_INCREMENT PRIMARY KEY, user_id VARCHAR(255) UNIQUE, report_json LONGTEXT, date TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`
+        `CREATE TABLE IF NOT EXISTS users (id VARCHAR(255) PRIMARY KEY, name VARCHAR(255), email VARCHAR(255) UNIQUE, password_hash VARCHAR(255), role VARCHAR(50) DEFAULT 'STUDENT', target_exam VARCHAR(100), target_year INT, institute VARCHAR(255), gender VARCHAR(50), dob DATE, is_verified TINYINT(1) DEFAULT 1, parent_id VARCHAR(255), linked_student_id VARCHAR(255), school VARCHAR(255), phone VARCHAR(50), avatar_url VARCHAR(500), security_question TEXT, security_answer TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
+        `CREATE TABLE IF NOT EXISTS test_attempts (id VARCHAR(255) PRIMARY KEY, user_id VARCHAR(255), test_id VARCHAR(255), title VARCHAR(255), score INT, total_marks INT, accuracy FLOAT, accuracy_percent INT, detailed_results LONGTEXT, topic_id VARCHAR(255), difficulty VARCHAR(50), total_questions INT DEFAULT 0, correct_count INT DEFAULT 0, incorrect_count INT DEFAULT 0, unattempted_count INT DEFAULT 0, date TIMESTAMP DEFAULT CURRENT_TIMESTAMP, INDEX(user_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
+        `CREATE TABLE IF NOT EXISTS user_progress (id INT AUTO_INCREMENT PRIMARY KEY, user_id VARCHAR(255), topic_id VARCHAR(255), status VARCHAR(50), last_revised DATETIME, revision_level INT, next_revision_date DATETIME, solved_questions_json LONGTEXT, UNIQUE KEY (user_id, topic_id), INDEX(user_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
+        `CREATE TABLE IF NOT EXISTS timetable (user_id VARCHAR(255) PRIMARY KEY, config_json LONGTEXT, slots_json LONGTEXT, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
+        `CREATE TABLE IF NOT EXISTS backlogs (id VARCHAR(255) PRIMARY KEY, user_id VARCHAR(255), topic VARCHAR(255), subject VARCHAR(50), priority VARCHAR(50), status VARCHAR(50), deadline DATE, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, INDEX(user_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
+        `CREATE TABLE IF NOT EXISTS goals (id VARCHAR(255) PRIMARY KEY, user_id VARCHAR(255), text VARCHAR(255), completed TINYINT(1) DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, INDEX(user_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
+        `CREATE TABLE IF NOT EXISTS mistake_logs (id VARCHAR(255) PRIMARY KEY, user_id VARCHAR(255), question TEXT, subject VARCHAR(50), note TEXT, date DATETIME, INDEX(user_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
+        `CREATE TABLE IF NOT EXISTS content (id INT AUTO_INCREMENT PRIMARY KEY, type VARCHAR(50), title VARCHAR(255), content_json LONGTEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, INDEX(type)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
+        `CREATE TABLE IF NOT EXISTS notifications (id VARCHAR(255) PRIMARY KEY, from_id VARCHAR(255), from_name VARCHAR(255), to_id VARCHAR(255), type VARCHAR(50), message TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, INDEX(to_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
+        `CREATE TABLE IF NOT EXISTS settings (setting_key VARCHAR(255) PRIMARY KEY, value TEXT) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
+        `CREATE TABLE IF NOT EXISTS chapter_notes (id INT AUTO_INCREMENT PRIMARY KEY, topic_id VARCHAR(255) UNIQUE, content_json LONGTEXT, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
+        `CREATE TABLE IF NOT EXISTS video_lessons (id INT AUTO_INCREMENT PRIMARY KEY, topic_id VARCHAR(255) UNIQUE, url VARCHAR(500), description TEXT) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
+        `CREATE TABLE IF NOT EXISTS psychometric_results (id INT AUTO_INCREMENT PRIMARY KEY, user_id VARCHAR(255) UNIQUE, report_json LONGTEXT, date TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
+        `CREATE TABLE IF NOT EXISTS contact_messages (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255), email VARCHAR(255), subject VARCHAR(255), message TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
+        `CREATE TABLE IF NOT EXISTS analytics_visits (date DATE PRIMARY KEY, count INT DEFAULT 0) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`
     ];
 
     sql += tables.join('\n\n') + '\n\nCOMMIT;';

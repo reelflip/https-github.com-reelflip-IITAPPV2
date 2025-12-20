@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { 
   BookOpen, Target, Brain, BarChart2, Calendar, 
@@ -22,7 +21,7 @@ export const FeaturesScreen: React.FC = () => {
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-400">Engineering Excellence</span>
             </h1>
             <p className="text-lg md:text-xl text-slate-400 max-w-2xl mx-auto leading-relaxed">
-                IITGEEPrep integrates syllabus tracking, AI-driven testing, and performance analytics into one cohesive ecosystem designed for JEE Main & Advanced aspirants.
+                IITGEEPrep integrates syllabus tracking, AI-driven testing, and performance analytics into one cohesive ecosystem designed for JEE Main, Advanced, BITSAT, VITEEE, and all other major engineering entrance exams.
             </p>
         </div>
       </div>
@@ -100,7 +99,7 @@ export const FeaturesScreen: React.FC = () => {
 
         </div>
 
-        {/* Detailed Parent Roles Section (Added as per request) */}
+        {/* Detailed Parent Roles Section */}
         <div className="mb-24 bg-white rounded-3xl border border-slate-200 shadow-xl overflow-hidden">
             <div className="bg-slate-900 p-10 text-white text-center relative overflow-hidden">
                 <div className="relative z-10">

@@ -4,7 +4,7 @@ import { BookReader } from '../components/BookReader';
 import { 
   Search, ChevronDown, CheckCircle2, LayoutGrid, BookOpen, 
   Save, Loader2, PlayCircle, X, Youtube, Filter, Info, StickyNote, 
-  ArrowLeft, List, CheckSquare, Target, BarChart2, Video, FileText, Check, AlertCircle, AlertTriangle, Clock, Trophy, ChevronRight, Play, ExternalLink, Send
+  ArrowLeft, List, CheckSquare, Target, BarChart2, Video, FileText, Check, AlertCircle, AlertTriangle, Clock, Trophy, ChevronRight, Play, ExternalLink, Send, Sparkles
 } from 'lucide-react';
 
 interface SyllabusTrackerProps {
@@ -56,6 +56,7 @@ const TopicDetailView: React.FC<{
   currentResultsVisible: Record<string, boolean>;
   currentTime: number;
   onAnswerQuestion: (qId: string, optionIdx: number, correctIdx: number) => void;
+  /* Fix: Removed duplicate onUpdateTestAnswer property definitions to resolve TypeScript errors */
   onUpdateTestAnswer: (qId: string, optionIdx: number) => void;
   onOpenNoteReader: (title: string, pages: string[]) => void;
 }> = ({ 
@@ -74,7 +75,7 @@ const TopicDetailView: React.FC<{
     }
 
     if (answeredCount < topicQuestions.length) {
-        if(!confirm(`You answered ${answeredCount} of ${topicQuestions.length} questions. Submit anyway?`)) return;
+        if(!confirm(`Wait! You have only answered ${answeredCount} out of ${topicQuestions.length} questions. Submit and save results anyway?`)) return;
     }
 
     setIsSubmitting(true);
@@ -111,9 +112,13 @@ const TopicDetailView: React.FC<{
     };
 
     if (addTestAttempt) {
-        await addTestAttempt(attempt);
-        alert(`Chapter Test Submitted!\nScore: ${score}/${totalMarks}\nResult saved to your history.`);
-        onClose();
+        try {
+            await addTestAttempt(attempt);
+            alert(`Test Successfully Submitted!\nFinal Score: ${score}/${totalMarks}\nResults are now saved to your dashboard analytics.`);
+            onClose();
+        } catch (e) {
+            alert("Error saving test result. Please try again.");
+        }
     }
     setIsSubmitting(false);
   };
@@ -136,7 +141,7 @@ const TopicDetailView: React.FC<{
             </div>
             
             {activeTab === 'TEST' && (
-                <div className="flex items-center gap-4 px-4 py-2 bg-slate-900 text-white rounded-xl">
+                <div className="flex items-center gap-4 px-4 py-2 bg-slate-900 text-white rounded-xl shadow-lg border border-slate-700">
                     <Clock className="w-4 h-4 text-blue-400" />
                     <span className="font-mono font-bold">
                         {Math.floor(currentTime / 60)}:{(currentTime % 60).toString().padStart(2, '0')}
@@ -170,7 +175,7 @@ const TopicDetailView: React.FC<{
                           activeTab === tab ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600'
                       }`}
                   >
-                      {tab === 'TEST' ? '🔥 Chapter Test' : tab}
+                      {tab === 'TEST' ? '🔥 Formal Test' : tab}
                   </button>
               ))}
             </div>
@@ -180,18 +185,20 @@ const TopicDetailView: React.FC<{
             <div className="max-w-4xl mx-auto p-4 md:p-8 space-y-8">
                 {(activeTab === 'PRACTICE' || activeTab === 'TEST') && (
                     <div className="space-y-6">
-                         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                         <div className={`p-6 rounded-2xl border flex items-center justify-between transition-all ${activeTab === 'TEST' ? 'bg-slate-900 border-slate-800 text-white shadow-xl' : 'bg-white border-slate-200 shadow-sm'}`}>
                             <div>
-                                <h3 className="font-bold text-slate-800">{activeTab === 'TEST' ? 'Formal Assessment' : 'Practice Bank'}</h3>
-                                <p className="text-xs text-slate-500 mt-1">
+                                <h3 className="font-bold">{activeTab === 'TEST' ? 'Assessment Mode Active' : 'Practice Bank'}</h3>
+                                <p className={`text-xs mt-1 ${activeTab === 'TEST' ? 'text-slate-400' : 'text-slate-500'}`}>
                                     {activeTab === 'TEST' 
-                                      ? "Timed attempt. Your results will be saved permanently to your scorecard." 
-                                      : `Explore ${topicQuestions.length} practice problems.`}
+                                      ? "Timed attempt. Your final score will be saved to your dashboard scorecard." 
+                                      : `Explore ${topicQuestions.length} practice problems to build confidence.`}
                                 </p>
                             </div>
+                            {/* Fix: Added Sparkles to lucide-react imports above to resolve error */}
+                            {activeTab === 'TEST' && <Sparkles className="text-amber-400 animate-pulse" />}
                          </div>
 
-                         <div className="space-y-6 pb-24">
+                         <div className="space-y-6 pb-32">
                              {topicQuestions.length === 0 ? (
                                  <div className="p-12 text-center text-slate-400 bg-white rounded-2xl border border-dashed">
                                      No questions available for this topic.
@@ -224,7 +231,7 @@ const TopicDetailView: React.FC<{
                                                               if (activeTab === 'PRACTICE') onAnswerQuestion(q.id, oIdx, q.correctOptionIndex);
                                                               else onUpdateTestAnswer(q.id, oIdx);
                                                           }}
-                                                          className={`p-4 rounded-xl border text-left text-sm transition-all ${btnStyle}`}
+                                                          className={`p-4 rounded-xl border text-left text-sm transition-all active:scale-[0.98] ${btnStyle}`}
                                                      >
                                                          <span className="mr-2 font-bold uppercase">{String.fromCharCode(65 + oIdx)}.</span> {opt}
                                                      </button>
@@ -236,14 +243,17 @@ const TopicDetailView: React.FC<{
                              )}
                              
                              {activeTab === 'TEST' && topicQuestions.length > 0 && (
-                                 <div className="flex justify-center pt-8 pb-12">
+                                 <div className="flex flex-col items-center justify-center pt-8 pb-20 border-t border-slate-200 mt-10">
+                                     <div className="bg-amber-50 p-4 rounded-xl border border-amber-200 mb-6 max-w-sm text-center">
+                                         <p className="text-xs text-amber-800 font-bold">Done with the assessment? Click below to save your score.</p>
+                                     </div>
                                      <button 
                                           onClick={handleSubmitChapterTest}
                                           disabled={isSubmitting}
-                                          className="bg-slate-900 text-white px-12 py-4 rounded-2xl font-black text-lg hover:bg-blue-600 transition-all shadow-xl flex items-center gap-3 active:scale-95 disabled:opacity-50"
+                                          className="bg-slate-900 text-white px-16 py-5 rounded-2xl font-black text-xl hover:bg-blue-600 transition-all shadow-2xl flex items-center gap-4 active:scale-95 disabled:opacity-50"
                                      >
-                                         {isSubmitting ? <Loader2 className="animate-spin" /> : <Send />}
-                                         Submit Chapter Test
+                                         {isSubmitting ? <Loader2 className="animate-spin" /> : <Send size={24} />}
+                                         Save & Submit Test
                                      </button>
                                  </div>
                              )}
@@ -257,6 +267,7 @@ const TopicDetailView: React.FC<{
                             <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm text-center">
                                 <StickyNote className="w-12 h-12 text-blue-500 mx-auto mb-4" />
                                 <h3 className="text-xl font-bold text-slate-800 mb-2">Detailed Chapter Notes</h3>
+                                <p className="text-sm text-slate-500 mb-6">Expert-curated revision sheets for this topic.</p>
                                 <button 
                                     onClick={() => onOpenNoteReader(topic.name, chapterNote.pages)}
                                     className="bg-blue-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-blue-700 transition-all flex items-center justify-center mx-auto gap-2"
@@ -283,6 +294,9 @@ const TopicDetailView: React.FC<{
                                         allowFullScreen
                                         title={topic.name}
                                     ></iframe>
+                                </div>
+                                <div className="bg-white p-4 rounded-xl border border-slate-100">
+                                    <p className="text-sm text-slate-600 font-medium">{videoLesson.description || "Video Lecture for this topic."}</p>
                                 </div>
                             </div>
                         ) : (

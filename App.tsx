@@ -362,7 +362,8 @@ const App: React.FC = () => {
       if (publicScreens.includes(currentScreen)) {
           return (
               <Suspense fallback={<LoadingView />}>
-                <PublicLayout onNavigate={setScreen} currentScreen={currentScreen}>
+                {/* Fix: Wrapped setScreen call with explicit cast to Screen to resolve Type incompatibility error with onNavigate */}
+                <PublicLayout onNavigate={(p) => setScreen(p as Screen)} currentScreen={currentScreen}>
                     {currentScreen === 'about' && <AboutUsScreen />}
                     {currentScreen === 'blog' && <PublicBlogScreen blogs={blogs} onBack={() => setScreen('dashboard')} />}
                     {currentScreen === 'exams' && <ExamGuideScreen />}
@@ -373,7 +374,8 @@ const App: React.FC = () => {
               </Suspense>
           );
       }
-      return <Suspense fallback={<LoadingView />}><AuthScreen onLogin={handleLogin} onNavigate={setScreen} /></Suspense>;
+      {/* Fix: Wrapped setScreen call with explicit cast to Screen to resolve Type incompatibility error with onNavigate */}
+      return <Suspense fallback={<LoadingView />}><AuthScreen onLogin={handleLogin} onNavigate={(p) => setScreen(p as Screen)} /></Suspense>;
   }
 
   const isAdminRole = user.role === 'ADMIN' || user.role === 'ADMIN_EXECUTIVE';
