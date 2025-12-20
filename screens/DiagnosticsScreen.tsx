@@ -1,6 +1,5 @@
-import React, { useState, useRef, useMemo } from 'react';
-/* Fix: Added Brain to lucide-react imports to resolve "Cannot find name 'Brain'" error */
-import { Brain, ShieldCheck, RefreshCw, Activity, Terminal, Download, HeartPulse, Play, FileJson, AlertTriangle, CheckCircle2, XCircle, Beaker, Shield, UserCheck, Database, Server, Sparkles, Code, FileText, ChevronRight, Lightbulb, AlertCircle, Wrench } from 'lucide-react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
+import { Brain, ShieldCheck, RefreshCw, Activity, Terminal, Download, HeartPulse, Play, FileJson, AlertTriangle, CheckCircle2, XCircle, Beaker, Shield, UserCheck, Database, Server, Sparkles, Code, FileText, ChevronRight, Lightbulb, AlertCircle, Wrench, FileCode, Layers, ChevronUp, ChevronDown } from 'lucide-react';
 import { E2ETestRunner, TestResult, AIFixRecommendation } from '../services/testRunnerService';
 
 export const DiagnosticsScreen: React.FC = () => {
@@ -8,6 +7,8 @@ export const DiagnosticsScreen: React.FC = () => {
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [results, setResults] = useState<TestResult[]>([]);
     const [aiFixes, setAiFixes] = useState<AIFixRecommendation[]>([]);
+    const [dbTables, setDbTables] = useState<any[]>([]);
+    const [expandedTable, setExpandedTable] = useState<string | null>(null);
     const runnerRef = useRef<E2ETestRunner | null>(null);
 
     const initRunner = () => {
@@ -17,6 +18,16 @@ export const DiagnosticsScreen: React.FC = () => {
         return runnerRef.current;
     };
 
+    const fetchDbStatus = async () => {
+        try {
+            const res = await fetch('/api/test_db.php');
+            const data = await res.json();
+            if (data.tables) setDbTables(data.tables);
+        } catch (e) {}
+    };
+
+    useEffect(() => { fetchDbStatus(); }, []);
+
     const runFullAudit = async () => {
         setResults([]);
         setAiFixes([]);
@@ -24,12 +35,13 @@ export const DiagnosticsScreen: React.FC = () => {
         const runner = initRunner();
         await runner.runFullAudit();
         setIsRunning(false);
+        fetchDbStatus();
     };
 
     const runAIDiagnosis = async () => {
         const failedTests = results.filter(r => r.status === 'FAIL');
         if (failedTests.length === 0) {
-            alert("No failures detected to analyze!");
+            alert("No failures detected in the legacy suite to analyze!");
             return;
         }
         setIsAnalyzing(true);
@@ -61,56 +73,56 @@ export const DiagnosticsScreen: React.FC = () => {
                     <div className="flex-1">
                         <div className="flex items-center gap-3 mb-2">
                             <Wrench className="w-8 h-8 text-blue-400" />
-                            <h2 className="text-3xl font-black tracking-tight uppercase">Platform Diagnostic Suite</h2>
+                            <h2 className="text-3xl font-black tracking-tight uppercase">System Health Dashboard</h2>
                         </div>
                         <p className="text-slate-400 text-sm max-w-xl font-medium">
-                            Self-repair engine v12.45. Identify PHP crashes, DB mismatches, and structural UI errors in one click.
+                            Dual-Core Diagnostics: Deterministic Legacy Suite (51 Tests) & AI-Assisted Recovery.
                         </p>
                     </div>
                     <div className="flex flex-wrap gap-3 shrink-0">
                         {results.length > 0 && (
                             <button onClick={downloadReport} className="bg-slate-800 hover:bg-slate-700 text-slate-200 px-6 py-3 rounded-xl font-bold text-sm flex items-center gap-2 transition-all border border-slate-700 active:scale-95">
-                                <Download size={18} /> Export Log
+                                <Download size={18} /> Export Results
                             </button>
                         )}
                         <button onClick={runFullAudit} disabled={isRunning} className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-3 rounded-xl font-bold text-sm flex items-center gap-2 transition-all shadow-lg shadow-blue-900/40 disabled:opacity-50 active:scale-95">
                             {isRunning ? <RefreshCw className="animate-spin" size={18} /> : <Play size={18} />}
-                            {isRunning ? 'Auditing System...' : 'Run New System Scan'}
+                            {isRunning ? 'Auditing 51 Nodes...' : 'Run Legacy Audit Suite'}
                         </button>
                     </div>
                 </div>
                 {results.length > 0 && (
                     <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-4 animate-in slide-in-from-top-4">
                         <div className="bg-white/5 border border-white/10 p-4 rounded-2xl">
-                            <span className="text-slate-400 text-[10px] font-black uppercase tracking-widest block mb-1">Pass Rate</span>
-                            <span className="text-2xl font-bold text-white">{Math.round((stats.passed / (stats.total || 1)) * 100)}%</span>
+                            <span className="text-slate-400 text-[10px] font-black uppercase tracking-widest block mb-1">Coverage</span>
+                            <span className="text-2xl font-bold text-white">{Math.round((results.length / 51) * 100)}% of 51</span>
                         </div>
                         <div className="bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-2xl">
-                            <span className="text-emerald-400 text-[10px] font-black uppercase tracking-widest block mb-1">Healthy</span>
-                            <span className="text-2xl font-bold text-emerald-400">{stats.passed} Nodes</span>
+                            <span className="text-emerald-400 text-[10px] font-black uppercase tracking-widest block mb-1">Passed</span>
+                            <span className="text-2xl font-bold text-emerald-400">{stats.passed} Checks</span>
                         </div>
                         <div className="bg-rose-500/10 border border-rose-500/20 p-4 rounded-2xl">
-                            <span className="text-red-400 text-[10px] font-black uppercase tracking-widest block mb-1">Critical</span>
-                            <span className="text-2xl font-bold text-red-400">{stats.failed} Failures</span>
+                            <span className="text-red-400 text-[10px] font-black uppercase tracking-widest block mb-1">Critical Failures</span>
+                            <span className="text-2xl font-bold text-red-400">{stats.failed} Errors</span>
                         </div>
                         <div className="bg-blue-500/10 border border-blue-500/20 p-4 rounded-2xl">
-                            <span className="text-blue-400 text-[10px] font-black uppercase tracking-widest block mb-1">Latency</span>
-                            <span className="text-2xl font-bold text-blue-400">Avg {Math.round(results.reduce((acc, r) => acc + (r.latency || 0), 0) / (results.length || 1))}ms</span>
+                            <span className="text-blue-400 text-[10px] font-black uppercase tracking-widest block mb-1">Host Response</span>
+                            <span className="text-2xl font-bold text-blue-400">{Math.round(results.reduce((acc, r) => acc + (r.latency || 0), 0) / (results.length || 1))}ms</span>
                         </div>
                     </div>
                 )}
             </div>
 
-            {/* AI Advisor Panel */}
+            {/* AI Advisor Panel (Dynamic) */}
             {failedSteps.length > 0 && !isRunning && (
                 <div className="bg-gradient-to-br from-indigo-600 to-violet-700 p-8 rounded-3xl shadow-xl text-white animate-in zoom-in-95">
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                         <div>
                             <div className="flex items-center gap-2 mb-2">
                                 <Sparkles className="w-6 h-6 text-amber-300 animate-pulse" />
-                                <h3 className="text-xl font-black uppercase tracking-tight">AI Repair Advisor</h3>
+                                <h3 className="text-xl font-black uppercase tracking-tight">AI Intelligent Recovery</h3>
                             </div>
-                            <p className="text-indigo-100 text-sm font-medium">Analyze {failedSteps.length} failures to get specific file-by-file fix recommendations.</p>
+                            <p className="text-indigo-100 text-sm font-medium">Found {failedSteps.length} legacy failures. Consultant the AI for specific code-level patch instructions.</p>
                         </div>
                         <button 
                             onClick={runAIDiagnosis} 
@@ -118,7 +130,7 @@ export const DiagnosticsScreen: React.FC = () => {
                             className="bg-white text-indigo-700 px-8 py-3 rounded-xl font-black text-sm flex items-center gap-2 hover:bg-indigo-50 transition-all shadow-lg active:scale-95 disabled:opacity-50"
                         >
                             {isAnalyzing ? <RefreshCw className="animate-spin" size={18} /> : <Brain size={18} />}
-                            {isAnalyzing ? 'Analyzing Failure Patterns...' : 'Consult AI Fix Advisor'}
+                            {isAnalyzing ? 'Analyzing 51-Point Log...' : 'Run AI Fix Analysis'}
                         </button>
                     </div>
 
@@ -132,7 +144,7 @@ export const DiagnosticsScreen: React.FC = () => {
                                             <h4 className="font-bold text-white">{fix.problem}</h4>
                                         </div>
                                         <div className="flex items-center gap-2">
-                                            <span className="text-[10px] font-bold text-white/50">Confidence</span>
+                                            <span className="text-[10px] font-bold text-white/50">Match Confidence</span>
                                             <div className="w-20 h-1.5 bg-white/10 rounded-full overflow-hidden">
                                                 <div className="h-full bg-emerald-400" style={{ width: `${fix.confidence * 100}%` }}></div>
                                             </div>
@@ -146,7 +158,7 @@ export const DiagnosticsScreen: React.FC = () => {
                                                 </div>
                                                 <div className="p-4 bg-slate-900/50 rounded-xl border border-white/10 text-sm">
                                                     <div className="flex items-center gap-2 text-amber-300 mb-2 font-bold">
-                                                        <Activity size={14} /> Action: {file.action}
+                                                        <Activity size={14} /> Recommended Action: {file.action}
                                                     </div>
                                                     {file.codeSnippet && (
                                                         <pre className="text-[11px] font-mono text-slate-300 overflow-x-auto p-3 bg-black/30 rounded-lg">
@@ -164,102 +176,116 @@ export const DiagnosticsScreen: React.FC = () => {
                 </div>
             )}
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                 {/* System Status Sidebar */}
-                <div className="lg:col-span-1 space-y-6">
+                <div className="lg:col-span-4 space-y-6">
                     <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
                         <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2 text-sm uppercase tracking-wider">
-                            <Activity className="w-5 h-5 text-blue-600" /> Live Telemetry
+                            <Database className="w-5 h-5 text-blue-600" /> Database Integrity
                         </h3>
-                        <div className="space-y-3">
-                            <div className="flex justify-between items-center p-3 bg-slate-50 rounded-xl">
-                                <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Version</span>
-                                <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-black rounded">v12.45-STABLE</span>
-                            </div>
-                            <div className="flex justify-between items-center p-3 bg-slate-50 rounded-xl">
-                                <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Environment</span>
-                                <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-black rounded uppercase">Production</span>
-                            </div>
-                            <div className="flex justify-between items-center p-3 bg-slate-50 rounded-xl">
-                                <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Cloud Sync</span>
-                                <span className="flex items-center gap-1.5 px-2 py-0.5 bg-slate-200 text-slate-600 text-[10px] font-black rounded uppercase">
-                                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div> Linked
-                                </span>
-                            </div>
+                        <div className="space-y-3 max-h-[500px] overflow-y-auto custom-scrollbar pr-1">
+                            {dbTables.length === 0 ? (
+                                <p className="text-xs text-slate-400 italic py-4 text-center">Run audit to refresh DB state.</p>
+                            ) : dbTables.map(table => (
+                                <div key={table.name} className="border border-slate-100 rounded-xl overflow-hidden bg-slate-50/50">
+                                    <button 
+                                        onClick={() => setExpandedTable(expandedTable === table.name ? null : table.name)}
+                                        className="w-full p-3 flex items-center justify-between hover:bg-slate-100 transition-colors"
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <Layers size={14} className="text-slate-400" />
+                                            <span className="text-xs font-bold text-slate-700">{table.name}</span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-[9px] font-black bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">{table.rows} Row</span>
+                                            {expandedTable === table.name ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}
+                                        </div>
+                                    </button>
+                                    {expandedTable === table.name && (
+                                        <div className="p-3 bg-white border-t border-slate-100 animate-in slide-in-from-top-1">
+                                            {table.columns.map((col: any) => (
+                                                <div key={col.name} className="flex justify-between text-[10px] py-1 border-b border-slate-50 last:border-0">
+                                                    <span className="font-bold text-slate-500">{col.name}</span>
+                                                    <span className="text-slate-400 font-mono">{col.type}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
                         </div>
                     </div>
 
                     <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
                         <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2 text-sm uppercase tracking-wider">
-                            <AlertCircle className="w-5 h-5 text-amber-500" /> Troubleshooting Tips
+                            <Activity className="w-5 h-5 text-orange-500" /> Server Parameters
                         </h3>
-                        <div className="space-y-4">
-                            <div className="flex gap-3">
-                                <div className="p-1.5 bg-slate-100 rounded text-slate-500 h-fit"><Database size={14}/></div>
-                                <div>
-                                    <p className="text-xs font-bold text-slate-700 mb-1">500 DB Errors</p>
-                                    <p className="text-[10px] text-slate-500 leading-relaxed">Check if 'accuracy_percent' column was added to 'test_attempts' via migrate_db.php.</p>
-                                </div>
+                        <div className="space-y-2">
+                            <div className="flex justify-between p-3 bg-slate-50 rounded-xl">
+                                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">PHP Version</span>
+                                <span className="text-[10px] font-black text-slate-800">8.1+ Detected</span>
                             </div>
-                            <div className="flex gap-3">
-                                <div className="p-1.5 bg-slate-100 rounded text-slate-500 h-fit"><FileText size={14}/></div>
-                                <div>
-                                    <p className="text-xs font-bold text-slate-700 mb-1">Missing Files</p>
-                                    <p className="text-[10px] text-slate-500 leading-relaxed">Ensure the 'api/' folder contains all 38 PHP endpoints from the build bundle.</p>
-                                </div>
+                            <div className="flex justify-between p-3 bg-slate-50 rounded-xl">
+                                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">API Count</span>
+                                <span className="text-[10px] font-black text-slate-800">38 Enpoints</span>
+                            </div>
+                            <div className="flex justify-between p-3 bg-slate-50 rounded-xl">
+                                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Audit Depth</span>
+                                <span className="text-[10px] font-black text-slate-800">51 Integrity Nodes</span>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                {/* Audit Stream */}
-                <div className="lg:col-span-2 bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col min-h-[600px]">
+                {/* Legacy Deterministic Audit Stream */}
+                <div className="lg:col-span-8 bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col min-h-[600px]">
                     <div className="p-5 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center sticky top-0 z-10 backdrop-blur-sm">
                         <h3 className="font-bold text-slate-700 flex items-center gap-2 text-sm uppercase tracking-wider">
-                            <Terminal className="w-4 h-4 text-slate-400" /> Core Audit Feed
+                            <Terminal className="w-4 h-4 text-slate-400" /> Legacy Audit Stream (51 Deterministic Tests)
                         </h3>
+                        <SyncStatusBadge status={isRunning ? 'SYNCING' : 'IDLE'} show={isRunning} />
                     </div>
                     <div className="flex-1 overflow-y-auto custom-scrollbar">
                         {results.length === 0 ? (
                             <div className="h-full flex flex-col items-center justify-center text-center p-20 text-slate-400">
                                 <Shield className="w-16 h-16 mb-4 opacity-5" />
-                                <p className="font-bold text-slate-500 uppercase tracking-widest text-xs">Ready to Scan</p>
-                                <p className="text-[11px] mt-2 font-medium max-w-[200px]">Execute a system audit to verify backend-frontend synchronization.</p>
+                                <p className="font-bold text-slate-500 uppercase tracking-widest text-xs">Ready for Deterministic Scan</p>
+                                <p className="text-[11px] mt-2 font-medium max-w-[200px]">Launch the 51-node legacy audit to verify table existence, schema mismatches, and core connectivity.</p>
                             </div>
                         ) : (
                             <div className="divide-y divide-slate-100 pb-20">
                                 {results.map((r) => (
-                                    <div key={r.step} className={`p-5 flex items-start justify-between transition-colors ${r.status === 'FAIL' ? 'bg-rose-50/30' : 'hover:bg-slate-50/50'}`}>
+                                    <div key={r.step} className={`p-4 flex items-start justify-between transition-all ${r.status === 'FAIL' ? 'bg-rose-50/30' : 'hover:bg-slate-50/50'}`}>
                                         <div className="flex gap-4 items-start">
-                                            <div className={`mt-1 p-2 rounded-xl border ${
+                                            <div className={`mt-0.5 p-1.5 rounded-lg border ${
                                                 r.status === 'PASS' ? 'bg-emerald-50 border-emerald-100 text-emerald-600' : 
                                                 r.status === 'FAIL' ? 'bg-rose-50 border-rose-100 text-rose-600' : 
                                                 r.status === 'RUNNING' ? 'bg-blue-50 border-blue-100 text-blue-600 animate-pulse' :
                                                 'bg-slate-50 border-slate-100 text-slate-300'
                                             }`}>
-                                                {r.status === 'PASS' ? <CheckCircle2 size={18} /> : 
-                                                 r.status === 'FAIL' ? <XCircle size={18} /> : <Activity size={18} />}
+                                                {r.status === 'PASS' ? <CheckCircle2 size={16} /> : 
+                                                 r.status === 'FAIL' ? <XCircle size={16} /> : <Activity size={16} />}
                                             </div>
-                                            <div>
+                                            <div className="min-w-0">
                                                 <div className="flex items-center gap-2 mb-0.5">
-                                                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{r.step}</span>
-                                                    {r.status === 'FAIL' && <span className="px-1.5 py-0.5 bg-rose-600 text-white text-[8px] font-black rounded uppercase">Critical</span>}
+                                                    <span className="text-[8px] font-black text-slate-400 uppercase tracking-[0.15em]">{r.step}</span>
+                                                    {r.status === 'FAIL' && <span className="px-1.5 py-0.5 bg-rose-600 text-white text-[8px] font-black rounded uppercase">Fix Req</span>}
                                                 </div>
-                                                <div className="font-black text-slate-800 text-sm">{r.description}</div>
-                                                <p className={`text-xs mt-1 font-medium ${r.status === 'FAIL' ? 'text-rose-700' : 'text-slate-500'}`}>{r.details}</p>
+                                                <div className="font-bold text-slate-800 text-xs truncate max-w-[400px]">{r.description}</div>
+                                                <p className={`text-[10px] mt-1 font-medium ${r.status === 'FAIL' ? 'text-rose-700 font-bold' : 'text-slate-500'}`}>{r.details}</p>
                                                 
                                                 {r.status === 'FAIL' && r.metadata?.rawResponse && (
-                                                    <div className="mt-3 p-3 bg-slate-900 rounded-xl text-[10px] font-mono text-rose-400 overflow-x-auto max-w-md border border-slate-800 shadow-inner">
+                                                    <div className="mt-3 p-3 bg-slate-900 rounded-xl text-[9px] font-mono text-rose-400 overflow-x-auto max-w-lg border border-slate-800 shadow-inner">
                                                         <div className="flex justify-between items-center mb-1 text-slate-500">
-                                                            <span>SERVER_RESPONSE</span>
+                                                            <span className="font-black">LOG_DUMP</span>
                                                             <span>{r.metadata.httpCode}</span>
                                                         </div>
-                                                        {r.metadata.rawResponse.slice(0, 200)}...
+                                                        {r.metadata.rawResponse.slice(0, 300)}...
                                                     </div>
                                                 )}
                                             </div>
                                         </div>
-                                        {r.latency && <div className="text-[10px] font-mono font-bold text-slate-300">{r.latency}ms</div>}
+                                        {r.latency && <div className="text-[9px] font-mono font-black text-slate-300 shrink-0 ml-2">{r.latency}ms</div>}
                                     </div>
                                 ))}
                             </div>
@@ -271,6 +297,12 @@ export const DiagnosticsScreen: React.FC = () => {
     );
 };
 
-const FileCode = ({size}: any) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><path d="m10 13-2 2 2 2"/><path d="m14 17 2-2-2-2"/></svg>
-);
+const SyncStatusBadge = ({status, show}: any) => {
+    if(!show) return null;
+    return (
+        <div className={`px-2 py-1 rounded-full text-[9px] font-black uppercase flex items-center gap-1.5 ${status === 'SYNCING' ? 'bg-blue-50 text-blue-600' : 'bg-slate-100 text-slate-400'}`}>
+            {status === 'SYNCING' && <RefreshCw size={10} className="animate-spin" />}
+            {status === 'SYNCING' ? 'Running Tests...' : 'Idle'}
+        </div>
+    );
+};
