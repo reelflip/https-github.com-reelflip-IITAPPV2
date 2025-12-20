@@ -95,7 +95,7 @@ export const DeploymentScreen: React.FC = () => {
         try {
             const res = await fetch('/api/migrate_db.php');
             if(res.ok) {
-                alert("v12.32 Stability Core Schema Verification Successful!");
+                alert("v12.34 Synchronized Schema Verification Successful!");
                 scanDatabase();
             }
             else throw new Error(`HTTP ${res.status}`);
@@ -109,11 +109,20 @@ export const DeploymentScreen: React.FC = () => {
             const zip = new JSZip();
             const backendFiles = getBackendFiles(dbConfig);
             const apiFolder = zip.folder("deployment/api");
-            if (apiFolder) backendFiles.forEach(file => apiFolder.file(file.name, file.content));
+            if (apiFolder) {
+                backendFiles.filter(f => f.folder === 'deployment/api').forEach(file => apiFolder.file(file.name, file.content));
+            }
+            const seoFolder = zip.folder("deployment/seo");
+            if (seoFolder) {
+                backendFiles.filter(f => f.folder === 'deployment/seo').forEach(file => seoFolder.file(file.name, file.content));
+            }
+            const sqlFolder = zip.folder("deployment/sql");
+            if (sqlFolder) sqlFolder.file('database.sql', generateSQLSchema());
+
             const content = await zip.generateAsync({ type: "blob" });
             const url = URL.createObjectURL(content);
             const link = document.createElement('a');
-            link.href = url; link.download = "IITGEEPrep_Stability_v12_32.zip";
+            link.href = url; link.download = "IITGEEPrep_Sync_v12_34.zip";
             link.click();
         } catch (error) { alert("Zip creation failed."); }
         setIsZipping(false);
@@ -126,9 +135,9 @@ export const DeploymentScreen: React.FC = () => {
                     <div>
                         <div className="flex items-center gap-3 mb-2">
                             <h2 className="text-3xl font-bold">Deployment Center</h2>
-                            <span className="px-2 py-1 rounded-md bg-blue-600 text-xs font-mono text-white animate-pulse">v12.32 STABILITY CORE</span>
+                            <span className="px-2 py-1 rounded-md bg-blue-600 text-xs font-mono text-white animate-pulse uppercase tracking-widest">v12.34 SYNC STABLE</span>
                         </div>
-                        <p className="text-slate-400 text-lg">Fixing syntax errors and database connectivity issues.</p>
+                        <p className="text-slate-400 text-lg">Platform-wide synchronization for 38 endpoints and SQL schema.</p>
                     </div>
                     <div className="flex bg-slate-700/50 p-1 rounded-xl border border-slate-600/50">
                         <button onClick={() => setActiveTab('guide')} className={`px-6 py-2 rounded-lg text-sm font-bold ${activeTab === 'guide' ? 'bg-blue-600 text-white' : 'text-slate-400'}`}>Guide</button>
@@ -139,21 +148,20 @@ export const DeploymentScreen: React.FC = () => {
 
             {activeTab === 'integrity' && (
                 <div className="space-y-8">
-                    {/* Database Link Health Check */}
                     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
                         <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
-                            <div><h3 className="text-lg font-bold text-slate-800 flex items-center gap-2"><Database className="text-blue-500" size={20}/> Database Stability Tracker</h3><p className="text-sm text-slate-500">Essential for fixing "Connection Refused" errors.</p></div>
+                            <div><h3 className="text-lg font-bold text-slate-800 flex items-center gap-2"><Database className="text-blue-500" size={20}/> Database Sync Tracker</h3><p className="text-sm text-slate-500">Checking v12.34 schema compliance and record counts.</p></div>
                             <div className="flex gap-2 w-full md:w-auto">
-                                <button onClick={runDbRepair} disabled={repairing} className="flex-1 md:flex-none bg-slate-800 hover:bg-black text-white px-6 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50">{repairing ? <RefreshCw className="animate-spin" size={18}/> : <ShieldCheck size={18}/>} Sync Schema</button>
-                                <button onClick={scanDatabase} disabled={scanningDb} className="flex-1 md:flex-none bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50">{scanningDb ? <RefreshCw className="animate-spin" size={18}/> : <RefreshCw size={18}/>} Test MySQL Connection</button>
+                                <button onClick={runDbRepair} disabled={repairing} className="flex-1 md:flex-none bg-slate-800 hover:bg-black text-white px-6 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50">{repairing ? <RefreshCw className="animate-spin" size={18}/> : <ShieldCheck size={18}/>} Repair Schema</button>
+                                <button onClick={scanDatabase} disabled={scanningDb} className="flex-1 md:flex-none bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50">{scanningDb ? <RefreshCw className="animate-spin" size={18}/> : <RefreshCw size={18}/>} Test DB Connection</button>
                             </div>
                         </div>
 
                         {dbTables.length === 0 && !scanningDb ? (
                             <div className="py-12 text-center text-rose-500 bg-rose-50 rounded-2xl border border-dashed border-rose-200 flex flex-col items-center">
                                 <AlertTriangle size={48} className="mb-4" />
-                                <p className="font-bold uppercase tracking-widest text-xs">No Database Connectivity</p>
-                                <p className="text-sm mt-2 max-w-sm">System diagnostic shows DB link is broken. Re-upload <b>config.php</b> with correct credentials.</p>
+                                <p className="font-bold uppercase tracking-widest text-xs">No DB Link Detected</p>
+                                <p className="text-sm mt-2 max-w-sm">Remote MySQL host rejected connection. Sync requires updated <b>config.php</b>.</p>
                             </div>
                         ) : (
                             <div className="space-y-3">
@@ -215,14 +223,13 @@ export const DeploymentScreen: React.FC = () => {
                         )}
                     </div>
 
-                    {/* API File Integrity Section */}
                     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
                         <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
                             <div>
-                                <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2"><Activity className="text-orange-500" size={20}/> Module Health Scan (v12.32)</h3>
-                                <p className="text-sm text-slate-500">Checking for 500 Syntax Crashes and 404 Missing Files.</p>
+                                <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2"><Activity className="text-orange-500" size={20}/> Module Integrity Scan (v12.34)</h3>
+                                <p className="text-sm text-slate-500">Checking for syntax stability across the full 38-file set.</p>
                             </div>
-                            <button onClick={runIntegrityScan} disabled={scanning} className="bg-orange-600 hover:bg-orange-700 text-white px-6 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all active:scale-95 disabled:opacity-50">{scanning ? <RefreshCw className="animate-spin" size={18}/> : <Activity size={18}/>} Run System-Wide Scan</button>
+                            <button onClick={runIntegrityScan} disabled={scanning} className="bg-orange-600 hover:bg-orange-700 text-white px-6 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all active:scale-95 disabled:opacity-50">{scanning ? <RefreshCw className="animate-spin" size={18}/> : <Activity size={18}/>} Full Set Scan</button>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             {integrityResults.map(res => {
@@ -261,23 +268,23 @@ export const DeploymentScreen: React.FC = () => {
             {activeTab === 'guide' && (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     <div className="lg:col-span-2 bg-white p-8 rounded-2xl border border-slate-200 shadow-sm space-y-6">
-                        <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2 text-rose-600"><AlertTriangle className="animate-bounce" /> URGENT: Stability Update</h3>
-                        <p className="text-slate-600 text-sm leading-relaxed">The previous release (v12.31) contained critical syntax errors that caused 500 crashes. Please follow these steps <b>immediately</b>:</p>
+                        <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2 text-blue-600"><CheckCircle2 className="animate-pulse" /> Unified Synchronization Guide</h3>
+                        <p className="text-slate-600 text-sm leading-relaxed">System v12.34 ensures complete synchronization between frontend and backend. Follow these steps for a clean install:</p>
                         <ol className="space-y-4 text-slate-600 text-sm list-decimal pl-5">
-                            <li>Download the <strong>v12.32 Stability Core Bundle</strong>.</li>
-                            <li><b>Replace all files</b> in your <code>/api</code> directory with the new ones. This fixes the internal syntax engine.</li>
-                            <li>Go to <b>Integrity</b> and click <b>Sync Schema</b> to verify and repair your database tables.</li>
-                            <li>If "DB Link Failed" persists, verify your <code>config.php</code> credentials manually.</li>
+                            <li>Download the <strong>v12.34 Master Sync Bundle</strong>. This contains the full, matching set of 38 PHP scripts.</li>
+                            <li><b>Completely empty</b> your server's <code>/api</code> directory before uploading. Mixing versions causes internal conflicts.</li>
+                            <li>Use the <b>Full Set Scan</b> to verify that all 38 endpoints are reachable and correctly reporting v12.34.</li>
+                            <li>Run <b>Repair Schema</b> to align the SQL tables with the latest audit requirements.</li>
                         </ol>
                     </div>
                     <div className="lg:col-span-1 space-y-6">
-                        <div className="bg-rose-900 rounded-2xl p-6 text-white shadow-xl relative overflow-hidden flex flex-col h-full">
+                        <div className="bg-blue-900 rounded-2xl p-6 text-white shadow-xl relative overflow-hidden flex flex-col h-full">
                             <div className="flex-1">
-                                <h3 className="text-xl font-bold mb-2">Get Stability Bundle</h3>
-                                <p className="text-rose-200 text-sm mb-6 leading-relaxed">Fixes all syntax errors and "500 Internal Server" issues from v12.31.</p>
+                                <h3 className="text-xl font-bold mb-2">Sync Master Bundle</h3>
+                                <p className="text-blue-200 text-sm mb-6 leading-relaxed">Contains 38 Synchronized PHP APIs and updated v12.34 SQL Schema for full system restoration.</p>
                             </div>
-                            <button onClick={downloadAllZip} disabled={isZipping} className="w-full bg-white text-rose-900 font-black py-3 rounded-xl flex items-center justify-center transition-all disabled:opacity-50 shadow-lg active:scale-95 mt-4">
-                                {isZipping ? <RefreshCw className="animate-spin mr-2"/> : <Download className="mr-2"/>} Download v12.32 .zip
+                            <button onClick={downloadAllZip} disabled={isZipping} className="w-full bg-white text-blue-900 font-black py-3 rounded-xl flex items-center justify-center transition-all disabled:opacity-50 shadow-lg active:scale-95 mt-4">
+                                {isZipping ? <RefreshCw className="animate-spin mr-2"/> : <Download className="mr-2"/>} Download v12.34 (38 Files)
                             </button>
                         </div>
                     </div>
