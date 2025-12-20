@@ -15,17 +15,34 @@ include_once 'config.php';
 
 function getJsonInput() {
     $raw = file_get_contents('php://input');
-    if (!$raw) return null;
+    if (!$raw || $raw === '{}') return null;
     $data = json_decode($raw);
     return (json_last_error() === JSON_ERROR_NONE) ? $data : null;
 }
 
-function getV($data, $p) {
-    if (!$data) return null;
+function getV($data, $p, $default = null) {
+    if (!$data) return $default;
     if (isset($data->$p)) return $data->$p;
     $snake = strtolower(preg_replace('/(?<!^)[A-Z]/', '_$0', $p));
     if (isset($data->$snake)) return $data->$snake;
-    return null;
+    return $default;
+}
+
+function sendError($msg, $code = 400) {
+    http_response_code($code);
+    echo json_encode(["status" => "error", "message" => $msg]);
+    exit;
+}
+
+function sendSuccess($data = []) {
+    echo json_encode(array_merge(["status" => "success"], $data));
+    exit;
+}
+
+// Global Health Check Handler
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty(file_get_contents('php://input'))) {
+    echo json_encode(["status" => "active", "message" => "Logic hub is reachable"]);
+    exit;
 }
 `;
 
@@ -70,8 +87,8 @@ try {
     $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     $conn->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
 } catch(PDOException $e) {
-    http_response_code(200); 
-    echo json_encode(["status" => "error", "message" => "DATABASE_CONNECTION_ERROR", "details" => $e.getMessage()]);
+    http_response_code(500); 
+    echo json_encode(["status" => "error", "message" => "DATABASE_CONNECTION_ERROR", "details" => $e->getMessage()]);
     exit;
 }
 ?>`
@@ -119,8 +136,10 @@ $tables = [
     'chapter_notes' => "(topic_id VARCHAR(255) PRIMARY KEY, pages_json LONGTEXT, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP)",
     'video_lessons' => "(topic_id VARCHAR(255) PRIMARY KEY, video_url TEXT, description TEXT, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP)"
 ];
-foreach($tables as $name => $def) { $conn->exec("CREATE TABLE IF NOT EXISTS \`$name\` $def ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"); }
-echo json_encode(["status" => "success", "message" => "v13.0 Full Master Schema Verified"]);`
+try {
+    foreach($tables as $name => $def) { $conn->exec("CREATE TABLE IF NOT EXISTS \`$name\` $def ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"); }
+    echo json_encode(["status" => "success", "message" => "v13.0 Full Master Schema Verified"]);
+} catch (Exception $e) { sendError($e->getMessage(), 500); }`
     },
     {
         name: 'read_source.php',
@@ -135,92 +154,116 @@ else { echo json_encode(["error" => "Not found"]); }`
         folder: 'deployment/api',
         content: `${phpHeader}
 $data = getJsonInput();
-$stmt = $conn->prepare("SELECT * FROM users WHERE email = ?");
-$stmt->execute([getV($data, 'email')]);
-$user = $stmt->fetch();
-if ($user && password_verify(getV($data, 'password'), $user['password_hash'])) {
-    unset($user['password_hash']);
-    echo json_encode(["status" => "success", "user" => $user]);
-} else { http_response_code(401); echo json_encode(["status" => "error", "message" => "Invalid credentials"]); }`
+if (!$data) sendError("Credentials required");
+try {
+    $stmt = $conn->prepare("SELECT * FROM users WHERE email = ?");
+    $stmt->execute([getV($data, 'email')]);
+    $user = $stmt->fetch();
+    if ($user && password_verify(getV($data, 'password'), $user['password_hash'])) {
+        unset($user['password_hash']);
+        sendSuccess(["user" => $user]);
+    } else { sendError("Invalid credentials", 401); }
+} catch (Exception $e) { sendError($e->getMessage(), 500); }`
     },
     {
         name: 'register.php',
         folder: 'deployment/api',
         content: `${phpHeader}
 $data = getJsonInput();
+if (!$data) sendError("Registration data required");
 $id = 'std_' . uniqid();
-$hash = password_hash(getV($data, 'password'), PASSWORD_BCRYPT);
-$stmt = $conn->prepare("INSERT INTO users (id, name, email, password_hash, role, institute, target_exam, target_year, dob, gender, security_question, security_answer) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+$email = getV($data, 'email');
+if (!$email) sendError("Email is required");
+$hash = password_hash(getV($data, 'password', ''), PASSWORD_BCRYPT);
 try {
-    $stmt->execute([$id, getV($data, 'name'), getV($data, 'email'), $hash, getV($data, 'role'), getV($data, 'institute'), getV($data, 'targetExam'), getV($data, 'targetYear'), getV($data, 'dob'), getV($data, 'gender'), getV($data, 'securityQuestion'), getV($data, 'securityAnswer')]);
-    echo json_encode(["status" => "success", "user_id" => $id]);
-} catch(Exception $e) { http_response_code(400); echo json_encode(["status" => "error", "message" => $e->getMessage()]); }`
+    $stmt = $conn->prepare("INSERT INTO users (id, name, email, password_hash, role, institute, target_exam, target_year, dob, gender, security_question, security_answer) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    $stmt->execute([$id, getV($data, 'name'), $email, $hash, getV($data, 'role'), getV($data, 'institute'), getV($data, 'targetExam'), getV($data, 'targetYear'), getV($data, 'dob'), getV($data, 'gender'), getV($data, 'securityQuestion'), getV($data, 'securityAnswer')]);
+    sendSuccess(["user_id" => $id]);
+} catch(Exception $e) { sendError($e->getMessage(), 500); }`
     },
     {
         name: 'get_dashboard.php',
         folder: 'deployment/api',
         content: `${phpHeader}
 $userId = $_GET['user_id'] ?? '';
-$res = [];
-$res['progress'] = $conn->query("SELECT * FROM user_progress WHERE user_id = '$userId'")->fetchAll();
-$res['attempts'] = $conn->query("SELECT * FROM test_attempts WHERE user_id = '$userId' ORDER BY date DESC")->fetchAll();
-$res['goals'] = $conn->query("SELECT * FROM goals WHERE user_id = '$userId'")->fetchAll();
-$res['backlogs'] = $conn->query("SELECT * FROM backlogs WHERE user_id = '$userId' ORDER BY created_at DESC")->fetchAll();
-$res['mistakes'] = $conn->query("SELECT * FROM mistake_logs WHERE user_id = '$userId' ORDER BY date DESC")->fetchAll();
-$res['timetable'] = $conn->query("SELECT * FROM timetable WHERE user_id = '$userId'")->fetch();
-$res['blogs'] = $conn->query("SELECT * FROM blog_posts ORDER BY date DESC LIMIT 10")->fetchAll();
-$res['flashcards'] = $conn->query("SELECT * FROM flashcards LIMIT 50")->fetchAll();
-$res['hacks'] = $conn->query("SELECT * FROM memory_hacks LIMIT 20")->fetchAll();
-$res['notifications'] = $conn->query("SELECT * FROM notifications WHERE to_id = '$userId' AND is_read = 0")->fetchAll();
-echo json_encode($res);`
+if (!$userId) sendError("User ID required");
+try {
+    $res = [];
+    $res['progress'] = $conn->query("SELECT * FROM user_progress WHERE user_id = '$userId'")->fetchAll();
+    $res['attempts'] = $conn->query("SELECT * FROM test_attempts WHERE user_id = '$userId' ORDER BY date DESC")->fetchAll();
+    $res['goals'] = $conn->query("SELECT * FROM goals WHERE user_id = '$userId'")->fetchAll();
+    $res['backlogs'] = $conn->query("SELECT * FROM backlogs WHERE user_id = '$userId' ORDER BY created_at DESC")->fetchAll();
+    $res['mistakes'] = $conn->query("SELECT * FROM mistake_logs WHERE user_id = '$userId' ORDER BY date DESC")->fetchAll();
+    $res['timetable'] = $conn->query("SELECT * FROM timetable WHERE user_id = '$userId'")->fetch();
+    $res['blogs'] = $conn->query("SELECT * FROM blog_posts ORDER BY date DESC LIMIT 10")->fetchAll();
+    $res['flashcards'] = $conn->query("SELECT * FROM flashcards LIMIT 50")->fetchAll();
+    $res['hacks'] = $conn->query("SELECT * FROM memory_hacks LIMIT 20")->fetchAll();
+    $res['notifications'] = $conn->query("SELECT * FROM notifications WHERE to_id = '$userId' AND is_read = 0")->fetchAll();
+    echo json_encode($res);
+} catch (Exception $e) { sendError($e->getMessage(), 500); }`
     },
     {
         name: 'sync_progress.php',
         folder: 'deployment/api',
         content: `${phpHeader}
 $data = getJsonInput();
+if (!$data) sendError("Sync data missing");
 $userId = getV($data, 'userId');
-$stmt = $conn->prepare("INSERT INTO user_progress (user_id, topic_id, status, last_revised, revision_level, next_revision_date, solved_questions_json) 
-    VALUES (?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE status=VALUES(status), last_revised=VALUES(last_revised), 
-    revision_level=VALUES(revision_level), next_revision_date=VALUES(next_revision_date), solved_questions_json=VALUES(solved_questions_json)");
-$stmt->execute([$userId, getV($data, 'topicId'), getV($data, 'status'), getV($data, 'lastRevised'), getV($data, 'revisionLevel'), getV($data, 'nextRevisionDate'), json_encode(getV($data, 'solvedQuestions') ?? [])]);
-echo json_encode(["status" => "success"]);`
+$topicId = getV($data, 'topicId');
+if (!$userId || !$topicId) sendError("Missing key identifiers");
+try {
+    $stmt = $conn->prepare("INSERT INTO user_progress (user_id, topic_id, status, last_revised, revision_level, next_revision_date, solved_questions_json) 
+        VALUES (?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE status=VALUES(status), last_revised=VALUES(last_revised), 
+        revision_level=VALUES(revision_level), next_revision_date=VALUES(next_revision_date), solved_questions_json=VALUES(solved_questions_json)");
+    $stmt->execute([$userId, $topicId, getV($data, 'status'), getV($data, 'lastRevised'), getV($data, 'revisionLevel'), getV($data, 'nextRevisionDate'), json_encode(getV($data, 'solvedQuestions') ?? [])]);
+    sendSuccess();
+} catch (Exception $e) { sendError($e->getMessage(), 500); }`
     },
     {
         name: 'save_attempt.php',
         folder: 'deployment/api',
         content: `${phpHeader}
 $data = getJsonInput();
-$stmt = $conn->prepare("INSERT INTO test_attempts (id, user_id, test_id, title, score, total_marks, accuracy, total_questions, correct_count, incorrect_count, unattempted_count, topic_id, difficulty, detailed_results) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-$stmt->execute([getV($data, 'id'), getV($data, 'userId'), getV($data, 'testId'), getV($data, 'title'), getV($data, 'score'), getV($data, 'totalMarks'), getV($data, 'accuracy'), getV($data, 'totalQuestions'), getV($data, 'correctCount'), getV($data, 'incorrectCount'), getV($data, 'unattemptedCount'), getV($data, 'topicId'), getV($data, 'difficulty'), json_encode(getV($data, 'detailedResults') ?? [])]);
-echo json_encode(["status" => "success"]);`
+if (!$data) sendError("Attempt data missing");
+try {
+    $stmt = $conn->prepare("INSERT INTO test_attempts (id, user_id, test_id, title, score, total_marks, accuracy, total_questions, correct_count, incorrect_count, unattempted_count, topic_id, difficulty, detailed_results) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    $stmt->execute([getV($data, 'id'), getV($data, 'userId'), getV($data, 'testId'), getV($data, 'title'), getV($data, 'score'), getV($data, 'totalMarks'), getV($data, 'accuracy'), getV($data, 'totalQuestions'), getV($data, 'correctCount'), getV($data, 'incorrectCount'), getV($data, 'unattemptedCount'), getV($data, 'topicId'), getV($data, 'difficulty'), json_encode(getV($data, 'detailedResults') ?? [])]);
+    sendSuccess();
+} catch (Exception $e) { sendError($e->getMessage(), 500); }`
     },
     {
         name: 'save_timetable.php',
         folder: 'deployment/api',
         content: `${phpHeader}
 $data = getJsonInput();
-$stmt = $conn->prepare("INSERT INTO timetable (user_id, config_json, slots_json) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE config_json = VALUES(config_json), slots_json = VALUES(slots_json)");
-$stmt->execute([getV($data, 'userId'), json_encode(getV($data, 'config')), json_encode(getV($data, 'slots'))]);
-echo json_encode(["status" => "success"]);`
+if (!$data) sendError("Timetable config missing");
+try {
+    $stmt = $conn->prepare("INSERT INTO timetable (user_id, config_json, slots_json) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE config_json = VALUES(config_json), slots_json = VALUES(slots_json)");
+    $stmt->execute([getV($data, 'userId'), json_encode(getV($data, 'config')), json_encode(getV($data, 'slots'))]);
+    sendSuccess();
+} catch (Exception $e) { sendError($e->getMessage(), 500); }`
     },
     {
         name: 'manage_users.php',
         folder: 'deployment/api',
         content: `${phpHeader}
 $method = $_SERVER['REQUEST_METHOD'];
-if ($method === 'GET') {
-    $group = $_GET['group'] ?? 'USERS';
-    $sql = $group === 'ADMINS' ? "SELECT * FROM users WHERE role LIKE 'ADMIN%'" : "SELECT * FROM users WHERE role NOT LIKE 'ADMIN%'";
-    echo json_encode($conn->query($sql)->fetchAll());
-} else if ($method === 'PUT') {
-    $data = getJsonInput();
-    $conn->prepare("UPDATE users SET is_verified = ? WHERE id = ?")->execute([getV($data, 'isVerified') ? 1 : 0, getV($data, 'id')]);
-    echo json_encode(["status" => "success"]);
-} else if ($method === 'DELETE') {
-    $conn->prepare("DELETE FROM users WHERE id = ?")->execute([$_GET['id']]);
-    echo json_encode(["status" => "success"]);
-}`
+try {
+    if ($method === 'GET') {
+        $group = $_GET['group'] ?? 'USERS';
+        $sql = $group === 'ADMINS' ? "SELECT * FROM users WHERE role LIKE 'ADMIN%'" : "SELECT * FROM users WHERE role NOT LIKE 'ADMIN%'";
+        echo json_encode($conn->query($sql)->fetchAll());
+    } else if ($method === 'PUT') {
+        $data = getJsonInput();
+        if (!$data) sendError("No update data");
+        $conn->prepare("UPDATE users SET is_verified = ? WHERE id = ?")->execute([getV($data, 'isVerified') ? 1 : 0, getV($data, 'id')]);
+        sendSuccess();
+    } else if ($method === 'DELETE') {
+        $id = $_GET['id'] ?? '';
+        $conn->prepare("DELETE FROM users WHERE id = ?")->execute([$id]);
+        sendSuccess();
+    }
+} catch (Exception $e) { sendError($e->getMessage(), 500); }`
     },
     {
         name: 'manage_content.php',
@@ -228,53 +271,59 @@ if ($method === 'GET') {
         content: `${phpHeader}
 $method = $_SERVER['REQUEST_METHOD'];
 $data = getJsonInput();
-if ($method === 'POST') {
-    $type = $_GET['type'] ?? '';
-    if ($type === 'flashcard') { $conn->prepare("INSERT INTO flashcards (front, back, subject_id) VALUES (?, ?, ?)")->execute([getV($data, 'front'), getV($data, 'back'), getV($data, 'subjectId')]); }
-    else if ($type === 'hack') { $conn->prepare("INSERT INTO memory_hacks (title, description, trick, tag) VALUES (?, ?, ?, ?)")->execute([getV($data, 'title'), getV($data, 'description'), getV($data, 'trick'), getV($data, 'tag')]); }
-    else if ($type === 'blog') { $conn->prepare("INSERT INTO blog_posts (title, excerpt, content, author, image_url, category) VALUES (?, ?, ?, ?, ?, ?)")->execute([getV($data, 'title'), getV($data, 'excerpt'), getV($data, 'content'), getV($data, 'author'), getV($data, 'imageUrl'), getV($data, 'category')]); }
-    echo json_encode(["status" => "success"]);
-} else if ($method === 'DELETE') {
-    $type = $_GET['type']; $id = $_GET['id'];
-    $table = $type === 'flashcard' ? 'flashcards' : ($type === 'hack' ? 'memory_hacks' : 'blog_posts');
-    $conn->prepare("DELETE FROM $table WHERE id = ?")->execute([$id]);
-    echo json_encode(["status" => "success"]);
-}`
+try {
+    if ($method === 'POST') {
+        $type = $_GET['type'] ?? '';
+        if ($type === 'flashcard') { $conn->prepare("INSERT INTO flashcards (front, back, subject_id) VALUES (?, ?, ?)")->execute([getV($data, 'front'), getV($data, 'back'), getV($data, 'subjectId')]); }
+        else if ($type === 'hack') { $conn->prepare("INSERT INTO memory_hacks (title, description, trick, tag) VALUES (?, ?, ?, ?)")->execute([getV($data, 'title'), getV($data, 'description'), getV($data, 'trick'), getV($data, 'tag')]); }
+        else if ($type === 'blog') { $conn->prepare("INSERT INTO blog_posts (title, excerpt, content, author, image_url, category) VALUES (?, ?, ?, ?, ?, ?)")->execute([getV($data, 'title'), getV($data, 'excerpt'), getV($data, 'content'), getV($data, 'author'), getV($data, 'imageUrl'), getV($data, 'category')]); }
+        sendSuccess();
+    } else if ($method === 'DELETE') {
+        $type = $_GET['type']; $id = $_GET['id'];
+        $table = $type === 'flashcard' ? 'flashcards' : ($type === 'hack' ? 'memory_hacks' : 'blog_posts');
+        $conn->prepare("DELETE FROM $table WHERE id = ?")->execute([$id]);
+        sendSuccess();
+    }
+} catch (Exception $e) { sendError($e->getMessage(), 500); }`
     },
     {
         name: 'manage_tests.php',
         folder: 'deployment/api',
         content: `${phpHeader}
 $method = $_SERVER['REQUEST_METHOD'];
-if ($method === 'GET') {
-    $tests = $conn->query("SELECT * FROM tests")->fetchAll();
-    foreach($tests as &$t) { $t['questions'] = json_decode($t['questions_json']); }
-    echo json_encode($tests);
-} else if ($method === 'POST') {
-    $data = getJsonInput();
-    $stmt = $conn->prepare("INSERT INTO tests (id, title, duration, questions_json, category, difficulty) VALUES (?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE title=VALUES(title), duration=VALUES(duration), questions_json=VALUES(questions_json)");
-    $stmt->execute([getV($data, 'id'), getV($data, 'title'), getV($data, 'durationMinutes'), json_encode(getV($data, 'questions')), getV($data, 'category'), getV($data, 'difficulty')]);
-    echo json_encode(["status" => "success"]);
-} else if ($method === 'DELETE') {
-    $conn->prepare("DELETE FROM tests WHERE id = ?")->execute([$_GET['id']]);
-    echo json_encode(["status" => "success"]);
-}`
+try {
+    if ($method === 'GET') {
+        $tests = $conn->query("SELECT * FROM tests")->fetchAll();
+        foreach($tests as &$t) { $t['questions'] = json_decode($t['questions_json']); }
+        echo json_encode($tests);
+    } else if ($method === 'POST') {
+        $data = getJsonInput();
+        $stmt = $conn->prepare("INSERT INTO tests (id, title, duration, questions_json, category, difficulty) VALUES (?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE title=VALUES(title), duration=VALUES(duration), questions_json=VALUES(questions_json)");
+        $stmt->execute([getV($data, 'id'), getV($data, 'title'), getV($data, 'durationMinutes'), json_encode(getV($data, 'questions')), getV($data, 'category'), getV($data, 'difficulty')]);
+        sendSuccess();
+    } else if ($method === 'DELETE') {
+        $conn->prepare("DELETE FROM tests WHERE id = ?")->execute([$_GET['id']]);
+        sendSuccess();
+    }
+} catch (Exception $e) { sendError($e->getMessage(), 500); }`
     },
     {
         name: 'manage_syllabus.php',
         folder: 'deployment/api',
         content: `${phpHeader}
 $method = $_SERVER['REQUEST_METHOD'];
-$data = getJsonInput();
-if ($method === 'GET') { echo json_encode($conn->query("SELECT * FROM topics")->fetchAll()); }
-else if ($method === 'POST') {
-    $id = 'top_' . uniqid();
-    $conn->prepare("INSERT INTO topics (id, name, chapter, subject) VALUES (?, ?, ?, ?)")->execute([$id, getV($data, 'name'), getV($data, 'chapter'), getV($data, 'subject')]);
-    echo json_encode(["status" => "success", "id" => $id]);
-} else if ($method === 'DELETE') {
-    $conn->prepare("DELETE FROM topics WHERE id = ?")->execute([$_GET['id']]);
-    echo json_encode(["status" => "success"]);
-}`
+try {
+    if ($method === 'GET') { echo json_encode($conn->query("SELECT * FROM topics")->fetchAll()); }
+    else if ($method === 'POST') {
+        $data = getJsonInput();
+        $id = 'top_' . uniqid();
+        $conn->prepare("INSERT INTO topics (id, name, chapter, subject) VALUES (?, ?, ?, ?)")->execute([$id, getV($data, 'name'), getV($data, 'chapter'), getV($data, 'subject')]);
+        sendSuccess(["id" => $id]);
+    } else if ($method === 'DELETE') {
+        $conn->prepare("DELETE FROM topics WHERE id = ?")->execute([$_GET['id']]);
+        sendSuccess();
+    }
+} catch (Exception $e) { sendError($e->getMessage(), 500); }`
     },
     {
         name: 'manage_questions.php',
@@ -288,18 +337,20 @@ echo json_encode(["status" => "active", "msg" => "Question Bank Integrated via T
         content: `${phpHeader}
 $method = $_SERVER['REQUEST_METHOD'];
 $data = getJsonInput();
-if ($method === 'POST') {
-    $id = 'bl_' . uniqid();
-    $stmt = $conn->prepare("INSERT INTO backlogs (id, user_id, title, subject, priority, status, deadline) VALUES (?, ?, ?, ?, ?, 'PENDING', ?)");
-    $stmt->execute([$id, getV($data, 'userId'), getV($data, 'topic'), getV($data, 'subject'), getV($data, 'priority'), getV($data, 'deadline')]);
-    echo json_encode(["status" => "success", "id" => $id]);
-} else if ($method === 'PUT') {
-    $conn->prepare("UPDATE backlogs SET status = 'COMPLETED' WHERE id = ?")->execute([getV($data, 'id')]);
-    echo json_encode(["status" => "success"]);
-} else if ($method === 'DELETE') {
-    $conn->prepare("DELETE FROM backlogs WHERE id = ?")->execute([$_GET['id']]);
-    echo json_encode(["status" => "success"]);
-}`
+try {
+    if ($method === 'POST') {
+        $id = 'bl_' . uniqid();
+        $stmt = $conn->prepare("INSERT INTO backlogs (id, user_id, title, subject, priority, status, deadline) VALUES (?, ?, ?, ?, ?, 'PENDING', ?)");
+        $stmt->execute([$id, getV($data, 'userId'), getV($data, 'topic'), getV($data, 'subject'), getV($data, 'priority'), getV($data, 'deadline')]);
+        sendSuccess(["id" => $id]);
+    } else if ($method === 'PUT') {
+        $conn->prepare("UPDATE backlogs SET status = 'COMPLETED' WHERE id = ?")->execute([getV($data, 'id')]);
+        sendSuccess();
+    } else if ($method === 'DELETE') {
+        $conn->prepare("DELETE FROM backlogs WHERE id = ?")->execute([$_GET['id']]);
+        sendSuccess();
+    }
+} catch (Exception $e) { sendError($e->getMessage(), 500); }`
     },
     {
         name: 'manage_goals.php',
@@ -307,200 +358,247 @@ if ($method === 'POST') {
         content: `${phpHeader}
 $method = $_SERVER['REQUEST_METHOD'];
 $data = getJsonInput();
-if ($method === 'POST') {
-    $id = 'goal_' . uniqid();
-    $conn->prepare("INSERT INTO goals (id, user_id, text, completed) VALUES (?, ?, ?, 0)")->execute([$id, getV($data, 'userId'), getV($data, 'text')]);
-    echo json_encode(["status" => "success", "id" => $id]);
-} else if ($method === 'PUT') {
-    $conn->prepare("UPDATE goals SET completed = 1 - completed WHERE id = ?")->execute([getV($data, 'id')]);
-    echo json_encode(["status" => "success"]);
-}`
+try {
+    if ($method === 'POST') {
+        $id = 'goal_' . uniqid();
+        $conn->prepare("INSERT INTO goals (id, user_id, text, completed) VALUES (?, ?, ?, 0)")->execute([$id, getV($data, 'userId'), getV($data, 'text')]);
+        sendSuccess(["id" => $id]);
+    } else if ($method === 'PUT') {
+        $conn->prepare("UPDATE goals SET completed = 1 - completed WHERE id = ?")->execute([getV($data, 'id')]);
+        sendSuccess();
+    }
+} catch (Exception $e) { sendError($e->getMessage(), 500); }`
     },
     {
         name: 'manage_mistakes.php',
         folder: 'deployment/api',
         content: `${phpHeader}
 $method = $_SERVER['REQUEST_METHOD'];
-$data = getJsonInput();
-if ($method === 'POST') {
-    $id = 'err_' . uniqid();
-    $conn->prepare("INSERT INTO mistake_logs (id, user_id, question, subject, note) VALUES (?, ?, ?, ?, ?)")->execute([$id, getV($data, 'userId'), getV($data, 'question'), getV($data, 'subject'), getV($data, 'note')]);
-    echo json_encode(["status" => "success", "id" => $id]);
-} else if ($method === 'GET') {
-    echo json_encode($conn->query("SELECT * FROM mistake_logs WHERE user_id = '".$_GET['user_id']."'")->fetchAll());
-}`
+try {
+    if ($method === 'POST') {
+        $data = getJsonInput();
+        $id = 'err_' . uniqid();
+        $conn->prepare("INSERT INTO mistake_logs (id, user_id, question, subject, note) VALUES (?, ?, ?, ?, ?)")->execute([$id, getV($data, 'userId'), getV($data, 'question'), getV($data, 'subject'), getV($data, 'note')]);
+        sendSuccess(["id" => $id]);
+    } else if ($method === 'GET') {
+        echo json_encode($conn->query("SELECT * FROM mistake_logs WHERE user_id = '".$_GET['user_id']."'")->fetchAll());
+    }
+} catch (Exception $e) { sendError($e->getMessage(), 500); }`
     },
     {
         name: 'manage_notes.php',
         folder: 'deployment/api',
         content: `${phpHeader}
 $method = $_SERVER['REQUEST_METHOD'];
-$data = getJsonInput();
-if ($method === 'GET') {
-    $row = $conn->prepare("SELECT pages_json FROM chapter_notes WHERE topic_id = ?");
-    $row->execute([$_GET['topic_id']]);
-    echo json_encode(["pages" => json_decode($row->fetchColumn())]);
-} else if ($method === 'POST') {
-    $stmt = $conn->prepare("INSERT INTO chapter_notes (topic_id, pages_json) VALUES (?, ?) ON DUPLICATE KEY UPDATE pages_json = VALUES(pages_json)");
-    $stmt->execute([getV($data, 'topicId'), json_encode(getV($data, 'pages'))]);
-    echo json_encode(["status" => "success"]);
-}`
+try {
+    if ($method === 'GET') {
+        $row = $conn->prepare("SELECT pages_json FROM chapter_notes WHERE topic_id = ?");
+        $row->execute([$_GET['topic_id']]);
+        echo json_encode(["pages" => json_decode($row->fetchColumn())]);
+    } else if ($method === 'POST') {
+        $data = getJsonInput();
+        $stmt = $conn->prepare("INSERT INTO chapter_notes (topic_id, pages_json) VALUES (?, ?) ON DUPLICATE KEY UPDATE pages_json = VALUES(pages_json)");
+        $stmt->execute([getV($data, 'topicId'), json_encode(getV($data, 'pages'))]);
+        sendSuccess();
+    }
+} catch (Exception $e) { sendError($e->getMessage(), 500); }`
     },
     {
         name: 'manage_videos.php',
         folder: 'deployment/api',
         content: `${phpHeader}
 $method = $_SERVER['REQUEST_METHOD'];
-$data = getJsonInput();
-if ($method === 'POST') {
-    $stmt = $conn->prepare("INSERT INTO video_lessons (topic_id, video_url, description) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE video_url=VALUES(video_url), description=VALUES(description)");
-    $stmt->execute([getV($data, 'topicId'), getV($data, 'url'), getV($data, 'description')]);
-    echo json_encode(["status" => "success"]);
-} else if ($method === 'GET') {
-    echo json_encode($conn->query("SELECT * FROM video_lessons")->fetchAll());
-}`
+try {
+    if ($method === 'POST') {
+        $data = getJsonInput();
+        $stmt = $conn->prepare("INSERT INTO video_lessons (topic_id, video_url, description) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE video_url=VALUES(video_url), description=VALUES(description)");
+        $stmt->execute([getV($data, 'topicId'), getV($data, 'url'), getV($data, 'description')]);
+        sendSuccess();
+    } else if ($method === 'GET') {
+        echo json_encode($conn->query("SELECT * FROM video_lessons")->fetchAll());
+    }
+} catch (Exception $e) { sendError($e->getMessage(), 500); }`
     },
     {
         name: 'manage_contact.php',
         folder: 'deployment/api',
         content: `${phpHeader}
 $method = $_SERVER['REQUEST_METHOD'];
-if ($method === 'GET') { echo json_encode($conn->query("SELECT * FROM contact_messages ORDER BY created_at DESC")->fetchAll()); }
-else if ($method === 'DELETE') { $conn->prepare("DELETE FROM contact_messages WHERE id = ?")->execute([$_GET['id']]); echo json_encode(["status" => "success"]); }`
+try {
+    if ($method === 'GET') { echo json_encode($conn->query("SELECT * FROM contact_messages ORDER BY created_at DESC")->fetchAll()); }
+    else if ($method === 'DELETE') { $conn->prepare("DELETE FROM contact_messages WHERE id = ?")->execute([$_GET['id']]); sendSuccess(); }
+} catch (Exception $e) { sendError($e->getMessage(), 500); }`
     },
     {
         name: 'contact.php',
         folder: 'deployment/api',
         content: `${phpHeader}
 $data = getJsonInput();
-$stmt = $conn->prepare("INSERT INTO contact_messages (name, email, subject, message) VALUES (?, ?, ?, ?)");
-$stmt->execute([getV($data, 'name'), getV($data, 'email'), getV($data, 'subject'), getV($data, 'message')]);
-echo json_encode(["status" => "success"]);`
+if (!$data) sendError("Message missing");
+try {
+    $stmt = $conn->prepare("INSERT INTO contact_messages (name, email, subject, message) VALUES (?, ?, ?, ?)");
+    $stmt->execute([getV($data, 'name'), getV($data, 'email'), getV($data, 'subject'), getV($data, 'message')]);
+    sendSuccess();
+} catch (Exception $e) { sendError($e->getMessage(), 500); }`
     },
     {
         name: 'manage_settings.php',
         folder: 'deployment/api',
         content: `${phpHeader}
 $method = $_SERVER['REQUEST_METHOD'];
-if ($method === 'GET') {
-    $stmt = $conn->prepare("SELECT value FROM settings WHERE setting_key = ?");
-    $stmt->execute([$_GET['key']]);
-    echo json_encode(["value" => $stmt->fetchColumn()]);
-} else if ($method === 'POST') {
-    $data = getJsonInput();
-    $stmt = $conn->prepare("INSERT INTO settings (setting_key, value) VALUES (?, ?) ON DUPLICATE KEY UPDATE value = VALUES(value)");
-    $stmt->execute([getV($data, 'key'), getV($data, 'value')]);
-    echo json_encode(["status" => "success"]);
-}`
+try {
+    if ($method === 'GET') {
+        $stmt = $conn->prepare("SELECT value FROM settings WHERE setting_key = ?");
+        $stmt->execute([$_GET['key']]);
+        echo json_encode(["value" => $stmt->fetchColumn()]);
+    } else if ($method === 'POST') {
+        $data = getJsonInput();
+        $stmt = $conn->prepare("INSERT INTO settings (setting_key, value) VALUES (?, ?) ON DUPLICATE KEY UPDATE value = VALUES(value)");
+        $stmt->execute([getV($data, 'key'), getV($data, 'value')]);
+        sendSuccess();
+    }
+} catch (Exception $e) { sendError($e->getMessage(), 500); }`
     },
     {
         name: 'update_profile.php',
         folder: 'deployment/api',
         content: `${phpHeader}
 $data = getJsonInput();
-$stmt = $conn->prepare("UPDATE users SET school=?, target_year=?, target_exam=?, phone=? WHERE id=?");
-$stmt->execute([getV($data, 'school'), getV($data, 'targetYear'), getV($data, 'targetExam'), getV($data, 'phone'), getV($data, 'id')]);
-echo json_encode(["status" => "success"]);`
+if (!$data) sendError("Profile data missing");
+try {
+    $stmt = $conn->prepare("UPDATE users SET school=?, target_year=?, target_exam=?, phone=? WHERE id=?");
+    $stmt->execute([getV($data, 'school'), getV($data, 'targetYear'), getV($data, 'targetExam'), getV($data, 'phone'), getV($data, 'id')]);
+    sendSuccess();
+} catch (Exception $e) { sendError($e->getMessage(), 500); }`
     },
     {
         name: 'track_visit.php',
         folder: 'deployment/api',
         content: `${phpHeader}
-$today = date('Y-m-d');
-$conn->exec("INSERT INTO analytics_visits (date, count) VALUES ('$today', 1) ON DUPLICATE KEY UPDATE count = count + 1");
-echo json_encode(["status" => "tracked"]);`
+try {
+    $today = date('Y-m-d');
+    $conn->exec("INSERT INTO analytics_visits (date, count) VALUES ('$today', 1) ON DUPLICATE KEY UPDATE count = count + 1");
+    echo json_encode(["status" => "tracked"]);
+} catch (Exception $e) { sendError($e->getMessage(), 500); }`
     },
     {
         name: 'get_admin_stats.php',
         folder: 'deployment/api',
         content: `${phpHeader}
-$res = [];
-$res['totalVisits'] = $conn->query("SELECT SUM(count) FROM analytics_visits")->fetchColumn();
-$res['totalUsers'] = $conn->query("SELECT count(*) FROM users")->fetchColumn();
-$res['dailyTraffic'] = $conn->query("SELECT date, count as visits FROM analytics_visits ORDER BY date DESC LIMIT 7")->fetchAll();
-echo json_encode($res);`
+try {
+    $res = [];
+    $res['totalVisits'] = $conn->query("SELECT SUM(count) FROM analytics_visits")->fetchColumn();
+    $res['totalUsers'] = $conn->query("SELECT count(*) FROM users")->fetchColumn();
+    $res['dailyTraffic'] = $conn->query("SELECT date, count as visits FROM analytics_visits ORDER BY date DESC LIMIT 7")->fetchAll();
+    echo json_encode($res);
+} catch (Exception $e) { sendError($e->getMessage(), 500); }`
     },
     {
         name: 'search_students.php',
         folder: 'deployment/api',
         content: `${phpHeader}
-$q = $_GET['q'] ?? '';
-$stmt = $conn->prepare("SELECT id, name FROM users WHERE role='STUDENT' AND (id = ? OR name LIKE ?)");
-$stmt->execute([$q, "%$q%"]);
-echo json_encode($stmt->fetchAll());`
+try {
+    $q = $_GET['q'] ?? '';
+    $stmt = $conn->prepare("SELECT id, name FROM users WHERE role='STUDENT' AND (id = ? OR name LIKE ?)");
+    $stmt->execute([$q, "%$q%"]);
+    echo json_encode($stmt->fetchAll());
+} catch (Exception $e) { sendError($e->getMessage(), 500); }`
     },
     {
         name: 'send_request.php',
         folder: 'deployment/api',
         content: `${phpHeader}
 $data = getJsonInput();
-$id = 'not_' . uniqid();
-$stmt = $conn->prepare("INSERT INTO notifications (id, from_id, from_name, to_id, type, message) VALUES (?, ?, ?, ?, 'connection_request', ?)");
-$stmt->execute([$id, getV($data, 'parentId'), getV($data, 'parentName'), getV($data, 'studentId'), "wants to link as your guardian."]);
-echo json_encode(["status" => "success"]);`
+if (!$data) sendError("Request data missing");
+try {
+    $id = 'not_' . uniqid();
+    $stmt = $conn->prepare("INSERT INTO notifications (id, from_id, from_name, to_id, type, message) VALUES (?, ?, ?, ?, 'connection_request', ?)");
+    $stmt->execute([$id, getV($data, 'parentId'), getV($data, 'parentName'), getV($data, 'studentId'), "wants to link as your guardian."]);
+    sendSuccess();
+} catch (Exception $e) { sendError($e->getMessage(), 500); }`
     },
     {
         name: 'respond_request.php',
         folder: 'deployment/api',
         content: `${phpHeader}
 $data = getJsonInput();
-$notId = getV($data, 'notificationId');
-$action = getV($data, 'action');
-if ($action === 'ACCEPT') {
-    $not = $conn->query("SELECT from_id, to_id FROM notifications WHERE id='$notId'")->fetch();
-    $conn->prepare("UPDATE users SET parent_id=? WHERE id=?")->execute([$not['from_id'], $not['to_id']]);
-    $conn->prepare("UPDATE users SET linked_student_id=? WHERE id=?")->execute([$not['to_id'], $not['from_id']]);
-}
-$conn->prepare("DELETE FROM notifications WHERE id=?")->execute([$notId]);
-echo json_encode(["status" => "success"]);`
+if (!$data) sendError("Response data missing");
+try {
+    $notId = getV($data, 'notificationId');
+    $action = getV($data, 'action');
+    if ($action === 'ACCEPT') {
+        $not = $conn->query("SELECT from_id, to_id FROM notifications WHERE id='$notId'")->fetch();
+        if ($not) {
+            $conn->prepare("UPDATE users SET parent_id=? WHERE id=?")->execute([$not['from_id'], $not['to_id']]);
+            $conn->prepare("UPDATE users SET linked_student_id=? WHERE id=?")->execute([$not['to_id'], $not['from_id']]);
+        }
+    }
+    $conn->prepare("DELETE FROM notifications WHERE id=?")->execute([$notId]);
+    sendSuccess();
+} catch (Exception $e) { sendError($e->getMessage(), 500); }`
     },
     {
         name: 'get_psychometric.php',
         folder: 'deployment/api',
         content: `${phpHeader}
-$stmt = $conn->prepare("SELECT report_json FROM psychometric_reports WHERE user_id = ?");
-$stmt->execute([$_GET['user_id']]);
-echo json_encode(["report" => json_decode($stmt->fetchColumn())]);`
+try {
+    $stmt = $conn->prepare("SELECT report_json FROM psychometric_reports WHERE user_id = ?");
+    $stmt->execute([$_GET['user_id']]);
+    echo json_encode(["report" => json_decode($stmt->fetchColumn())]);
+} catch (Exception $e) { sendError($e->getMessage(), 500); }`
     },
     {
         name: 'save_psychometric.php',
         folder: 'deployment/api',
         content: `${phpHeader}
 $data = getJsonInput();
-$stmt = $conn->prepare("INSERT INTO psychometric_reports (user_id, report_json) VALUES (?, ?) ON DUPLICATE KEY UPDATE report_json = VALUES(report_json)");
-$stmt->execute([getV($data, 'user_id'), json_encode(getV($data, 'report'))]);
-echo json_encode(["status" => "success"]);`
+if (!$data) sendError("Report data missing");
+try {
+    $stmt = $conn->prepare("INSERT INTO psychometric_reports (user_id, report_json) VALUES (?, ?) ON DUPLICATE KEY UPDATE report_json = VALUES(report_json)");
+    $stmt->execute([getV($data, 'user_id'), json_encode(getV($data, 'report'))]);
+    sendSuccess();
+} catch (Exception $e) { sendError($e->getMessage(), 500); }`
     },
     {
         name: 'delete_account.php',
         folder: 'deployment/api',
         content: `${phpHeader}
-$conn->prepare("DELETE FROM users WHERE id = ?")->execute([$_GET['id']]);
-echo json_encode(["status" => "success"]);`
+try {
+    $id = $_GET['id'] ?? '';
+    $conn->prepare("DELETE FROM users WHERE id = ?")->execute([$id]);
+    sendSuccess();
+} catch (Exception $e) { sendError($e->getMessage(), 500); }`
     },
     {
         name: 'upload_avatar.php',
         folder: 'deployment/api',
         content: `${phpHeader}
 $data = getJsonInput();
-$conn->prepare("UPDATE users SET avatar_url = ? WHERE id = ?")->execute([getV($data, 'url'), getV($data, 'id')]);
-echo json_encode(["status" => "success"]);`
+if (!$data) sendError("Avatar data missing");
+try {
+    $conn->prepare("UPDATE users SET avatar_url = ? WHERE id = ?")->execute([getV($data, 'url'), getV($data, 'id')]);
+    sendSuccess();
+} catch (Exception $e) { sendError($e->getMessage(), 500); }`
     },
     {
         name: 'get_topics.php',
         folder: 'deployment/api',
         content: `${phpHeader}
-echo json_encode($conn->query("SELECT * FROM topics")->fetchAll());`
+try {
+    echo json_encode($conn->query("SELECT * FROM topics")->fetchAll());
+} catch (Exception $e) { sendError($e->getMessage(), 500); }`
     },
     {
         name: 'get_attempt_details.php',
         folder: 'deployment/api',
         content: `${phpHeader}
-$stmt = $conn->prepare("SELECT * FROM test_attempts WHERE id = ?");
-$stmt->execute([$_GET['id']]);
-$row = $stmt->fetch();
-if($row) { $row['detailed_results'] = json_decode($row['detailed_results']); }
-echo json_encode($row);`
+try {
+    $stmt = $conn->prepare("SELECT * FROM test_attempts WHERE id = ?");
+    $stmt->execute([$_GET['id']]);
+    $row = $stmt->fetch();
+    if($row) { $row['detailed_results'] = json_decode($row['detailed_results']); }
+    echo json_encode($row);
+} catch (Exception $e) { sendError($e->getMessage(), 500); }`
     },
     {
         name: 'manage_chapter_test.php',
@@ -513,20 +611,26 @@ echo json_encode(["status" => "success", "msg" => "Endpoint mapped to save_attem
         folder: 'deployment/api',
         content: `${phpHeader}
 $data = getJsonInput();
-$stmt = $conn->prepare("SELECT * FROM users WHERE email = ?");
-$stmt->execute([getV($data, 'email')]);
-$user = $stmt->fetch();
-if ($user) { echo json_encode(["status" => "success", "user" => $user]); }
-else { echo json_encode(["status" => "error", "msg" => "Create account first"]); }`
+if (!$data) sendError("Google identity required");
+try {
+    $stmt = $conn->prepare("SELECT * FROM users WHERE email = ?");
+    $stmt->execute([getV($data, 'email')]);
+    $user = $stmt->fetch();
+    if ($user) { sendSuccess(["user" => $user]); }
+    else { sendError("Create account first", 404); }
+} catch (Exception $e) { sendError($e->getMessage(), 500); }`
     },
     {
         name: 'update_password.php',
         folder: 'deployment/api',
         content: `${phpHeader}
 $data = getJsonInput();
-$hash = password_hash(getV($data, 'newPassword'), PASSWORD_BCRYPT);
-$conn->prepare("UPDATE users SET password_hash=? WHERE id=?")->execute([$hash, getV($data, 'userId')]);
-echo json_encode(["status" => "success"]);`
+if (!$data) sendError("Password data required");
+try {
+    $hash = password_hash(getV($data, 'newPassword'), PASSWORD_BCRYPT);
+    $conn->prepare("UPDATE users SET password_hash=? WHERE id=?")->execute([$hash, getV($data, 'userId')]);
+    sendSuccess();
+} catch (Exception $e) { sendError($e->getMessage(), 500); }`
     }
 ];
 
