@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { getBackendFiles, generateSQLSchema } from '../services/generatorService';
-import { Download, Server, BookOpen, Package, FileText, Folder, ArrowRight, ShieldCheck, Database, Layout, Activity, PlugZap, CheckCircle2, XCircle, Lock, AlertTriangle, RefreshCw, List, ChevronDown, ChevronUp, Table as TableIcon, Layers, Info } from 'lucide-react';
+import { Download, Server, BookOpen, Package, FileText, Folder, ArrowRight, ShieldCheck, Database, Layout, Activity, PlugZap, CheckCircle2, XCircle, Lock, AlertTriangle, RefreshCw, List, ChevronDown, ChevronUp, Table as TableIcon, Layers, Info, Filter, FileJson } from 'lucide-react';
 import JSZip from 'jszip';
 
 export const DeploymentScreen: React.FC = () => {
@@ -10,6 +10,7 @@ export const DeploymentScreen: React.FC = () => {
     const [dbConfig, setDbConfig] = useState({ host: "localhost", name: "u123456789_iitjee", user: "u123456789_admin", pass: "" });
     const [isZipping, setIsZipping] = useState(false);
     const [integrityResults, setIntegrityResults] = useState<any[]>([]);
+    const [integrityFilter, setIntegrityFilter] = useState<'ALL' | 'PASS' | '500' | 'CRASH_ERR'>('ALL');
     const [dbTables, setDbTables] = useState<any[]>([]);
     const [scanning, setScanning] = useState(false);
     const [scanningDb, setScanningDb] = useState(false);
@@ -74,6 +75,29 @@ export const DeploymentScreen: React.FC = () => {
         setScanning(false);
     };
 
+    const exportJsonReport = () => {
+        if (integrityResults.length === 0) {
+            alert("Please run a scan first before exporting.");
+            return;
+        }
+        const report = {
+            metadata: {
+                timestamp: new Date().toISOString(),
+                version: "13.0 Ultimate Sync Core",
+                totalFiles: API_FILES.length,
+                dbStatus: dbTables.length > 0 ? 'CONNECTED' : 'DISCONNECTED'
+            },
+            results: integrityResults
+        };
+        const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `IITGEE_Integrity_Report_${new Date().toISOString().split('T')[0]}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+    };
+
     const scanDatabase = async () => {
         setScanningDb(true);
         setDbTables([]);
@@ -130,6 +154,14 @@ export const DeploymentScreen: React.FC = () => {
         setIsZipping(false);
     };
 
+    const filteredIntegrity = integrityResults.filter(res => {
+        if (integrityFilter === 'ALL') return true;
+        if (integrityFilter === 'PASS') return res.status === 'OK';
+        if (integrityFilter === '500') return res.code === 500;
+        if (integrityFilter === 'CRASH_ERR') return ['CRASH', 'DB_ERROR', 'NET_ERR', 'ERROR'].includes(res.status);
+        return true;
+    });
+
     return (
         <div className="space-y-8 animate-in fade-in pb-12">
             <div className="bg-slate-900 rounded-2xl p-8 text-white shadow-xl relative overflow-hidden">
@@ -181,12 +213,34 @@ export const DeploymentScreen: React.FC = () => {
                     </div>
 
                     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-                        <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
-                            <div><h3 className="text-lg font-bold text-slate-800 flex items-center gap-2"><Activity className="text-orange-500" size={20}/> Module Integrity Scan (v13.0)</h3><p className="text-sm text-slate-500">Checking for syntax stability across the full 38-file set.</p></div>
-                            <button onClick={runIntegrityScan} disabled={scanning} className="bg-orange-600 hover:bg-orange-700 text-white px-6 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all active:scale-95 disabled:opacity-50">{scanning ? <RefreshCw className="animate-spin" size={18}/> : <Activity size={18}/>} Full Set Scan</button>
+                        <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+                            <div>
+                                <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                                    <Activity className="text-orange-500" size={20}/> 
+                                    Module Integrity Scan
+                                </h3>
+                                <p className="text-sm text-slate-500">Checking for syntax stability across the full 38-file set.</p>
+                            </div>
+                            <div className="flex gap-2">
+                                <button onClick={exportJsonReport} disabled={integrityResults.length === 0} className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-6 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50">
+                                    <FileJson size={18}/> Export JSON
+                                </button>
+                                <button onClick={runIntegrityScan} disabled={scanning} className="bg-orange-600 hover:bg-orange-700 text-white px-6 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50">
+                                    {scanning ? <RefreshCw className="animate-spin" size={18}/> : <Activity size={18}/>} Full Set Scan
+                                </button>
+                            </div>
                         </div>
+
+                        {/* Filter Bar */}
+                        <div className="flex flex-wrap gap-2 mb-6 bg-slate-50 p-2 rounded-xl border border-slate-100">
+                             <button onClick={() => setIntegrityFilter('ALL')} className={`flex-1 min-w-[80px] py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${integrityFilter === 'ALL' ? 'bg-slate-800 text-white' : 'bg-white text-slate-500 hover:bg-slate-100'}`}>All</button>
+                             <button onClick={() => setIntegrityFilter('PASS')} className={`flex-1 min-w-[80px] py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${integrityFilter === 'PASS' ? 'bg-emerald-600 text-white' : 'bg-white text-slate-500 hover:bg-slate-100'}`}>Pass</button>
+                             <button onClick={() => setIntegrityFilter('500')} className={`flex-1 min-w-[80px] py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${integrityFilter === '500' ? 'bg-rose-600 text-white' : 'bg-white text-slate-500 hover:bg-slate-100'}`}>HTTP 500</button>
+                             <button onClick={() => setIntegrityFilter('CRASH_ERR')} className={`flex-1 min-w-[80px] py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${integrityFilter === 'CRASH_ERR' ? 'bg-red-800 text-white' : 'bg-white text-slate-500 hover:bg-slate-100'}`}>Crash / Error</button>
+                        </div>
+
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {integrityResults.map(res => {
+                            {filteredIntegrity.map(res => {
                                 const info = getStatusInfo(res.code, res.text);
                                 return (
                                     <div key={res.file} className={`p-4 rounded-2xl border flex flex-col justify-between transition-all hover:shadow-md ${res.status === 'OK' ? 'bg-emerald-50/50 border-emerald-100' : 'bg-rose-50/50 border-rose-100'}`}>
@@ -197,6 +251,11 @@ export const DeploymentScreen: React.FC = () => {
                                     </div>
                                 );
                             })}
+                            {filteredIntegrity.length === 0 && (
+                                <div className="col-span-full py-12 text-center text-slate-400 italic">
+                                    No files match the selected filter.
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
