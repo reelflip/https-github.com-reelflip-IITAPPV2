@@ -110,7 +110,7 @@ export const Navigation: React.FC<NavigationProps> = ({ currentScreen, setScreen
         </h1>
         <div className="flex items-center gap-2 mt-1">
           <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1.5 py-0.5 bg-slate-800 rounded">{user?.role || 'STUDENT'}</p>
-          <span className="text-[10px] text-slate-600">• v12.28</span>
+          <span className="text-[10px] text-slate-600">• v12.29</span>
         </div>
       </div>
 
