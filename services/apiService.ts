@@ -1,8 +1,9 @@
 
 /**
- * IITGEEPrep Production API Bridge v17.0
- * STRICT LIVE-ONLY MODE - NO MOCKING
+ * IITGEEPrep Strict Server Sync Engine v18.0
+ * MODE: EXCLUSIVELY SERVER-SIDE (NO LOCAL FALLBACK)
  */
+
 export const apiService = {
     async request(endpoint: string, options: RequestInit = {}) {
         const url = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
@@ -13,38 +14,33 @@ export const apiService = {
                 headers: {
                     'Content-Type': 'application/json',
                     'Accept': 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest',
                     ...(options.headers || {})
                 }
             });
 
+            // If the server returns 404, the API folder or file is missing
+            if (res.status === 404) {
+                throw new Error(`API_NOT_FOUND: The endpoint ${endpoint} was not found on the server.`);
+            }
+
             const text = await res.text();
             let json;
+            
             try {
                 json = JSON.parse(text);
             } catch (e) {
-                // This is a critical point: The server returned HTML/Text instead of JSON (likely a 404 or 500)
-                throw {
-                    status: res.status,
-                    statusText: res.statusText,
-                    raw: text,
-                    isHtml: text.includes('<!DOCTYPE html>') || text.includes('<?php'),
-                    message: `Server returned non-JSON response (HTTP ${res.status})`
-                };
+                // If it's not JSON, the server likely returned an HTML error page (like a 404 or 500)
+                throw new Error(`NON_JSON_RESPONSE: Server returned a non-JSON response (HTTP ${res.status}). Ensure backend files are uploaded to the /api/ directory.`);
             }
 
             if (!res.ok) {
-                throw {
-                    status: res.status,
-                    message: json.message || `Server Error ${res.status}`,
-                    details: json.details || null,
-                    raw: json
-                };
+                throw new Error(json.message || `SERVER_ERROR: ${res.status} ${res.statusText}`);
             }
 
             return json;
         } catch (error: any) {
-            // Propagate the real network error or the parsed server error
+            // Re-throw to be handled by the UI (App.tsx / SyncStatusBadge)
+            console.error(`Strict Sync Error [${endpoint}]:`, error.message || error);
             throw error;
         }
     }

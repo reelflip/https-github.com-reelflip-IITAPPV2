@@ -3,7 +3,7 @@ import { SYLLABUS_DATA } from '../lib/syllabusData';
 
 const phpHeader = `<?php
 /**
- * IITGEEPrep Unified Sync Engine v17.1
+ * IITGEEPrep Unified Sync Engine v17.3
  * PRODUCTION CORE - STRICT MYSQL PDO
  */
 error_reporting(E_ALL);
@@ -63,6 +63,14 @@ export const API_FILES_LIST = [
 
 export const getBackendFiles = (dbConfig: any) => {
     const files = [
+    {
+        name: '.htaccess',
+        folder: 'deployment/api',
+        content: `RewriteEngine On
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)$ index.php [QSA,L]`
+    },
     {
         name: 'config.php',
         folder: 'deployment/api',
@@ -141,9 +149,19 @@ try {
     }
 
     // 4. Backlogs
-    $stmt = $conn->prepare("SELECT * FROM backlogs WHERE user_id = ?");
+    $stmt = $conn->prepare("SELECT id, topic, subject, priority, deadline, status FROM backlogs WHERE user_id = ?");
     $stmt->execute([$user_id]);
-    $backlogs = $stmt->fetchAll();
+    $backlogs = [];
+    foreach($stmt->fetchAll() as $row) {
+        $backlogs[] = [
+            "id" => $row['id'],
+            "topic" => $row['topic'],
+            "subject" => $row['subject'],
+            "priority" => $row['priority'],
+            "deadline" => $row['deadline'],
+            "status" => $row['status']
+        ];
+    }
 
     // 5. Timetable
     $stmt = $conn->prepare("SELECT config_json, slots_json FROM timetables WHERE user_id = ?");
@@ -181,7 +199,14 @@ try {
         id, user_id, test_id, title, score, total_marks, accuracy, 
         total_questions, correct_count, incorrect_count, unattempted_count, 
         topic_id, difficulty, detailed_results, date
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON DUPLICATE KEY UPDATE 
+        score = VALUES(score), 
+        accuracy = VALUES(accuracy),
+        correct_count = VALUES(correct_count),
+        incorrect_count = VALUES(incorrect_count),
+        unattempted_count = VALUES(unattempted_count),
+        detailed_results = VALUES(detailed_results)";
     
     $stmt = $conn->prepare($sql);
     $stmt->execute([
@@ -206,7 +231,7 @@ try {
 } catch(Exception $e) { sendError("PERSISTENCE_FAILURE", 500, $e->getMessage()); }`
     },
     {
-        name: 'save_timetable.php',
+        name: 'sync_progress.php',
         folder: 'deployment/api',
         content: `${phpHeader}
 if(!$conn) sendError("DATABASE_OFFLINE", 500, $db_error);
@@ -214,53 +239,27 @@ $input = getJsonInput();
 if(!$input || !isset($input->userId)) sendError("MISSING_DATA");
 
 try {
-    $stmt = $conn->prepare("INSERT INTO timetables (user_id, config_json, slots_json) 
-                            VALUES (?, ?, ?) 
-                            ON DUPLICATE KEY UPDATE config_json = VALUES(config_json), slots_json = VALUES(slots_json)");
+    $sql = "INSERT INTO user_progress (user_id, topic_id, status, last_revised, revision_level, next_revision_date, solved_questions_json) 
+            VALUES (:uid, :tid, :status, :lr, :rl, :nrd, :sqj) 
+            ON DUPLICATE KEY UPDATE 
+            status = VALUES(status), 
+            last_revised = VALUES(last_revised), 
+            revision_level = VALUES(revision_level), 
+            next_revision_date = VALUES(next_revision_date),
+            solved_questions_json = VALUES(solved_questions_json)";
+    
+    $stmt = $conn->prepare($sql);
     $stmt->execute([
-        $input->userId,
-        json_encode($input->config),
-        json_encode($input->slots)
+        ':uid' => $input->userId,
+        ':tid' => $input->topicId,
+        ':status' => $input->status,
+        ':lr' => $input->lastRevised ?? null,
+        ':rl' => $input->revisionLevel ?? 0,
+        ':nrd' => $input->nextRevisionDate ?? null,
+        ':sqj' => isset($input->solvedQuestions) ? json_encode($input->solvedQuestions) : null
     ]);
-    sendSuccess();
-} catch(Exception $e) { sendError($e->getMessage(), 500); }`
-    },
-    {
-        name: 'save_psychometric.php',
-        folder: 'deployment/api',
-        content: `${phpHeader}
-if(!$conn) sendError("DATABASE_OFFLINE", 500, $db_error);
-$input = getJsonInput();
-if(!$input || !isset($input->user_id)) sendError("MISSING_DATA");
 
-try {
-    $stmt = $conn->prepare("INSERT INTO psychometric_reports (user_id, report_json) 
-                            VALUES (?, ?) 
-                            ON DUPLICATE KEY UPDATE report_json = VALUES(report_json)");
-    $stmt->execute([ $input->user_id, json_encode($input->report) ]);
-    sendSuccess();
-} catch(Exception $e) { sendError($e->getMessage(), 500); }`
-    },
-    {
-        name: 'manage_goals.php',
-        folder: 'deployment/api',
-        content: `${phpHeader}
-if(!$conn) sendError("DATABASE_OFFLINE", 500, $db_error);
-
-try {
-    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        $input = getJsonInput();
-        $stmt = $conn->prepare("INSERT INTO goals (id, user_id, text, completed) VALUES (?, ?, ?, ?) 
-                                ON DUPLICATE KEY UPDATE completed = VALUES(completed)");
-        $stmt->execute([$input->id, $input->userId, $input->text, $input->completed ? 1 : 0]);
-        sendSuccess();
-    }
-    if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
-        $id = $_GET['id'];
-        $stmt = $conn->prepare("DELETE FROM goals WHERE id = ?");
-        $stmt->execute([$id]);
-        sendSuccess();
-    }
+    sendSuccess(["status" => "SYNCED"]);
 } catch(Exception $e) { sendError($e->getMessage(), 500); }`
     }
 ];
@@ -279,7 +278,7 @@ try {
 };
 
 export const generateSQLSchema = () => {
-    return `-- IITGEEPrep Master Schema v17.1
+    return `-- IITGEEPrep Master Schema v17.3
 CREATE TABLE IF NOT EXISTS users (
     id VARCHAR(255) PRIMARY KEY,
     name VARCHAR(255) NOT NULL,

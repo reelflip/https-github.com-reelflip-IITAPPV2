@@ -42,13 +42,14 @@ const ADMIN_MENU: {id: Screen, icon: any, label: string}[] = [
   { id: 'users', icon: Users, label: "User Management" },
   { id: 'inbox', icon: Inbox, label: "Inbox" },
   { id: 'syllabus_admin', icon: BookOpen, label: "Syllabus" },
-  { id: 'tests', icon: FileText, label: "Tests" },
+  { id: 'tests_admin', icon: FileText, label: "Tests" },
   { id: 'content', icon: Layers, label: "Content" },
   { id: 'blog_admin', icon: PenTool, label: "Blog" },
   { id: 'analytics', icon: BarChart2, label: "Analytics" },
   { id: 'diagnostics', icon: Activity, label: "Diagnostics" },
   { id: 'system', icon: Settings, label: "System" },
   { id: 'deployment', icon: UploadCloud, label: "Deploy" },
+  { id: 'profile', icon: UserIcon, label: "Profile" },
 ];
 
 const PARENT_MENU: {id: Screen, icon: any, label: string}[] = [
@@ -60,11 +61,9 @@ const PARENT_MENU: {id: Screen, icon: any, label: string}[] = [
 ];
 
 const getMenu = (role?: string) => {
-  switch(role) {
-    case 'ADMIN': return ADMIN_MENU;
-    case 'PARENT': return PARENT_MENU;
-    default: return STUDENT_MENU;
-  }
+  if (role?.startsWith('ADMIN')) return ADMIN_MENU;
+  if (role === 'PARENT') return PARENT_MENU;
+  return STUDENT_MENU;
 };
 
 const NavItem: React.FC<NavItemProps> = ({ id, icon: Icon, label, isActive, onClick, hasNotification }) => (
@@ -96,7 +95,7 @@ export const Navigation: React.FC<NavigationProps> = ({ currentScreen, setScreen
         </h1>
         <div className="flex items-center gap-2 mt-1">
           <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1.5 py-0.5 bg-slate-800 rounded">{user?.role || 'STUDENT'}</p>
-          <span className="text-[10px] text-slate-600">• v17.0</span>
+          <span className="text-[10px] text-slate-600">• v17.5</span>
         </div>
       </div>
 

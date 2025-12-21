@@ -43,7 +43,7 @@ const ParentFamilyScreen = lazy(() => import('./screens/ParentFamilyScreen').the
 const LoadingView = () => (
   <div className="flex flex-col items-center justify-center min-h-[60vh] text-slate-400">
     <div className="w-10 h-10 border-4 border-slate-200 border-t-violet-600 rounded-full animate-spin mb-4"></div>
-    <p className="text-xs font-bold uppercase tracking-widest">Resuming Prep Node...</p>
+    <p className="text-xs font-bold uppercase tracking-widest">Master Node v18.0 Handshake...</p>
   </div>
 );
 
@@ -55,7 +55,8 @@ const App: React.FC = () => {
 
   const [currentScreen, setScreen] = useState<Screen>(() => {
     const saved = localStorage.getItem('last_screen');
-    return (saved as Screen) || 'dashboard';
+    if (saved) return saved as Screen;
+    return user?.role.includes('ADMIN') ? 'overview' : 'dashboard';
   });
 
   const [globalSyncStatus, setGlobalSyncStatus] = useState<SyncStatus>('IDLE');
@@ -65,9 +66,12 @@ const App: React.FC = () => {
   const [backlogs, setBacklogs] = useState<BacklogItem[]>([]);
   const [timetable, setTimetable] = useState<{config?: TimetableConfig, slots?: any[]}>({});
   const [psychReport, setPsychReport] = useState<PsychometricReport | null>(null);
+  
   const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
   const [hacks, setHacks] = useState<MemoryHack[]>([]);
   const [blogs, setBlogs] = useState<BlogPost[]>([]);
+  const [questionBank, setQuestionBank] = useState<Question[]>(() => generateInitialQuestionBank());
+  const [tests, setTests] = useState<Test[]>(MOCK_TESTS_DATA);
 
   const loadData = useCallback(async (userId: string) => {
     setGlobalSyncStatus('SYNCING');
@@ -87,8 +91,9 @@ const App: React.FC = () => {
         setPsychReport(data.psychometric || null);
         
         setGlobalSyncStatus('SYNCED');
-    } catch (e) { 
-        console.error("Master Sync Failure:", e);
+    } catch (e: any) { 
+        const errorMsg = e.message || (typeof e === 'string' ? e : JSON.stringify(e));
+        console.error("Master Sync Failure:", errorMsg);
         setGlobalSyncStatus('ERROR'); 
     }
   }, []);
@@ -96,84 +101,151 @@ const App: React.FC = () => {
   useEffect(() => { if (user) loadData(user.id); }, [user?.id, loadData]);
   useEffect(() => { localStorage.setItem('last_screen', currentScreen); }, [currentScreen]);
 
+  // --- STRICT SERVER PERSISTENCE HANDLERS ---
+
   const updateProgress = async (topicId: string, updates: Partial<UserProgress>) => {
     setGlobalSyncStatus('SYNCING');
     const existing = progress[topicId] || { topicId, status: 'NOT_STARTED', lastRevised: null, revisionLevel: 0, nextRevisionDate: null, solvedQuestions: [] };
     const updated = { ...existing, ...updates };
-    setProgress(prev => ({ ...prev, [topicId]: updated }));
     try {
         await apiService.request('/api/sync_progress.php', { method: 'POST', body: JSON.stringify({ userId: user?.id, ...updated }) });
+        setProgress(prev => ({ ...prev, [topicId]: updated }));
         setGlobalSyncStatus('SYNCED');
     } catch (e) { setGlobalSyncStatus('ERROR'); }
   };
 
   const addTestAttempt = async (attempt: TestAttempt) => {
     setGlobalSyncStatus('SYNCING');
-    setTestAttempts(prev => [attempt, ...prev]);
     try {
         await apiService.request('/api/save_attempt.php', { method: 'POST', body: JSON.stringify({ ...attempt, userId: user?.id }) });
+        setTestAttempts(prev => [attempt, ...prev]);
         setGlobalSyncStatus('SYNCED');
     } catch (e) { setGlobalSyncStatus('ERROR'); }
   };
 
   const saveTimetable = async (config: TimetableConfig, slots: any[]) => {
     setGlobalSyncStatus('SYNCING');
-    setTimetable({ config, slots });
     try {
         await apiService.request('/api/save_timetable.php', { method: 'POST', body: JSON.stringify({ userId: user?.id, config, slots }) });
-        setGlobalSyncStatus('SYNCED');
-    } catch (e) { setGlobalSyncStatus('ERROR'); }
-  };
-
-  const toggleGoal = async (id: string) => {
-    setGlobalSyncStatus('SYNCING');
-    const updatedGoals = goals.map(g => g.id === id ? { ...g, completed: !g.completed } : g);
-    const target = updatedGoals.find(g => g.id === id);
-    setGoals(updatedGoals);
-    try {
-        await apiService.request('/api/manage_goals.php', { method: 'POST', body: JSON.stringify({ ...target, userId: user?.id }) });
+        setTimetable({ config, slots });
         setGlobalSyncStatus('SYNCED');
     } catch (e) { setGlobalSyncStatus('ERROR'); }
   };
 
   const addGoal = async (text: string) => {
     setGlobalSyncStatus('SYNCING');
-    const newGoal = { id: `g_${Date.now()}`, text, completed: false };
-    setGoals(prev => [...prev, newGoal]);
+    const newGoal: Goal = { id: `g_${Date.now()}`, text, completed: false };
     try {
         await apiService.request('/api/manage_goals.php', { method: 'POST', body: JSON.stringify({ ...newGoal, userId: user?.id }) });
+        setGoals(prev => [...prev, newGoal]);
         setGlobalSyncStatus('SYNCED');
     } catch (e) { setGlobalSyncStatus('ERROR'); }
   };
 
+  const toggleGoal = async (id: string) => {
+    setGlobalSyncStatus('SYNCING');
+    const target = goals.find(g => g.id === id);
+    if (!target) return;
+    const updated = { ...target, completed: !target.completed };
+    try {
+        await apiService.request('/api/manage_goals.php', { method: 'POST', body: JSON.stringify({ ...updated, userId: user?.id }) });
+        setGoals(prev => prev.map(g => g.id === id ? updated : g));
+        setGlobalSyncStatus('SYNCED');
+    } catch (e) { setGlobalSyncStatus('ERROR'); }
+  };
+
+  const addBacklog = async (item: Omit<BacklogItem, 'id' | 'status'>) => {
+      setGlobalSyncStatus('SYNCING');
+      const newItem: BacklogItem = { ...item, id: `bl_${Date.now()}`, status: 'PENDING' };
+      try {
+          await apiService.request('/api/manage_backlogs.php', { method: 'POST', body: JSON.stringify({ ...newItem, userId: user?.id }) });
+          setBacklogs(prev => [...prev, newItem]);
+          setGlobalSyncStatus('SYNCED');
+      } catch (e) { setGlobalSyncStatus('ERROR'); }
+  };
+
+  const toggleBacklog = async (id: string) => {
+      setGlobalSyncStatus('SYNCING');
+      const target = backlogs.find(b => b.id === id);
+      if (!target) return;
+      const updated: BacklogItem = { ...target, status: target.status === 'COMPLETED' ? 'PENDING' : 'COMPLETED' };
+      try {
+          await apiService.request('/api/manage_backlogs.php', { method: 'POST', body: JSON.stringify({ ...updated, userId: user?.id }) });
+          setBacklogs(prev => prev.map(b => b.id === id ? updated : b));
+          setGlobalSyncStatus('SYNCED');
+      } catch (e) { setGlobalSyncStatus('ERROR'); }
+  };
+
+  const deleteBacklog = async (id: string) => {
+      setGlobalSyncStatus('SYNCING');
+      try {
+          await apiService.request(`/api/manage_backlogs.php?id=${id}`, { method: 'DELETE' });
+          setBacklogs(prev => prev.filter(b => b.id !== id));
+          setGlobalSyncStatus('SYNCED');
+      } catch (e) { setGlobalSyncStatus('ERROR'); }
+  };
+
   const handleSavePsychometric = async (report: PsychometricReport) => {
       setGlobalSyncStatus('SYNCING');
-      setPsychReport(report);
       try {
           await apiService.request('/api/save_psychometric.php', { method: 'POST', body: JSON.stringify({ user_id: user?.id, report }) });
+          setPsychReport(report);
           setGlobalSyncStatus('SYNCED');
       } catch (e) { setGlobalSyncStatus('ERROR'); }
   };
 
   const renderContent = () => {
-    const isAdmin = user?.role === 'ADMIN' || user?.role === 'ADMIN_EXECUTIVE';
+    const role = user?.role || 'STUDENT';
+    const isAdmin = role.includes('ADMIN');
     
+    // --- ROLE: ADMIN ROUTING ---
+    if (isAdmin) {
+        switch(currentScreen) {
+            case 'overview': return <AdminDashboardScreen user={user!} onNavigate={setScreen} />;
+            case 'users': return <AdminUserManagementScreen />;
+            case 'inbox': return <AdminInboxScreen />;
+            case 'syllabus_admin': return <AdminSyllabusScreen syllabus={SYLLABUS_DATA} onAddTopic={()=>{}} onDeleteTopic={()=>{}} />;
+            case 'tests_admin': return <AdminTestManagerScreen questionBank={questionBank} tests={tests} onAddQuestion={q => setQuestionBank([...questionBank, q])} onCreateTest={t => setTests([...tests, t])} onDeleteQuestion={id => setQuestionBank(questionBank.filter(q => q.id !== id))} onDeleteTest={id => setTests(tests.filter(t => t.id !== id))} syllabus={SYLLABUS_DATA} />;
+            case 'content': return <ContentManagerScreen flashcards={flashcards} hacks={hacks} blogs={blogs} onAddFlashcard={c => setFlashcards([...flashcards, {...c, id: Date.now()}])} onAddHack={h => setHacks([...hacks, {...h, id: Date.now()}])} onAddBlog={b => setBlogs([...blogs, {...b, id: Date.now(), date: new Date().toISOString()}])} onDelete={(t, id) => {}} />;
+            case 'blog_admin': return <AdminBlogScreen blogs={blogs} onAddBlog={b => setBlogs([b, ...blogs])} />;
+            case 'diagnostics': return <DiagnosticsScreen />;
+            case 'system': return <AdminSystemScreen />;
+            case 'deployment': return <DeploymentScreen />; // FIXED: Explicitly returns DeploymentScreen
+            case 'admin_analytics': return <AnalyticsScreen progress={progress} testAttempts={testAttempts} />;
+            case 'profile': return <ProfileScreen user={user!} onAcceptRequest={()=>{}} />;
+            default: return <AdminDashboardScreen user={user!} onNavigate={setScreen} />;
+        }
+    }
+
+    // --- ROLE: PARENT ROUTING ---
+    if (role === 'PARENT') {
+        switch(currentScreen) {
+            case 'dashboard': return <DashboardScreen user={user!} progress={progress} testAttempts={testAttempts} goals={goals} toggleGoal={toggleGoal} addGoal={addGoal} setScreen={setScreen} linkedPsychReport={psychReport || undefined} />;
+            case 'family': return <ParentFamilyScreen user={user!} onSendRequest={async ()=>({success:true, message: 'Request Sent'})} />;
+            case 'analytics': return <AnalyticsScreen progress={progress} testAttempts={testAttempts} />;
+            case 'tests': return <TestScreen user={user!} addTestAttempt={()=>{}} history={testAttempts} availableTests={[]} />;
+            case 'profile': return <ProfileScreen user={user!} onAcceptRequest={()=>{}} />;
+            default: return <DashboardScreen user={user!} progress={progress} testAttempts={testAttempts} goals={goals} toggleGoal={toggleGoal} addGoal={addGoal} setScreen={setScreen} />;
+        }
+    }
+
+    // --- ROLE: STUDENT ROUTING ---
     switch (currentScreen) {
-      case 'dashboard':
-      case 'overview':
-        return isAdmin 
-          ? <AdminDashboardScreen user={user!} onNavigate={setScreen} />
-          : <DashboardScreen user={user!} progress={progress} testAttempts={testAttempts} goals={goals} toggleGoal={toggleGoal} addGoal={addGoal} setScreen={setScreen} linkedPsychReport={psychReport || undefined} />;
-      
-      case 'syllabus': return <SyllabusScreen user={user!} subjects={SYLLABUS_DATA} progress={progress} onUpdateProgress={updateProgress} questionBank={generateInitialQuestionBank()} addTestAttempt={addTestAttempt} syncStatus={globalSyncStatus} />;
-      case 'tests': return <TestScreen user={user!} addTestAttempt={addTestAttempt} history={testAttempts} availableTests={MOCK_TESTS_DATA} />;
-      case 'psychometric': return <PsychometricScreen user={user!} reportData={psychReport || undefined} />;
+      case 'dashboard': return <DashboardScreen user={user!} progress={progress} testAttempts={testAttempts} goals={goals} toggleGoal={toggleGoal} addGoal={addGoal} setScreen={setScreen} linkedPsychReport={psychReport || undefined} />;
+      case 'syllabus': return <SyllabusScreen user={user!} subjects={SYLLABUS_DATA} progress={progress} onUpdateProgress={updateProgress} questionBank={questionBank} addTestAttempt={addTestAttempt} syncStatus={globalSyncStatus} showIndicators={true} />;
+      case 'tests': return <TestScreen user={user!} addTestAttempt={addTestAttempt} history={testAttempts} availableTests={tests} />;
+      case 'psychometric': return <PsychometricScreen user={user!} reportData={psychReport || undefined} onSaveReport={handleSavePsychometric} />;
       case 'timetable': return <TimetableScreen user={user!} savedConfig={timetable.config} savedSlots={timetable.slots} progress={progress} onSave={saveTimetable} />;
       case 'revision': return <RevisionScreen progress={progress} handleRevisionComplete={(id) => updateProgress(id, { lastRevised: new Date().toISOString() })} />;
-      case 'backlogs': return <BacklogScreen backlogs={backlogs} onAddBacklog={()=>{}} onToggleBacklog={()=>{}} onDeleteBacklog={()=>{}} />;
+      case 'backlogs': return <BacklogScreen backlogs={backlogs} onAddBacklog={addBacklog} onToggleBacklog={toggleBacklog} onDeleteBacklog={deleteBacklog} />;
+      case 'mistakes': return <MistakesScreen mistakes={[]} addMistake={()=>{}} />;
+      case 'flashcards': return <FlashcardScreen flashcards={flashcards} />;
+      case 'hacks': return <HacksScreen hacks={hacks} />;
+      case 'wellness': return <WellnessScreen />;
       case 'profile': return <ProfileScreen user={user!} onAcceptRequest={() => {}} onUpdateUser={upd => setUser({...user!, ...upd})} />;
       case 'analytics': return <AnalyticsScreen user={user!} progress={progress} testAttempts={testAttempts} />;
       case 'ai-tutor': return <AITutorChat isFullScreen={true} />;
+      case 'focus': return <FocusScreen />;
       default: return <DashboardScreen user={user!} progress={progress} testAttempts={testAttempts} goals={goals} toggleGoal={toggleGoal} addGoal={addGoal} setScreen={setScreen} />;
     }
   };
@@ -192,7 +264,7 @@ const App: React.FC = () => {
         <Suspense fallback={<LoadingView />}>{renderContent()}</Suspense>
       </main>
       <MobileNavigation currentScreen={currentScreen} setScreen={setScreen} logout={() => { setUser(null); localStorage.clear(); window.location.reload(); }} user={user} />
-      {user.role === 'STUDENT' && !['ai-tutor', 'tests', 'focus'].includes(currentScreen) && <AITutorChat />}
+      {user.role === 'STUDENT' && !['ai-tutor', 'tests', 'focus', 'psychometric'].includes(currentScreen) && <AITutorChat />}
     </div>
   );
 };
