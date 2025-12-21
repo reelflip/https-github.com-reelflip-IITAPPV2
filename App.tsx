@@ -49,7 +49,7 @@ const PublicBlogScreen = lazy(() => import('./screens/PublicBlogScreen').then(m 
 const LoadingView = () => (
   <div className="flex flex-col items-center justify-center min-h-[60vh] text-slate-400">
     <div className="w-10 h-10 border-4 border-slate-200 border-t-blue-600 rounded-full animate-spin mb-4"></div>
-    <p className="text-xs font-bold uppercase tracking-widest text-slate-500">Synchronizing v13.0 Core...</p>
+    <p className="text-xs font-bold uppercase tracking-widest text-slate-500">Synchronizing v13.5 Core...</p>
   </div>
 );
 
@@ -77,8 +77,14 @@ const App: React.FC = () => {
   const [hacks, setHacks] = useState<MemoryHack[]>([]);
   const [blogs, setBlogs] = useState<BlogPost[]>([]);
 
+  // Fix: Object literal may only specify known properties, but 'solved_questions_json' does not exist in type 'UserProgress'.
   const mapProgress = (p: any): UserProgress => ({
-    topicId: p.topic_id, status: p.status, lastRevised: p.last_revised, revisionLevel: Number(p.revision_level || 0), nextRevisionDate: p.next_revision_date, solvedQuestions: p.solved_questions_json ? JSON.parse(p.solved_questions_json) : []
+    topicId: p.topic_id,
+    status: p.status,
+    lastRevised: p.last_revised,
+    revisionLevel: Number(p.revision_level || 0),
+    nextRevisionDate: p.next_revision_date,
+    solvedQuestions: p.solved_questions_json ? JSON.parse(p.solved_questions_json) : []
   });
 
   const loadDashboard = useCallback(async (userId: string) => {
