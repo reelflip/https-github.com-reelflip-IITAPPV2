@@ -101,7 +101,7 @@ export const DiagnosticsScreen: React.FC = () => {
                             </div>
                             <div>
                                 <h2 className="text-3xl font-black uppercase tracking-tight">System Integrity Hub</h2>
-                                <p className="text-slate-400 text-sm font-bold uppercase tracking-widest">Diagnostic & Deployment Analyzer • v14.5</p>
+                                <p className="text-slate-400 text-sm font-bold uppercase tracking-widest">Diagnostic & Deployment Analyzer • v17.0</p>
                             </div>
                         </div>
                     </div>
@@ -263,7 +263,7 @@ export const DiagnosticsScreen: React.FC = () => {
                         </div>
                     </div>
                     <div className="lg:col-span-8 bg-white p-10 rounded-[3rem] border border-slate-200 shadow-sm">
-                        <h3 className="text-xl font-black uppercase text-slate-800 tracking-tighter mb-10 flex items-center gap-3"><Database className="text-indigo-600" size={24}/> SQL Registry (v14.5)</h3>
+                        <h3 className="text-xl font-black uppercase text-slate-800 tracking-tighter mb-10 flex items-center gap-3"><Database className="text-indigo-600" size={24}/> SQL Registry (v17.0)</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {dbTables.map(t => (
                                 <div key={t.name} className="flex justify-between items-center p-5 bg-slate-50 rounded-2xl border border-slate-100 shadow-sm group">

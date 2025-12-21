@@ -2,7 +2,7 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
-// IITGEEPrep v13.5 Build Config
+// IITGEEPrep v17.0 Build Config
 export default defineConfig({
   plugins: [react()],
   build: {

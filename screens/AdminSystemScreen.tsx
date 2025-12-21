@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Save, Bot, Zap, CheckCircle2, AlertCircle, MessageSquare, Loader2, Play, Check, Brain, Key, BarChart3, ToggleLeft, ToggleRight, Share2, Instagram, Facebook, Twitter, Youtube, Linkedin, ShieldCheck, Database, FileCode, RefreshCw, Activity, Terminal, ExternalLink, Sparkles, Send, ShieldAlert, Globe, Lock } from 'lucide-react';
 import { SocialConfig } from '../lib/types';
@@ -142,7 +143,7 @@ export const AdminSystemScreen: React.FC = () => {
     <div className="space-y-8 animate-in fade-in pb-12">
       <div className="bg-slate-900 rounded-2xl p-8 text-white shadow-xl relative overflow-hidden">
         <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-6">
-          <div><h2 className="text-3xl font-black flex items-center gap-3"><Activity className="text-blue-400" /> Admin System</h2><p className="text-slate-400 mt-2">v12.39 Sync Status Control</p></div>
+          <div><h2 className="text-3xl font-black flex items-center gap-3"><Activity className="text-blue-400" /> Admin System</h2><p className="text-slate-400 mt-2">v17.0 Sync Status Control</p></div>
           <div className="flex bg-slate-800/50 p-1 rounded-xl border border-slate-700/50">
              <button onClick={() => setActiveTab('ai')} className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'ai' ? 'bg-blue-600 text-white' : 'text-slate-400'}`}>AI</button>
              <button onClick={() => setActiveTab('auth')} className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'auth' ? 'bg-blue-600 text-white' : 'text-slate-400'}`}>Auth & Analytics</button>
@@ -165,7 +166,7 @@ export const AdminSystemScreen: React.FC = () => {
               <div className="bg-white rounded-2xl border border-slate-200 p-6">
                   <div className="flex items-center gap-3 mb-6"><Terminal className="text-slate-400" /> <h3 className="font-bold">AI Sandbox Verification</h3></div>
                   <div className="flex flex-col md:flex-row gap-6">
-                      <textarea value={testInput} onChange={e => setTestInput(e.target.value)} className="flex-1 p-4 bg-slate-50 border rounded-xl text-sm h-32" placeholder="Send a test doubt..."/>
+                      <textarea value={testInput} onChange={e => setTestInput(testInput)} className="flex-1 p-4 bg-slate-50 border rounded-xl text-sm h-32" placeholder="Send a test doubt..."/>
                       <div className="flex-1 bg-slate-50 rounded-xl p-4 border overflow-y-auto text-sm min-h-[128px]">{testResponse || 'No output.'}</div>
                   </div>
                   <div className="mt-6 flex justify-between items-center">
@@ -266,7 +267,7 @@ export const AdminSystemScreen: React.FC = () => {
       {activeTab === 'health' && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-in slide-in-from-bottom-4">
             <div className="bg-white rounded-2xl border border-slate-200 p-6">
-                <h3 className="font-black uppercase tracking-wider text-xs mb-6 flex items-center gap-2"><Database className="text-blue-500"/> Database Schema (v12.39)</h3>
+                <h3 className="font-black uppercase tracking-wider text-xs mb-6 flex items-center gap-2"><Database className="text-blue-500"/> Database Schema (v17.0)</h3>
                 <div className="space-y-3 max-h-[400px] overflow-y-auto">
                     {dbTables.map(t => (
                         <div key={t.name} className="flex justify-between p-3 bg-slate-50 rounded-lg border">

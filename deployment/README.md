@@ -1,5 +1,5 @@
 
-# IITGEEPrep Deployment Guide (v13.5)
+# IITGEEPrep Deployment Guide (v17.0)
 
 This guide explains how to deploy the IITGEEPrep application with its new **Granular Component Delivery** architecture to a LAMP stack server (e.g., Hostinger, Bluehost, AWS EC2).
 
@@ -39,7 +39,7 @@ Copy files from your **dist** folder to the server's **public_html** directory.
 ## 3. maintainability Features
 
 - **Granular Chunks**: If you only need to modify the logic for the "Test Center", you can find `screens/TestScreen.js` in your assets folder.
-- **Human Readable**: Files are not minified (v13.5+). You can read and edit them using any code editor.
+- **Human Readable**: Files are not minified (v17.0+). You can read and edit them using any code editor.
 - **Indentation**: All generated bundles follow standard indentation for clear debugging.
 
 ## 4. Troubleshooting the Granular Build

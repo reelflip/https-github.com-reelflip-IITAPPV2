@@ -3,14 +3,13 @@ import { SYLLABUS_DATA } from '../lib/syllabusData';
 
 const phpHeader = `<?php
 /**
- * IITGEEPrep Engine v16.1 - MySQL Production Core
- * HOSTINGER OPTIMIZED - NO MOCKING
+ * IITGEEPrep Unified Sync Engine v17.0
+ * PRODUCTION CORE - STRICT MYSQL PDO
  */
 error_reporting(E_ALL);
 ini_set('display_errors', 0);
 ini_set('log_errors', 1);
 
-// PRODUCTION CORS HEADERS
 header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, Accept");
@@ -23,10 +22,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 include_once 'config.php';
 
-/**
- * Standardized JSON Input Reader
- * Essential for modern React Fetch requests.
- */
 function getJsonInput() {
     $raw = file_get_contents('php://input');
     if (!$raw) return null;
@@ -47,7 +42,7 @@ function sendSuccess($data = []) {
 `;
 
 export const API_FILES_LIST = [
-    'index.php', 'config.php', 'cors.php', 'test_db.php', 'migrate_db.php', 'read_source.php',
+    'index.php', 'config.php', 'cors.php', 'test_db.php', 'migrate_db.php', 
     'login.php', 'register.php', 'google_login.php', 'update_password.php',
     'get_dashboard.php', 'sync_progress.php', 
     'save_attempt.php', 'save_timetable.php',
@@ -77,7 +72,6 @@ $conn = null;
 $db_error = null;
 
 try {
-    // REVERTED TO MYSQL (Hostinger Standard)
     $conn = new PDO("mysql:host=$host;dbname=$db_name;charset=utf8", $user, $pass);
     $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     $conn->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
@@ -90,69 +84,54 @@ try {
         name: 'test_db.php',
         folder: 'deployment/api',
         content: `${phpHeader}
-if (!$conn) {
-    sendError("DATABASE_CONNECTION_FAILED", 500, $db_error);
-}
-
+if (!$conn) sendError("DATABASE_CONNECTION_FAILED", 500, $db_error);
 try {
     $tables = [];
     $stmt = $conn->query("SHOW TABLES");
     while ($row = $stmt->fetch(PDO::FETCH_NUM)) {
         $name = $row[0];
         $countStmt = $conn->query("SELECT COUNT(*) FROM \`$name\`");
-        $count = $countStmt->fetchColumn();
-        $tables[] = ["name" => $name, "rows" => (int)$count];
+        $tables[] = ["name" => $name, "rows" => (int)$countStmt->fetchColumn()];
     }
-    sendSuccess(["status" => "CONNECTED", "engine" => "MySQL", "tables" => $tables]);
-} catch (Exception $e) {
-    sendError("QUERY_FAILED", 500, $e->getMessage());
-}`
-    },
-    {
-        name: 'save_psychometric.php',
-        folder: 'deployment/api',
-        content: `${phpHeader}
-if(!$conn) sendError("DATABASE_OFFLINE", 500, $db_error);
-$input = getJsonInput();
-if(!$input || !isset($input->user_id)) sendError("INVALID_INPUT", 400);
-
-try {
-    $stmt = $conn->prepare("INSERT INTO psychometric_reports (user_id, report_json) VALUES (?, ?) ON DUPLICATE KEY UPDATE report_json = VALUES(report_json)");
-    $stmt->execute([$input->user_id, json_encode($input->report)]);
-    sendSuccess();
-} catch(Exception $e) {
-    sendError($e->getMessage(), 500);
-}`
+    sendSuccess(["engine" => "MySQL", "tables" => $tables]);
+} catch (Exception $e) { sendError("QUERY_FAILED", 500, $e->getMessage()); }`
     },
     {
         name: 'get_psychometric.php',
         folder: 'deployment/api',
         content: `${phpHeader}
-if(!$conn) sendError("DATABASE_OFFLINE", 500, $db_error);
+if(!$conn) sendError("DB_OFFLINE", 500);
 $user_id = $_GET['user_id'] ?? null;
-if(!$user_id) sendError("MISSING_USER_ID", 400);
-
+if(!$user_id) sendError("MISSING_ID");
 try {
     $stmt = $conn->prepare("SELECT report_json FROM psychometric_reports WHERE user_id = ?");
     $stmt->execute([$user_id]);
     $row = $stmt->fetch();
-    if($row) {
-        sendSuccess(["report" => json_decode($row['report_json'])]);
-    } else {
-        sendSuccess(["report" => null]);
-    }
-} catch(Exception $e) {
-    sendError($e->getMessage(), 500);
-}`
+    sendSuccess(["report" => $row ? json_decode($row['report_json']) : null]);
+} catch(Exception $e) { sendError($e->getMessage(), 500); }`
+    },
+    {
+        name: 'save_psychometric.php',
+        folder: 'deployment/api',
+        content: `${phpHeader}
+if(!$conn) sendError("DB_OFFLINE", 500);
+$input = getJsonInput();
+if(!$input || !isset($input->user_id)) sendError("INVALID_PAYLOAD");
+try {
+    $stmt = $conn->prepare("INSERT INTO psychometric_reports (user_id, report_json) VALUES (?, ?) ON DUPLICATE KEY UPDATE report_json = VALUES(report_json)");
+    $stmt->execute([$input->user_id, json_encode($input->report)]);
+    sendSuccess();
+} catch(Exception $e) { sendError($e->getMessage(), 500); }`
     }
 ];
 
+    // Bulk Generate Consistent CRUD endpoints
     API_FILES_LIST.forEach(name => {
         if (!files.find(f => f.name === name)) {
             files.push({
                 name,
                 folder: 'deployment/api',
-                content: `${phpHeader}\n// MySQL Business logic for ${name}\nif(!$conn) sendError("DATABASE_OFFLINE", 500, $db_error);\n\n/**\n * Fixed: Only enforce JSON input on POST/PUT requests to avoid 400 on diagnostic probes\n */\n$input = null;\nif ($_SERVER['REQUEST_METHOD'] === 'POST' || $_SERVER['REQUEST_METHOD'] === 'PUT') {\n    $input = getJsonInput();\n    if(!$input) sendError("INVALID_JSON_INPUT", 400);\n}\n\nsendSuccess(["info" => "Production Endpoint Active", "method" => $_SERVER['REQUEST_METHOD']]);`
+                content: `${phpHeader}\n// Business Logic for ${name}\nif(!$conn) sendError("DATABASE_OFFLINE", 500, $db_error);\n\n$input = null;\nif ($_SERVER['REQUEST_METHOD'] === 'POST' || $_SERVER['REQUEST_METHOD'] === 'PUT') {\n    $input = getJsonInput();\n    if(!$input) sendError("INVALID_JSON_INPUT", 400);\n}\n\n// TODO: Implement specific logic for ${name}\nsendSuccess(["info" => "Endpoint Active", "method" => $_SERVER['REQUEST_METHOD']]);`
             });
         }
     });
@@ -161,15 +140,15 @@ try {
 };
 
 export const generateSQLSchema = () => {
-    return `-- IITGEEPrep v16.1 MySQL Schema
--- RUN IN PHPMYADMIN
+    return `-- IITGEEPrep Unified Schema v17.0
+-- IMPORT TO PHPMYADMIN (HOSTINGER)
 
 CREATE TABLE IF NOT EXISTS users (
     id VARCHAR(255) PRIMARY KEY,
-    name VARCHAR(255),
-    email VARCHAR(255) UNIQUE,
+    name VARCHAR(255) NOT NULL,
+    email VARCHAR(255) UNIQUE NOT NULL,
     password_hash VARCHAR(255),
-    role VARCHAR(50),
+    role VARCHAR(50) DEFAULT 'STUDENT',
     institute VARCHAR(255),
     target_exam VARCHAR(255),
     target_year INT,
@@ -185,9 +164,9 @@ CREATE TABLE IF NOT EXISTS user_progress (
     user_id VARCHAR(255),
     topic_id VARCHAR(255),
     status VARCHAR(50),
-    last_revised TIMESTAMP NULL DEFAULT NULL,
+    last_revised TIMESTAMP NULL,
     revision_level INT DEFAULT 0,
-    next_revision_date TIMESTAMP NULL DEFAULT NULL,
+    next_revision_date TIMESTAMP NULL,
     solved_questions_json LONGTEXT,
     UNIQUE KEY user_topic (user_id, topic_id),
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
@@ -217,5 +196,38 @@ CREATE TABLE IF NOT EXISTS psychometric_reports (
     report_json LONGTEXT,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS goals (
+    id VARCHAR(255) PRIMARY KEY,
+    user_id VARCHAR(255),
+    text TEXT,
+    completed TINYINT(1) DEFAULT 0,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS backlogs (
+    id VARCHAR(255) PRIMARY KEY,
+    user_id VARCHAR(255),
+    topic VARCHAR(255),
+    subject VARCHAR(50),
+    priority VARCHAR(20),
+    deadline DATE,
+    status VARCHAR(20) DEFAULT 'PENDING',
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS contacts (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255),
+    email VARCHAR(255),
+    subject VARCHAR(255),
+    message TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS settings (
+    setting_key VARCHAR(255) PRIMARY KEY,
+    setting_value TEXT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`;
 };
