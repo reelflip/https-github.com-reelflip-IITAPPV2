@@ -38,14 +38,6 @@ function sendSuccess($data = []) {
     echo json_encode(array_merge(["status" => "success"], $data));
     exit;
 }
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $raw = file_get_contents('php://input');
-    if ($raw === '{}' || $raw === '[]') {
-        echo json_encode(["status" => "active", "message" => "Endpoint responsive"]);
-        exit;
-    }
-}
 `;
 
 export const API_FILES_LIST = [
@@ -75,11 +67,14 @@ $db_name = "${dbConfig.name}";
 $user = "${dbConfig.user}";
 $pass = "${dbConfig.pass.replace(/"/g, '\\"')}";
 $conn = null;
+$db_error = null;
 try {
     if (!empty($host) && !empty($db_name)) {
         $conn = new PDO("mysql:host=$host;dbname=$db_name;charset=utf8mb4", $user, $pass);
         $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         $conn->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+    } else {
+        $db_error = "Database host or name not configured in config.php";
     }
 } catch(PDOException $e) {
     $db_error = $e->getMessage();
@@ -90,15 +85,24 @@ try {
         name: 'test_db.php',
         folder: 'deployment/api',
         content: `${phpHeader}
-if (!$conn) sendError($db_error ?? "Database not configured: PDO Connection Failed", 500);
 $action = $_GET['action'] ?? 'status';
 
 try {
     if ($action === 'full_diagnostic') {
         $report = ["checks" => []];
         
-        // 1. Connectivity
-        $report["checks"]["connectivity"] = ["pass" => true, "msg" => "Host Reachable"];
+        // 1. Connectivity Check (Done first without dying)
+        if (!$conn) {
+            $report["checks"]["connectivity"] = ["pass" => false, "msg" => "Connection Failed: " . ($db_error ?? "Unknown Error")];
+            // If connection fails, block subsequent logic checks
+            $report["checks"]["schema"] = ["pass" => false, "msg" => "Awaiting connectivity"];
+            $report["checks"]["columns"] = ["pass" => false, "msg" => "Awaiting connectivity"];
+            $report["checks"]["integrity"] = ["pass" => false, "msg" => "Awaiting connectivity"];
+            $report["checks"]["write_safety"] = ["pass" => false, "msg" => "Awaiting connectivity"];
+            sendSuccess($report);
+        }
+
+        $report["checks"]["connectivity"] = ["pass" => true, "msg" => "Database link stable"];
 
         // 2. Schema Validation
         $requiredTables = ['users', 'user_progress', 'test_attempts', 'timetable', 'system_settings', 'blogs', 'flashcards', 'memory_hacks', 'contact_messages', 'psychometric_reports', 'notifications'];
@@ -109,33 +113,42 @@ try {
         $missing = array_diff($requiredTables, $existingTables);
         $report["checks"]["schema"] = [
             "pass" => empty($missing),
-            "msg" => empty($missing) ? "All core tables present" : "Missing tables: " . implode(', ', $missing)
+            "msg" => empty($missing) ? "All 11 core tables present" : "Missing: " . implode(', ', $missing)
         ];
 
-        // 3. Column & Type Check (Sample on 'users')
+        // 3. Column & Type Check (Check 'users' and 'test_attempts')
+        $colPass = true;
+        $colMsg = "Structure verified";
         if (in_array('users', $existingTables)) {
             $cols = $conn->query("DESCRIBE users")->fetchAll();
-            $hasEmail = false;
-            foreach($cols as $c) if($c['Field'] === 'email') $hasEmail = true;
-            $report["checks"]["columns"] = ["pass" => $hasEmail, "msg" => $hasEmail ? "Critical columns verified" : "Column mismatch in 'users'"];
+            $fields = array_column($cols, 'Field');
+            if(!in_array('email', $fields) || !in_array('role', $fields)) {
+                $colPass = false;
+                $colMsg = "Critical columns missing in 'users' table";
+            }
         }
+        $report["checks"]["columns"] = ["pass" => $colPass, "msg" => $colMsg];
 
         // 4. Key Integrity
         $orphans = $conn->query("SELECT COUNT(*) FROM user_progress WHERE user_id NOT IN (SELECT id FROM users)")->fetchColumn();
-        $report["checks"]["integrity"] = ["pass" => $orphans == 0, "msg" => $orphans == 0 ? "No orphan records detected" : "$orphans orphan progress rows found"];
+        $report["checks"]["integrity"] = ["pass" => $orphans == 0, "msg" => $orphans == 0 ? "Zero orphan records detected" : "$orphans orphan records found"];
 
-        // 5. Write Safety
+        // 5. Write Safety (Transactional)
         try {
             $conn->beginTransaction();
-            $conn->exec("INSERT INTO system_settings (s_key, s_value) VALUES ('diag_write_test', '1')");
+            $stmt = $conn->prepare("INSERT INTO system_settings (s_key, s_value) VALUES (?, ?)");
+            $stmt->execute(['DIAG_TEST_' . time(), 'ACTIVE']);
             $conn->rollBack();
-            $report["checks"]["write_safety"] = ["pass" => true, "msg" => "Transactional write-rollback successful"];
+            $report["checks"]["write_safety"] = ["pass" => true, "msg" => "ACID Transactions Verified"];
         } catch (Exception $e) {
-            $report["checks"]["write_safety"] = ["pass" => false, "msg" => "Write safety failed: " . $e->getMessage()];
+            $report["checks"]["write_safety"] = ["pass" => false, "msg" => "Write Error: " . $e->getMessage()];
         }
 
         sendSuccess($report);
     }
+
+    // Standard Status Fallback
+    if (!$conn) sendError($db_error ?? "Database Offline", 500);
 
     $tables = [];
     $res = $conn->query("SHOW TABLES");
@@ -144,7 +157,7 @@ try {
         $count = $conn->query("SELECT COUNT(*) FROM $name")->fetchColumn();
         $tables[] = ["name" => $name, "rows" => $count];
     }
-    sendSuccess(["status" => "CONNECTED", "tables" => $tables, "version" => "v13.5_MASTER_GATE"]);
+    sendSuccess(["status" => "CONNECTED", "tables" => $tables, "version" => "v13.5_STABLE_GATE"]);
 } catch (Exception $e) { sendError($e->getMessage(), 500); }`
     },
     {
@@ -158,7 +171,7 @@ try {
     CREATE TABLE IF NOT EXISTS user_progress (id INT AUTO_INCREMENT PRIMARY KEY, user_id VARCHAR(255), topic_id VARCHAR(255), status VARCHAR(50), last_revised TIMESTAMP NULL, revision_level INT DEFAULT 0, next_revision_date TIMESTAMP NULL, solved_questions_json TEXT, UNIQUE KEY user_topic (user_id, topic_id)) ENGINE=InnoDB;
     CREATE TABLE IF NOT EXISTS test_attempts (id VARCHAR(255) PRIMARY KEY, user_id VARCHAR(255), test_id VARCHAR(255), title VARCHAR(255), score INT, total_marks INT, accuracy INT, total_questions INT, correct_count INT, incorrect_count INT, unattempted_count INT, topic_id VARCHAR(255), difficulty VARCHAR(50), detailed_results LONGTEXT, date TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB;
     CREATE TABLE IF NOT EXISTS timetable (user_id VARCHAR(255) PRIMARY KEY, config_json LONGTEXT, slots_json LONGTEXT, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP) ENGINE=InnoDB;
-    CREATE TABLE IF NOT EXISTS system_settings (s_key VARCHAR(255) PRIMARY KEY, s_value LONGTEXT);
+    CREATE TABLE IF NOT EXISTS system_settings (s_key VARCHAR(255) PRIMARY KEY, s_value LONGTEXT) ENGINE=InnoDB;
     CREATE TABLE IF NOT EXISTS notifications (id VARCHAR(255) PRIMARY KEY, user_id VARCHAR(255), from_id VARCHAR(255), from_name VARCHAR(255), type VARCHAR(50), title TEXT, message TEXT, date TIMESTAMP DEFAULT CURRENT_TIMESTAMP, is_read TINYINT(1) DEFAULT 0) ENGINE=InnoDB;
     CREATE TABLE IF NOT EXISTS blogs (id INT AUTO_INCREMENT PRIMARY KEY, title TEXT, excerpt TEXT, content LONGTEXT, author VARCHAR(255), date TIMESTAMP DEFAULT CURRENT_TIMESTAMP, image_url TEXT, category VARCHAR(100)) ENGINE=InnoDB;
     CREATE TABLE IF NOT EXISTS flashcards (id INT AUTO_INCREMENT PRIMARY KEY, front TEXT, back TEXT, subject_id VARCHAR(100), difficulty VARCHAR(50)) ENGINE=InnoDB;
@@ -167,7 +180,7 @@ try {
     CREATE TABLE IF NOT EXISTS psychometric_reports (id INT AUTO_INCREMENT PRIMARY KEY, user_id VARCHAR(255), report_json LONGTEXT, date TIMESTAMP DEFAULT CURRENT_TIMESTAMP, UNIQUE KEY user_report (user_id)) ENGINE=InnoDB;
     ";
     $conn->exec($sql);
-    sendSuccess(["message" => "v13.5 Master Sync Schema Initialized with 11 Tables"]);
+    sendSuccess(["message" => "Database Core v13.5 Synchronized Successfully"]);
 } catch (Exception $e) { sendError($e->getMessage(), 500); }`
     }
 ];

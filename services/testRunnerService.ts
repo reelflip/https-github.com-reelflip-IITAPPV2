@@ -66,27 +66,35 @@ export class E2ETestRunner {
 
     async runDbGate(): Promise<Record<string, GateCheck>> {
         const checks: Record<string, GateCheck> = {
-            connectivity: { id: 'connectivity', label: 'Database Connection', status: 'RUNNING', msg: 'Checking handshake...' },
-            schema: { id: 'schema', label: 'Schema Validation', status: 'PENDING', msg: 'Awaiting connectivity...' },
-            columns: { id: 'columns', label: 'Column Consistency', status: 'PENDING', msg: 'Awaiting schema...' },
-            integrity: { id: 'integrity', label: 'Key & Relationship Integrity', status: 'PENDING', msg: 'Awaiting columns...' },
-            write_safety: { id: 'write_safety', label: 'Write-Safety Handshake', status: 'PENDING', msg: 'Awaiting integrity...' }
+            connectivity: { id: 'connectivity', label: 'Database Connection', status: 'RUNNING', msg: 'Initiating handshake...' },
+            schema: { id: 'schema', label: 'Schema Existence', status: 'PENDING', msg: 'Awaiting connection' },
+            columns: { id: 'columns', label: 'Column Consistency', status: 'PENDING', msg: 'Awaiting schema' },
+            integrity: { id: 'integrity', label: 'Key & Relations', status: 'PENDING', msg: 'Awaiting column check' },
+            write_safety: { id: 'write_safety', label: 'Write-Safety', status: 'PENDING', msg: 'Awaiting integrity' }
         };
 
+        this.onUpdate([]); // Trigger UI refresh
+
         const res = await this.apiProbe('/api/test_db.php?action=full_diagnostic');
-        if (!res.ok || res.json?.status !== 'success') {
+        
+        if (!res.ok && !res.json) {
             Object.keys(checks).forEach(k => {
                 checks[k].status = 'FAIL';
-                checks[k].msg = res.json?.message || 'Server Unreachable';
+                checks[k].msg = res.raw || 'API Endpoint Unreachable';
             });
             return checks;
         }
 
-        const data = res.json.checks;
+        const data = res.json?.checks || {};
+        const apiSuccess = res.json?.status === 'success';
+
         Object.keys(checks).forEach(k => {
             if (data[k]) {
                 checks[k].status = data[k].pass ? 'PASS' : 'FAIL';
                 checks[k].msg = data[k].msg;
+            } else if (!apiSuccess) {
+                checks[k].status = 'FAIL';
+                checks[k].msg = res.json?.message || 'Check failed to execute';
             }
         });
 
@@ -96,10 +104,7 @@ export class E2ETestRunner {
     async runFullAudit() {
         this.results = [];
         this.dbLive = false;
-        
-        // Step 1: Force INFRA Category first to set dependency state
         await this.runCategory('INFRA');
-        
         const categories = (Object.keys(CATEGORY_MAP) as CategoryKey[]).filter(c => c !== 'INFRA');
         for (const cat of categories) {
             await this.runCategory(cat);
@@ -111,19 +116,13 @@ export class E2ETestRunner {
         for (let i = 1; i <= config.count; i++) {
             const testId = `${config.prefix}.${i.toString().padStart(2, '0')}`;
             const desc = this.getTestDescription(testId);
-            
-            // Check Dependency for non-INFRA categories
             if (cat !== 'INFRA' && cat !== 'SECURITY' && !this.dbLive) {
                 this.log(testId, cat, desc, 'INFRA_BLOCK', 'Blocked: Database is offline (A.02 Failed)');
                 continue;
             }
-
             this.log(testId, cat, desc, 'RUNNING');
             const result = await this.executeTestLogic(testId);
-            
-            // If A.02 passes, mark DB as live
             if (testId === 'A.02' && result.pass) this.dbLive = true;
-
             this.log(testId, cat, desc, result.pass ? 'PASS' : 'FAIL', result.msg, result.latency, result.raw);
         }
     }
@@ -164,7 +163,6 @@ export class E2ETestRunner {
                     method: 'POST', 
                     body: JSON.stringify({ email: "' OR 1=1 --", password: 'x' }) 
                 });
-                // If DB is offline, this test is technically inconclusive for security, but valid for sanitization
                 const sanitized = inj.status !== 200 || (inj.json && !inj.json.user);
                 return { pass: sanitized, msg: sanitized ? 'Injection Blocked/Neutralized' : 'LEAK DETECTED', latency: inj.latency };
             }
@@ -173,6 +171,31 @@ export class E2ETestRunner {
                 return { pass: gen.ok, msg: gen.ok ? 'Node Responsive' : 'Service Unreachable', latency: gen.latency };
             }
         }
+    }
+
+    exportGateReport(gateChecks: Record<string, GateCheck>) {
+        const report = {
+            header: {
+                title: "IITGEEPrep Database Readiness Gate Report",
+                version: "v13.5",
+                timestamp: new Date().toISOString(),
+                environment: "Production_Sync_Mode"
+            },
+            summary: {
+                totalChecks: Object.keys(gateChecks).length,
+                passed: Object.values(gateChecks).filter(c => c.status === 'PASS').length,
+                failed: Object.values(gateChecks).filter(c => c.status === 'FAIL').length,
+                status: Object.values(gateChecks).every(c => c.status === 'PASS') ? 'COMPLIANT' : 'NON_COMPLIANT'
+            },
+            details: gateChecks
+        };
+        const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `IITGEE_DB_Gate_Report_${new Date().toISOString().replace(/:/g, '-')}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
     }
 
     exportReport() {

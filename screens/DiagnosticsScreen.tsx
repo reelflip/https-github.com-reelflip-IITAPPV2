@@ -46,11 +46,15 @@ export const DiagnosticsScreen: React.FC = () => {
         const checks = await runner.runDbGate();
         setGateChecks(checks);
         
-        // Fix: Explicitly cast Object.values result to GateCheck[] to resolve property access on 'unknown' error
         const allPass = (Object.values(checks) as GateCheck[]).every(c => c.status === 'PASS');
         setGatePassed(allPass);
         setIsGating(false);
         fetchDbStatus();
+    };
+
+    const exportGateReport = () => {
+        const runner = initRunner();
+        runner.exportGateReport(gateChecks);
     };
 
     const runMasterAudit = async () => {
@@ -102,15 +106,10 @@ export const DiagnosticsScreen: React.FC = () => {
     const generateAIReport = async () => {
         if (isAnalyzing || results.length === 0) return;
         setIsAnalyzing(true);
-        const apiKey = process.env.API_KEY;
-        if (!apiKey || apiKey === "undefined") {
-            setAnalysisReport("### API KEY MISSING\nPlease configure an API key in system settings to use live AI diagnostics.");
-            setIsAnalyzing(false);
-            return;
-        }
-
+        
+        // Fix: Guideline adherence - Exclusively obtaining API key from process.env.API_KEY and using it directly in initialization.
         try {
-            const ai = new GoogleGenAI({ apiKey });
+            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
             const failures = results.filter(r => r.status === 'FAIL').map(r => `[${r.id}] ${r.description}: ${r.details}`).join('\n');
             const prompt = `Act as a Senior SRE. Analyze these diagnostic results: 121 TOTAL, ${results.filter(r => r.status === 'FAIL').length} FAILED.
             Failures list:\n${failures}
@@ -119,8 +118,11 @@ export const DiagnosticsScreen: React.FC = () => {
             const response = await ai.models.generateContent({
                 model: 'gemini-3-pro-preview',
                 contents: prompt,
-                config: { systemInstruction: "Expert System Reliability Engineer." }
+                config: {
+                    systemInstruction: "Expert System Reliability Engineer.",
+                }
             });
+            // Fix: Guideline adherence - Using .text property directly from the response.
             setAnalysisReport(response.text || "Report empty.");
         } catch (error: any) {
             setAnalysisReport(`### ERROR\n\n${error.message}`);
@@ -129,6 +131,9 @@ export const DiagnosticsScreen: React.FC = () => {
 
     const currentResults = results.filter(r => r.category === activeTab);
     const progressPercent = Math.round((results.length / 121) * 100);
+
+    // Fix: Explicitly cast Object.values(gateChecks) to GateCheck[] to resolve Property 'status' does not exist on type 'unknown' error
+    const gateHasRun = (Object.values(gateChecks) as GateCheck[]).some(c => c.status !== 'PENDING');
 
     return (
         <div className="space-y-6 max-w-7xl mx-auto pb-24 animate-in fade-in">
@@ -177,7 +182,6 @@ export const DiagnosticsScreen: React.FC = () => {
                             <Shield className={`w-5 h-5 ${gatePassed ? 'text-emerald-500' : 'text-slate-300'}`} />
                         </div>
                         <div className="p-6 space-y-4">
-                            {/* Fix: Explicitly cast Object.values result to GateCheck[] to resolve property access on 'unknown' error in mapping */}
                             {(Object.values(gateChecks) as GateCheck[]).map((check) => (
                                 <div key={check.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-2xl border border-slate-100 group transition-all hover:border-blue-200">
                                     <div className="flex items-center gap-3">
@@ -193,14 +197,24 @@ export const DiagnosticsScreen: React.FC = () => {
                                 </div>
                             ))}
                             
-                            <button 
-                                onClick={runGateCheck} 
-                                disabled={isGating}
-                                className="w-full mt-4 bg-slate-900 hover:bg-black text-white py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95"
-                            >
-                                {isGating ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
-                                Initialize DB Checker
-                            </button>
+                            <div className="grid grid-cols-1 gap-2 mt-4">
+                                <button 
+                                    onClick={runGateCheck} 
+                                    disabled={isGating}
+                                    className="w-full bg-slate-900 hover:bg-black text-white py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95"
+                                >
+                                    {isGating ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
+                                    Initialize DB Checker
+                                </button>
+                                <button 
+                                    onClick={exportGateReport} 
+                                    disabled={!gateHasRun || isGating}
+                                    className="w-full bg-slate-50 hover:bg-slate-100 text-slate-600 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all border border-slate-200 disabled:opacity-50"
+                                >
+                                    <FileJson className="w-4 h-4" />
+                                    Export Gate JSON
+                                </button>
+                            </div>
                         </div>
                         {!gatePassed && (
                             <div className="px-6 pb-6 pt-2">
