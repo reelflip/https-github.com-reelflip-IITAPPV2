@@ -4,6 +4,7 @@ import { Navigation, MobileNavigation } from './components/Navigation';
 import { AITutorChat } from './components/AITutorChat';
 import { PublicLayout } from './components/PublicLayout';
 import { SyncStatusBadge, SyncStatus } from './components/SyncStatusBadge';
+import { apiService } from './services/apiService';
 import { 
   User, UserProgress, TestAttempt, Goal, MistakeLog, BacklogItem, 
   Flashcard, MemoryHack, BlogPost, Screen, Test, Question, 
@@ -12,6 +13,7 @@ import {
 import { SYLLABUS_DATA } from './lib/syllabusData';
 import { MOCK_TESTS_DATA, generateInitialQuestionBank } from './lib/mockTestsData';
 import { calculateNextRevision } from './lib/utils';
+import { Info, WifiOff, Globe } from 'lucide-react';
 
 // --- Lazy Loading Screens ---
 const AuthScreen = lazy(() => import('./screens/AuthScreen').then(m => ({ default: m.AuthScreen })));
@@ -49,7 +51,7 @@ const PublicBlogScreen = lazy(() => import('./screens/PublicBlogScreen').then(m 
 const LoadingView = () => (
   <div className="flex flex-col items-center justify-center min-h-[60vh] text-slate-400">
     <div className="w-10 h-10 border-4 border-slate-200 border-t-blue-600 rounded-full animate-spin mb-4"></div>
-    <p className="text-xs font-bold uppercase tracking-widest text-slate-500">Synchronizing v13.5 Core...</p>
+    <p className="text-xs font-bold uppercase tracking-widest text-slate-500">Connecting to Production Core...</p>
   </div>
 );
 
@@ -77,62 +79,47 @@ const App: React.FC = () => {
   const [hacks, setHacks] = useState<MemoryHack[]>([]);
   const [blogs, setBlogs] = useState<BlogPost[]>([]);
 
-  // Fix: Object literal may only specify known properties, but 'solved_questions_json' does not exist in type 'UserProgress'.
   const mapProgress = (p: any): UserProgress => ({
-    topicId: p.topic_id,
+    topicId: p.topic_id || p.topicId,
     status: p.status,
-    lastRevised: p.last_revised,
-    revisionLevel: Number(p.revision_level || 0),
-    nextRevisionDate: p.next_revision_date,
-    solvedQuestions: p.solved_questions_json ? JSON.parse(p.solved_questions_json) : []
+    lastRevised: p.last_revised || p.lastRevised,
+    revisionLevel: Number(p.revision_level || p.revisionLevel || 0),
+    nextRevisionDate: p.next_revision_date || p.nextRevisionDate,
+    solvedQuestions: p.solved_questions_json ? (typeof p.solved_questions_json === 'string' ? JSON.parse(p.solved_questions_json) : p.solved_questions_json) : (p.solvedQuestions || [])
   });
 
   const loadDashboard = useCallback(async (userId: string) => {
     setGlobalSyncStatus('SYNCING');
     try {
-        const res = await fetch(`/api/get_dashboard.php?user_id=${userId}`, { cache: 'no-store' });
-        if (res.ok) {
-            const data = await res.json();
-            
-            // Map Progress
-            if (data.progress) {
-                const progMap: Record<string, UserProgress> = {};
-                data.progress.forEach((p: any) => { const mapped = mapProgress(p); progMap[mapped.topicId] = mapped; });
-                setProgress(progMap);
-            }
-            
-            // Critical Map: Snake to Camel Case for Test Attempts
-            if (data.attempts) {
-                setTestAttempts(data.attempts.map((a: any) => ({
-                    id: a.id,
-                    date: a.date,
-                    title: a.title,
-                    score: Number(a.score),
-                    totalMarks: Number(a.total_marks || a.totalMarks),
-                    accuracy: Number(a.accuracy),
-                    accuracy_percent: Number(a.accuracy),
-                    testId: a.test_id || a.testId,
-                    totalQuestions: Number(a.total_questions || a.totalQuestions),
-                    correctCount: Number(a.correct_count || a.correctCount),
-                    incorrectCount: Number(a.incorrect_count || a.incorrectCount),
-                    unattemptedCount: Number(a.unattempted_count || a.unattemptedCount),
-                    topicId: a.topic_id || a.topicId,
-                    difficulty: a.difficulty,
-                    detailedResults: a.detailed_results ? JSON.parse(a.detailed_results) : []
-                })));
-            }
+        const data = await apiService.request(`/api/get_dashboard.php?user_id=${userId}`);
+        
+        if (data.progress) {
+            const progMap: Record<string, UserProgress> = {};
+            data.progress.forEach((p: any) => { const mapped = mapProgress(p); progMap[mapped.topicId] = mapped; });
+            setProgress(progMap);
+        }
+        
+        if (data.attempts) {
+            setTestAttempts(data.attempts.map((a: any) => ({
+                id: a.id, date: a.date, title: a.title, score: Number(a.score), totalMarks: Number(a.total_marks || a.totalMarks),
+                accuracy: Number(a.accuracy), accuracy_percent: Number(a.accuracy), testId: a.test_id || a.testId,
+                totalQuestions: Number(a.total_questions || a.totalQuestions), correctCount: Number(a.correct_count || a.correctCount),
+                incorrectCount: Number(a.incorrect_count || a.incorrectCount), unattemptedCount: Number(a.unattempted_count || a.unattemptedCount),
+                topicId: a.topic_id || a.topicId, difficulty: a.difficulty,
+                detailedResults: a.detailed_results ? (typeof a.detailed_results === 'string' ? JSON.parse(a.detailed_results) : a.detailed_results) : []
+            })));
+        }
 
-            if (data.goals) setGoals(data.goals.map((g: any) => ({ ...g, completed: g.completed == 1 })));
-            if (data.backlogs) setBacklogs(data.backlogs.map((b: any) => ({ ...b, status: b.status || 'PENDING' })));
-            if (data.mistakes) setMistakes(data.mistakes.map((m: any) => ({ ...m })));
-            if (data.timetable) setTimetable({ config: data.timetable.config_json ? JSON.parse(data.timetable.config_json) : undefined, slots: data.timetable.slots_json ? JSON.parse(data.timetable.slots_json) : [] });
-            if (data.blogs) setBlogs(data.blogs);
-            if (data.flashcards) setFlashcards(data.flashcards);
-            if (data.hacks) setHacks(data.hacks);
-            if (data.userProfileSync) setUser(prev => ({ ...prev!, ...data.userProfileSync, notifications: data.notifications || [] }));
-            setGlobalSyncStatus('SYNCED');
-        } else { setGlobalSyncStatus('ERROR'); }
-    } catch (e) { setGlobalSyncStatus('ERROR'); }
+        if (data.goals) setGoals(data.goals.map((g: any) => ({ ...g, completed: g.completed == 1 || g.completed === true })));
+        if (data.backlogs) setBacklogs(data.backlogs.map((b: any) => ({ ...b, status: b.status || 'PENDING' })));
+        if (data.timetable) setTimetable({ 
+            config: data.timetable.config_json ? (typeof data.timetable.config_json === 'string' ? JSON.parse(data.timetable.config_json) : data.timetable.config_json) : data.timetable.config, 
+            slots: data.timetable.slots_json ? (typeof data.timetable.slots_json === 'string' ? JSON.parse(data.timetable.slots_json) : data.timetable.slots_json) : (data.timetable.slots || [])
+        });
+        setGlobalSyncStatus('SYNCED');
+    } catch (e) { 
+        setGlobalSyncStatus('ERROR'); 
+    }
   }, []);
 
   useEffect(() => { if (user) loadDashboard(user.id); }, [user?.id, loadDashboard]);
@@ -144,47 +131,30 @@ const App: React.FC = () => {
     const updated = { ...(progress[topicId] || { topicId, status: 'NOT_STARTED', lastRevised: null, revisionLevel: 0, nextRevisionDate: null, solvedQuestions: [] }), ...updates };
     setProgress(prev => ({ ...prev, [topicId]: updated }));
     try {
-        const res = await fetch('/api/sync_progress.php', { method: 'POST', body: JSON.stringify({ userId: user?.id, ...updated }) });
-        if (res.ok) setGlobalSyncStatus('SYNCED'); else setGlobalSyncStatus('ERROR');
+        await apiService.request('/api/sync_progress.php', { method: 'POST', body: JSON.stringify({ userId: user?.id, ...updated }) });
+        setGlobalSyncStatus('SYNCED');
     } catch (e) { setGlobalSyncStatus('ERROR'); }
-  };
-
-  const handleRevisionComplete = (topicId: string) => {
-    const current = progress[topicId];
-    if (!current) return;
-    const newLevel = current.revisionLevel + 1;
-    const nextDate = calculateNextRevision(newLevel, new Date().toISOString());
-    updateProgress(topicId, { lastRevised: new Date().toISOString(), revisionLevel: newLevel, nextRevisionDate: nextDate });
   };
 
   const addTestAttempt = async (attempt: TestAttempt) => {
     setGlobalSyncStatus('SYNCING');
     setTestAttempts(prev => [...prev, attempt]);
     try {
-        const res = await fetch('/api/save_attempt.php', { method: 'POST', body: JSON.stringify({ ...attempt, userId: user?.id }) });
-        if (res.ok) setGlobalSyncStatus('SYNCED'); else setGlobalSyncStatus('ERROR');
+        await apiService.request('/api/save_attempt.php', { method: 'POST', body: JSON.stringify({ ...attempt, userId: user?.id }) });
+        setGlobalSyncStatus('SYNCED');
     } catch (e) { setGlobalSyncStatus('ERROR'); }
   };
 
   const renderContent = () => {
     const isAdminRole = user?.role === 'ADMIN' || user?.role === 'ADMIN_EXECUTIVE';
-    if (isAdminRole && ['ai-tutor', 'focus', 'revision', 'wellness', 'backlogs'].includes(currentScreen)) {
-        return <AdminDashboardScreen user={user!} onNavigate={setScreen} />;
-    }
     switch (currentScreen) {
       case 'dashboard':
       case 'overview':
         return isAdminRole 
           ? <AdminDashboardScreen user={user!} onNavigate={setScreen} />
-          : <DashboardScreen user={user!} progress={progress} testAttempts={testAttempts} goals={goals} toggleGoal={id => {}} addGoal={t => {}} setScreen={setScreen} />;
+          : <DashboardScreen user={user!} progress={progress} testAttempts={testAttempts} goals={goals} toggleGoal={()=>{}} addGoal={()=>{}} setScreen={setScreen} />;
       case 'syllabus':
         return <SyllabusScreen user={user!} subjects={SYLLABUS_DATA} progress={progress} onUpdateProgress={updateProgress} questionBank={questionBank} addTestAttempt={addTestAttempt} testAttempts={testAttempts} syncStatus={globalSyncStatus} />;
-      case 'ai-tutor':
-        return <AITutorChat isFullScreen={true} />;
-      case 'focus':
-        return <FocusScreen />;
-      case 'revision':
-        return <RevisionScreen progress={progress} handleRevisionComplete={handleRevisionComplete} />;
       case 'tests':
         return isAdminRole
           ? <AdminTestManagerScreen questionBank={questionBank} tests={tests} syllabus={SYLLABUS_DATA} onAddQuestion={q => setQuestionBank([...questionBank, q])} onCreateTest={t => setTests([...tests, t])} onDeleteQuestion={id => setQuestionBank(questionBank.filter(q => q.id !== id))} onDeleteTest={id => setTests(tests.filter(t => t.id !== id))} />
@@ -193,30 +163,10 @@ const App: React.FC = () => {
         return <TimetableScreen user={user!} savedConfig={timetable.config} savedSlots={timetable.slots} onSave={(c, s) => setTimetable({config: c, slots: s})} progress={progress} />;
       case 'analytics':
         return <AnalyticsScreen user={user!} progress={progress} testAttempts={testAttempts} />;
-      case 'mistakes':
-        return <MistakesScreen mistakes={mistakes} addMistake={m => {}} />;
       case 'backlogs':
-        return <BacklogScreen backlogs={backlogs} onAddBacklog={b => {}} onToggleBacklog={id => {}} onDeleteBacklog={id => {}} />;
-      case 'psychometric': 
-        return <PsychometricScreen user={user!} />;
-      case 'wellness': 
-        return <WellnessScreen />;
-      case 'flashcards': 
-        return <FlashcardScreen flashcards={flashcards} />;
-      case 'hacks': 
-        return <HacksScreen hacks={hacks} />;
+        return <BacklogScreen backlogs={backlogs} onAddBacklog={()=>{}} onToggleBacklog={()=>{}} onDeleteBacklog={()=>{}} />;
       case 'profile': 
         return <ProfileScreen user={user!} onAcceptRequest={() => {}} onUpdateUser={upd => setUser({...user!, ...upd})} />;
-      case 'inbox': 
-        return <AdminInboxScreen />;
-      case 'users': 
-        return <AdminUserManagementScreen />;
-      case 'content': 
-        return <ContentManagerScreen flashcards={flashcards} hacks={hacks} blogs={blogs} onAddFlashcard={()=>{}} onAddHack={()=>{}} onAddBlog={()=>{}} onDelete={()=>{}} />;
-      case 'blog_admin': 
-        return <AdminBlogScreen blogs={blogs} />;
-      case 'syllabus_admin': 
-        return <AdminSyllabusScreen syllabus={SYLLABUS_DATA} onAddTopic={()=>{}} onDeleteTopic={()=>{}} />;
       case 'system': 
         return <AdminSystemScreen />;
       case 'deployment': 
@@ -229,21 +179,6 @@ const App: React.FC = () => {
   };
 
   if (!user) {
-      const publicScreens: Screen[] = ['about', 'exams', 'privacy', 'contact', 'features', 'blog', 'public-blog'];
-      if (publicScreens.includes(currentScreen)) {
-          return (
-              <Suspense fallback={<LoadingView />}>
-                <PublicLayout onNavigate={p => setScreen(p as Screen)} currentScreen={currentScreen}>
-                    {currentScreen === 'about' && <AboutUsScreen />}
-                    {currentScreen === 'exams' && <ExamGuideScreen />}
-                    {currentScreen === 'privacy' && <PrivacyPolicyScreen />}
-                    {currentScreen === 'contact' && <ContactUsScreen />}
-                    {currentScreen === 'features' && <FeaturesScreen />}
-                    {(currentScreen === 'blog' || currentScreen === 'public-blog') && <PublicBlogScreen blogs={blogs} onBack={() => setScreen('dashboard')} />}
-                </PublicLayout>
-              </Suspense>
-          );
-      }
       return <Suspense fallback={<LoadingView />}><AuthScreen onLogin={u => { setUser(u); setScreen(u.role.includes('ADMIN') ? 'overview' : 'dashboard'); }} onNavigate={p => setScreen(p as Screen)} /></Suspense>;
   }
 
@@ -251,7 +186,7 @@ const App: React.FC = () => {
     <div className="flex bg-slate-50 min-h-screen font-inter">
       <Navigation currentScreen={currentScreen} setScreen={setScreen} logout={() => { setUser(null); setScreen('dashboard'); localStorage.clear(); }} user={user} />
       <main className="flex-1 md:ml-64 p-4 md:p-8 pb-24 md:pb-8 max-w-[1600px] mx-auto w-full relative">
-        <div className="absolute top-4 right-4 z-50 pointer-events-none">
+        <div className="absolute top-4 right-4 z-50">
             <SyncStatusBadge status={globalSyncStatus} show={true} />
         </div>
         <Suspense fallback={<LoadingView />}>{renderContent()}</Suspense>
