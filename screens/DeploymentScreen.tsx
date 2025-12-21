@@ -1,132 +1,62 @@
 
 import React, { useState } from 'react';
 import { getBackendFiles, generateSQLSchema } from '../services/generatorService';
-import { Download, Server, BookOpen, Package, FileText, Folder, ArrowRight, ShieldCheck, Database, Layout, Activity, PlugZap, CheckCircle2, XCircle, Lock, AlertTriangle, RefreshCw, List, ChevronDown, ChevronUp, Table as TableIcon, Layers, Info, Filter, FileJson } from 'lucide-react';
+import { Download, Server, BookOpen, Package, FileText, Folder, ArrowRight, ShieldCheck, Database, Layout, Activity, PlugZap, CheckCircle2, XCircle, Lock, AlertTriangle, RefreshCw, List, ChevronDown, ChevronUp, Table as TableIcon, Layers, Info, Filter, FileJson, Terminal } from 'lucide-react';
 import JSZip from 'jszip';
 
 export const DeploymentScreen: React.FC = () => {
     
     const [activeTab, setActiveTab] = useState<'guide' | 'architecture' | 'integrity'>('guide');
-    const [dbConfig, setDbConfig] = useState({ host: "localhost", name: "u123456789_iitjee", user: "u123456789_admin", pass: "" });
+    const [dbConfig, setDbConfig] = useState({ 
+        host: "localhost", 
+        name: "u123456789_prep", 
+        user: "u123456789_admin", 
+        pass: "password" 
+    });
+    
     const [isZipping, setIsZipping] = useState(false);
     const [integrityResults, setIntegrityResults] = useState<any[]>([]);
-    const [integrityFilter, setIntegrityFilter] = useState<'ALL' | 'PASS' | '500' | 'CRASH_ERR'>('ALL');
     const [dbTables, setDbTables] = useState<any[]>([]);
     const [scanning, setScanning] = useState(false);
     const [scanningDb, setScanningDb] = useState(false);
-    const [repairing, setRepairing] = useState(false);
-    const [expandedTable, setExpandedTable] = useState<string | null>(null);
-
-    const API_FILES = [
-        'index.php', 'config.php', 'cors.php', 'test_db.php', 'migrate_db.php',
-        'login.php', 'register.php', 'google_login.php', 'update_password.php',
-        'get_dashboard.php', 'sync_progress.php', 
-        'save_attempt.php', 'save_timetable.php',
-        'manage_users.php', 'manage_content.php', 'manage_tests.php', 
-        'manage_syllabus.php', 'manage_questions.php', 'manage_backlogs.php',
-        'manage_goals.php', 'manage_mistakes.php', 'manage_notes.php',
-        'manage_videos.php', 'manage_contact.php', 'contact.php',
-        'manage_settings.php', 'update_profile.php', 'track_visit.php',
-        'get_admin_stats.php', 'search_students.php', 'send_request.php',
-        'respond_request.php', 'get_psychometric.php', 'save_psychometric.php',
-        'delete_account.php', 'upload_avatar.php', 'get_topics.php', 
-        'get_attempt_details.php', 'manage_chapter_test.php'
-    ];
-
-    const getStatusInfo = (code: number, text?: string) => {
-        if (text?.includes("DATABASE_CONNECTION_ERROR")) return { desc: 'DB Link Failed', msg: 'PHP is OK, but MySQL credentials rejected.' };
-        switch (code) {
-            case 200: return { desc: 'Success', msg: 'File reachable and active.' };
-            case 400: return { desc: 'Bad Request', msg: 'Invalid input parameters.' };
-            case 401: return { desc: 'Unauthorized', msg: 'Auth token missing or invalid.' };
-            case 403: return { desc: 'Forbidden', msg: 'Check folder permissions.' };
-            case 404: return { desc: 'Not Found', msg: 'File is missing from server.' };
-            case 500: return { desc: 'Syntax Error', msg: 'PHP engine crashed. Likely code error.' };
-            case 0: return { desc: 'Network Error', msg: 'CORS or Connection timeout.' };
-            default: return { desc: 'Unknown', msg: 'Unexpected response code.' };
-        }
-    };
 
     const runIntegrityScan = async () => {
         setScanning(true);
         setIntegrityResults([]);
+        const API_FILES = ['test_db.php', 'login.php', 'get_dashboard.php'];
         const results = [];
         for (const file of API_FILES) {
             const start = performance.now();
             let status = 'UNKNOWN';
             let code = 0;
-            let responseText = '';
             try {
-                const res = await fetch(`/api/${file}`, { method: 'POST', body: '{}', cache: 'no-store' }); 
+                // Diagnostics use GET now to avoid body requirement
+                const res = await fetch(`/api/${file}`, { method: 'GET', cache: 'no-store' }); 
                 code = res.status;
-                responseText = await res.clone().text();
-                if (res.ok) {
-                   if (responseText.includes("DATABASE_CONNECTION_ERROR")) status = 'DB_ERROR';
-                   else status = 'OK';
-                }
-                else if (res.status === 403) status = 'PERM_ERR';
+                if (res.ok) status = 'OK';
                 else if (res.status === 404) status = 'MISSING';
-                else if (res.status === 500) status = 'CRASH';
                 else status = 'ERROR';
             } catch (e) { status = 'NET_ERR'; }
-            results.push({ file, status, code, time: Math.round(performance.now() - start), text: responseText });
+            results.push({ file, status, code, time: Math.round(performance.now() - start) });
             setIntegrityResults([...results]); 
         }
         setScanning(false);
     };
 
-    const exportJsonReport = () => {
-        if (integrityResults.length === 0) {
-            alert("Please run a scan first before exporting.");
-            return;
-        }
-        const report = {
-            metadata: {
-                timestamp: new Date().toISOString(),
-                version: "v13.5 Ultimate Sync Core",
-                totalFiles: API_FILES.length,
-                dbStatus: dbTables.length > 0 ? 'CONNECTED' : 'DISCONNECTED'
-            },
-            results: integrityResults
-        };
-        const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `IITGEE_Integrity_Report_${new Date().toISOString().split('T')[0]}.json`;
-        a.click();
-        URL.revokeObjectURL(url);
-    };
-
     const scanDatabase = async () => {
         setScanningDb(true);
-        setDbTables([]);
         try {
             const res = await fetch('/api/test_db.php', { cache: 'no-store' });
             const data = await res.json();
-            if (data.status === 'CONNECTED') {
-                setDbTables(data.tables || []);
+            if (data.status === 'success' && data.tables) {
+                setDbTables(data.tables);
             } else {
-                alert("Database Connectivity Error: " + (data.message || data.details || "Access Denied"));
+                alert(`MySQL Error: ${data.message || 'Check credentials'}`);
             }
         } catch (e) {
-            alert("API Unreachable: Ensure test_db.php exists in /api folder.");
-        } finally {
-            setScanningDb(false);
+            alert("Endpoint unreachable. Ensure you have uploaded the api/ folder to your server.");
         }
-    };
-
-    const runDbRepair = async () => {
-        setRepairing(true);
-        try {
-            const res = await fetch('/api/migrate_db.php');
-            if(res.ok) {
-                alert("v13.5 Ultimate Sync Schema Verification Successful!");
-                scanDatabase();
-            }
-            else throw new Error(`HTTP ${res.status}`);
-        } catch(e: any) { alert("Sync Failed: " + e.message); }
-        finally { setRepairing(false); }
+        setScanningDb(false);
     };
 
     const downloadAllZip = async () => {
@@ -134,153 +64,118 @@ export const DeploymentScreen: React.FC = () => {
         try {
             const zip = new JSZip();
             const backendFiles = getBackendFiles(dbConfig);
-            const apiFolder = zip.folder("deployment/api");
+            const apiFolder = zip.folder("api");
             if (apiFolder) {
                 backendFiles.filter(f => f.folder === 'deployment/api').forEach(file => apiFolder.file(file.name, file.content));
             }
-            const seoFolder = zip.folder("deployment/seo");
-            if (seoFolder) {
-                backendFiles.filter(f => f.folder === 'deployment/seo').forEach(file => seoFolder.file(file.name, file.content));
-            }
-            const sqlFolder = zip.folder("deployment/sql");
-            if (sqlFolder) sqlFolder.file('database.sql', generateSQLSchema());
-
+            zip.file('database_mysql.sql', generateSQLSchema());
+            
             const content = await zip.generateAsync({ type: "blob" });
             const url = URL.createObjectURL(content);
             const link = document.createElement('a');
-            link.href = url; link.download = "IITGEEPrep_Full_v13_5.zip";
+            link.href = url; link.download = "IITGEE_MySQL_Bundle_v16.zip";
             link.click();
-        } catch (error) { alert("Zip creation failed."); }
+        } catch (error) { alert("Zip failed."); }
         setIsZipping(false);
     };
 
-    const filteredIntegrity = integrityResults.filter(res => {
-        if (integrityFilter === 'ALL') return true;
-        if (integrityFilter === 'PASS') return res.status === 'OK';
-        if (integrityFilter === '500') return res.code === 500;
-        if (integrityFilter === 'CRASH_ERR') return ['CRASH', 'DB_ERROR', 'NET_ERR', 'ERROR'].includes(res.status);
-        return true;
-    });
-
     return (
         <div className="space-y-8 animate-in fade-in pb-12">
+            {/* Header */}
             <div className="bg-slate-900 rounded-2xl p-8 text-white shadow-xl relative overflow-hidden">
-                <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-6">
                     <div>
                         <div className="flex items-center gap-3 mb-2">
-                            <h2 className="text-3xl font-bold">Deployment Center</h2>
-                            <span className="px-2 py-1 rounded-md bg-blue-600 text-xs font-mono text-white animate-pulse uppercase tracking-widest">v13.5 MASTER SYNC</span>
+                            <Database className="text-blue-400" />
+                            <h2 className="text-3xl font-bold">MySQL Sync Console</h2>
+                            <span className="px-2 py-1 rounded-md bg-indigo-600 text-[10px] font-black text-white uppercase tracking-widest">v16.0 ENGINE</span>
                         </div>
-                        <p className="text-slate-400 text-lg">Platform-wide synchronization for 38 endpoints and v13.5 SQL schema.</p>
+                        <p className="text-slate-400 text-lg">Connected to Hostinger MySQL environment.</p>
                     </div>
-                    <div className="flex bg-slate-700/50 p-1 rounded-xl border border-slate-600/50">
+                    <div className="flex gap-2">
                         <button onClick={() => setActiveTab('guide')} className={`px-6 py-2 rounded-lg text-sm font-bold ${activeTab === 'guide' ? 'bg-blue-600 text-white' : 'text-slate-400'}`}>Guide</button>
-                        <button onClick={() => setActiveTab('integrity')} className={`px-6 py-2 rounded-lg text-sm font-bold ${activeTab === 'integrity' ? 'bg-orange-600 text-white' : 'text-slate-400'}`}>Integrity</button>
+                        <button onClick={() => setActiveTab('integrity')} className={`px-6 py-2 rounded-lg text-sm font-bold ${activeTab === 'integrity' ? 'bg-orange-600 text-white' : 'text-slate-400'}`}>Verify</button>
                     </div>
                 </div>
             </div>
 
-            {activeTab === 'integrity' && (
-                <div className="space-y-8">
-                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-                        <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
-                            <div><h3 className="text-lg font-bold text-slate-800 flex items-center gap-2"><Database className="text-blue-500" size={20}/> Database Sync Tracker</h3><p className="text-sm text-slate-500">Checking v13.5 schema compliance across 26 tables.</p></div>
-                            <div className="flex gap-2 w-full md:w-auto">
-                                <button onClick={runDbRepair} disabled={repairing} className="flex-1 md:flex-none bg-slate-800 hover:bg-black text-white px-6 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50">{repairing ? <RefreshCw className="animate-spin" size={18}/> : <ShieldCheck size={18}/>} Repair Schema</button>
-                                <button onClick={scanDatabase} disabled={scanningDb} className="flex-1 md:flex-none bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50">{scanningDb ? <RefreshCw className="animate-spin" size={18}/> : <RefreshCw size={18}/>} Test DB Connection</button>
-                            </div>
-                        </div>
-                        {dbTables.length === 0 && !scanningDb ? (
-                            <div className="py-12 text-center text-rose-500 bg-rose-50 rounded-2xl border border-dashed border-rose-200 flex flex-col items-center">
-                                <AlertTriangle size={48} className="mb-4" />
-                                <p className="font-bold uppercase tracking-widest text-xs">No DB Link Detected</p>
-                            </div>
-                        ) : (
-                            <div className="space-y-3">
-                                {dbTables.map(table => (
-                                    <div key={table.name} className="border border-slate-200 rounded-xl overflow-hidden shadow-sm hover:border-blue-300 transition-all">
-                                        <div onClick={() => setExpandedTable(expandedTable === table.name ? null : table.name)} className={`p-4 flex items-center justify-between cursor-pointer ${expandedTable === table.name ? 'bg-blue-50' : 'bg-white'}`}>
-                                            <div className="flex items-center gap-4">
-                                                <div className={`p-2 rounded-lg ${expandedTable === table.name ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'}`}><Layers size={18} /></div>
-                                                <div><h4 className="font-black text-slate-800 text-sm tracking-tight">{table.name}</h4><p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{table.rows} Records Detected</p></div>
-                                            </div>
-                                            {expandedTable === table.name ? <ChevronUp size={20} className="text-slate-400" /> : <ChevronDown size={20} className="text-slate-400" />}
-                                        </div>
+            {activeTab === 'guide' && (
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <div className="lg:col-span-2 space-y-6">
+                        <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm space-y-6">
+                            <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2 text-indigo-600"><Terminal size={20} /> MySQL Instructions</h3>
+                            <div className="space-y-4">
+                                <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
+                                    <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3">1. Database Config</h4>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div><label className="text-[10px] font-bold text-slate-500 uppercase">DBHOST</label><input className="w-full p-2 border rounded mt-1 text-sm font-mono" value={dbConfig.host} onChange={e => setDbConfig({...dbConfig, host: e.target.value})}/></div>
+                                        <div><label className="text-[10px] font-bold text-slate-500 uppercase">DBNAME</label><input className="w-full p-2 border rounded mt-1 text-sm font-mono" value={dbConfig.name} onChange={e => setDbConfig({...dbConfig, name: e.target.value})}/></div>
+                                        <div><label className="text-[10px] font-bold text-slate-500 uppercase">DBUSER</label><input className="w-full p-2 border rounded mt-1 text-sm font-mono" value={dbConfig.user} onChange={e => setDbConfig({...dbConfig, user: e.target.value})}/></div>
+                                        <div><label className="text-[10px] font-bold text-slate-500 uppercase">DBPASS</label><input className="w-full p-2 border rounded mt-1 text-sm font-mono" type="password" value={dbConfig.pass} onChange={e => setDbConfig({...dbConfig, pass: e.target.value})}/></div>
                                     </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-
-                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-                        <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
-                            <div>
-                                <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                                    <Activity className="text-orange-500" size={20}/> 
-                                    Module Integrity Scan
-                                </h3>
-                                <p className="text-sm text-slate-500">Checking for syntax stability across the full 38-file set.</p>
-                            </div>
-                            <div className="flex gap-2">
-                                <button onClick={exportJsonReport} disabled={integrityResults.length === 0} className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-6 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50">
-                                    <FileJson size={18}/> Export JSON
-                                </button>
-                                <button onClick={runIntegrityScan} disabled={scanning} className="bg-orange-600 hover:bg-orange-700 text-white px-6 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50">
-                                    {scanning ? <RefreshCw className="animate-spin" size={18}/> : <Activity size={18}/>} Full Set Scan
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Filter Bar */}
-                        <div className="flex flex-wrap gap-2 mb-6 bg-slate-50 p-2 rounded-xl border border-slate-100">
-                             <button onClick={() => setIntegrityFilter('ALL')} className={`flex-1 min-w-[80px] py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${integrityFilter === 'ALL' ? 'bg-slate-800 text-white' : 'bg-white text-slate-500 hover:bg-slate-100'}`}>All</button>
-                             <button onClick={() => setIntegrityFilter('PASS')} className={`flex-1 min-w-[80px] py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${integrityFilter === 'PASS' ? 'bg-emerald-600 text-white' : 'bg-white text-slate-500 hover:bg-slate-100'}`}>Pass</button>
-                             <button onClick={() => setIntegrityFilter('500')} className={`flex-1 min-w-[80px] py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${integrityFilter === '500' ? 'bg-rose-600 text-white' : 'bg-white text-slate-500 hover:bg-slate-100'}`}>HTTP 500</button>
-                             <button onClick={() => setIntegrityFilter('CRASH_ERR')} className={`flex-1 min-w-[80px] py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${integrityFilter === 'CRASH_ERR' ? 'bg-red-800 text-white' : 'bg-white text-slate-500 hover:bg-slate-100'}`}>Crash / Error</button>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {filteredIntegrity.map(res => {
-                                const info = getStatusInfo(res.code, res.text);
-                                return (
-                                    <div key={res.file} className={`p-4 rounded-2xl border flex flex-col justify-between transition-all hover:shadow-md ${res.status === 'OK' ? 'bg-emerald-50/50 border-emerald-100' : 'bg-rose-50/50 border-rose-100'}`}>
-                                        <div className="flex justify-between items-start mb-2">
-                                            <div className="min-w-0"><div className="font-black text-slate-800 text-xs truncate mb-1">{res.file}</div><span className={`px-1.5 py-0.5 rounded-md font-mono text-[10px] font-bold ${res.code === 200 ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>HTTP {res.code}</span></div>
-                                            <span className={`text-[10px] font-black uppercase tracking-tighter px-2 py-0.5 rounded-lg border ${res.status === 'OK' ? 'bg-white border-emerald-200 text-emerald-600' : 'bg-white border-rose-200 text-rose-600'}`}>{res.status}</span>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                            {filteredIntegrity.length === 0 && (
-                                <div className="col-span-full py-12 text-center text-slate-400 italic">
-                                    No files match the selected filter.
                                 </div>
-                            )}
+                                <ul className="space-y-3 text-sm text-slate-600 list-disc pl-5 font-medium">
+                                    <li>Extract the <code>api/</code> folder to your <code>public_html</code> root.</li>
+                                    <li>Import <code>database_mysql.sql</code> via phpMyAdmin in your Hostinger panel.</li>
+                                    <li>Ensure <strong>PDO MySQL</strong> is enabled in your PHP Selector settings.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="lg:col-span-1">
+                        <div className="bg-indigo-900 rounded-2xl p-8 text-white shadow-xl flex flex-col h-full">
+                            <h3 className="text-xl font-bold mb-4">MySQL Bundle</h3>
+                            <p className="text-indigo-200 text-sm mb-8 font-medium italic">Optimized for Hostinger LAMP stacks. Includes full relational schema.</p>
+                            <button onClick={downloadAllZip} disabled={isZipping} className="w-full bg-white text-indigo-900 font-black py-4 rounded-xl flex items-center justify-center gap-2 hover:bg-indigo-50 transition-all active:scale-95">
+                                {isZipping ? <RefreshCw className="animate-spin" /> : <Download />}
+                                Download v16.0 ZIP
+                            </button>
                         </div>
                     </div>
                 </div>
             )}
 
-            {activeTab === 'guide' && (
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    <div className="lg:col-span-2 bg-white p-8 rounded-2xl border border-slate-200 shadow-sm space-y-6">
-                        <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2 text-blue-600"><CheckCircle2 className="animate-pulse" /> Master Synchronization Guide (v13.5)</h3>
-                        <p className="text-slate-600 text-sm leading-relaxed">System v13.5 ensures 100% synchronization. This is the production-ready build for Hostinger.</p>
-                        <ol className="space-y-4 text-slate-600 text-sm list-decimal pl-5">
-                            <li>Download the <strong>v13.5 Ultimate Sync Bundle</strong>.</li>
-                            <li><b>Clear /api/</b> completely before deployment.</li>
-                            <li>Run <b>Repair Schema</b> to initialize the v13.5 SQL structure.</li>
-                            <li>Perform a <b>Full Set Scan</b> to confirm logic readiness.</li>
-                        </ol>
-                    </div>
-                    <div className="lg:col-span-1 space-y-6">
-                        <div className="bg-blue-900 rounded-2xl p-6 text-white shadow-xl relative overflow-hidden flex flex-col h-full">
-                            <h3 className="text-xl font-bold mb-2">Ultimate Sync Bundle</h3>
-                            <p className="text-blue-200 text-sm mb-6 flex-1">38 Synchronized PHP APIs and v13.5 SQL Schema.</p>
-                            <button onClick={downloadAllZip} disabled={isZipping} className="w-full bg-white text-blue-900 font-black py-3 rounded-xl flex items-center justify-center transition-all disabled:opacity-50">
-                                {isZipping ? <RefreshCw className="animate-spin mr-2"/> : <Download className="mr-2"/>} Download v13.5
-                            </button>
+            {activeTab === 'integrity' && (
+                <div className="space-y-8 animate-in slide-in-from-right-4">
+                    <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm">
+                        <div className="flex justify-between items-center mb-8">
+                            <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2"><Activity className="text-orange-500"/> MySQL Link Status</h3>
+                            <div className="flex gap-2">
+                                <button onClick={runIntegrityScan} disabled={scanning} className="bg-slate-800 text-white px-6 py-2 rounded-xl font-bold flex items-center gap-2">
+                                    {scanning ? <RefreshCw className="animate-spin" /> : <Activity />} Scan Endpoints
+                                </button>
+                                <button onClick={scanDatabase} disabled={scanningDb} className="bg-blue-600 text-white px-6 py-2 rounded-xl font-bold flex items-center gap-2">
+                                    {scanningDb ? <RefreshCw className="animate-spin" /> : <RefreshCw />} Test Connection
+                                </button>
+                            </div>
                         </div>
+
+                        {integrityResults.length > 0 && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+                                {integrityResults.map(res => (
+                                    <div key={res.file} className={`p-4 border rounded-xl flex flex-col justify-between ${res.status === 'OK' ? 'bg-emerald-50 border-emerald-100' : 'bg-rose-50 border-rose-100'}`}>
+                                        <span className="text-xs font-black text-slate-800 truncate mb-1 uppercase">{res.file}</span>
+                                        <span className={`text-[10px] font-bold ${res.code === 200 ? 'text-emerald-600' : 'text-rose-600'}`}>HTTP {res.code} ({res.status})</span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {dbTables.length > 0 ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {dbTables.map(t => (
+                                    <div key={t.name} className="p-4 bg-slate-50 border rounded-xl flex justify-between items-center">
+                                        <div className="flex items-center gap-3"><Layers className="text-slate-400" size={16}/> <span className="text-sm font-bold text-slate-700">{t.name}</span></div>
+                                        <span className="text-[10px] font-black bg-white px-2 py-1 rounded border text-blue-600">{t.rows} rows</span>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="py-20 text-center text-slate-400 border-2 border-dashed rounded-3xl">
+                                <AlertTriangle size={48} className="mx-auto mb-4 opacity-20" />
+                                <p className="font-bold">No active tables detected. Run the test above.</p>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}

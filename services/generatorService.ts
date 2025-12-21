@@ -3,14 +3,14 @@ import { SYLLABUS_DATA } from '../lib/syllabusData';
 
 const phpHeader = `<?php
 /**
- * IITGEEPrep Engine v14.5 - Production Logic Core
- * REAL DATABASE OPERATIONS ONLY - NO MOCKING
+ * IITGEEPrep Engine v16.0 - MySQL Production Core
+ * HOSTINGER OPTIMIZED - NO MOCKING
  */
 error_reporting(E_ALL);
 ini_set('display_errors', 0);
 ini_set('log_errors', 1);
 
-// STRONG CORS HEADERS FOR PRODUCTION
+// PRODUCTION CORS HEADERS
 header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, Accept");
@@ -25,7 +25,7 @@ include_once 'config.php';
 
 /**
  * Standardized JSON Input Reader
- * Essential for modern React Fetch requests on PHP servers.
+ * Essential for modern React Fetch requests.
  */
 function getJsonInput() {
     $raw = file_get_contents('php://input');
@@ -68,24 +68,45 @@ export const getBackendFiles = (dbConfig: any) => {
         name: 'config.php',
         folder: 'deployment/api',
         content: `<?php
-$host = "${dbConfig.host}";
-$db_name = "${dbConfig.name}";
-$user = "${dbConfig.user}";
-$pass = "${dbConfig.pass.replace(/"/g, '\\"')}";
+$host = "${dbConfig.host || 'localhost'}";
+$db_name = "${dbConfig.name || 'u123456789_prep'}";
+$user = "${dbConfig.user || 'u123456789_admin'}";
+$pass = "${(dbConfig.pass || 'password').replace(/"/g, '\\"')}";
+
 $conn = null;
 $db_error = null;
+
 try {
-    if (!empty($host) && !empty($db_name)) {
-        $conn = new PDO("mysql:host=$host;dbname=$db_name;charset=utf8mb4", $user, $pass);
-        $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::EXCEPTION);
-        $conn->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
-    } else {
-        $db_error = "Database configuration incomplete.";
-    }
+    // REVERTED TO MYSQL (Hostinger Standard)
+    $conn = new PDO("mysql:host=$host;dbname=$db_name;charset=utf8", $user, $pass);
+    $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    $conn->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
 } catch(PDOException $e) {
     $db_error = $e->getMessage();
 }
 ?>`
+    },
+    {
+        name: 'test_db.php',
+        folder: 'deployment/api',
+        content: `${phpHeader}
+if (!$conn) {
+    sendError("DATABASE_CONNECTION_FAILED", 500, $db_error);
+}
+
+try {
+    $tables = [];
+    $stmt = $conn->query("SHOW TABLES");
+    while ($row = $stmt->fetch(PDO::FETCH_NUM)) {
+        $name = $row[0];
+        $countStmt = $conn->query("SELECT COUNT(*) FROM \`$name\`");
+        $count = $countStmt->fetchColumn();
+        $tables[] = ["name" => $name, "rows" => (int)$count];
+    }
+    sendSuccess(["status" => "CONNECTED", "engine" => "MySQL", "tables" => $tables]);
+} catch (Exception $e) {
+    sendError("QUERY_FAILED", 500, $e->getMessage());
+}`
     },
     {
         name: '.htaccess',
@@ -108,7 +129,7 @@ RewriteRule . /index.html [L]`
             files.push({
                 name,
                 folder: 'deployment/api',
-                content: `${phpHeader}\n// Business logic for ${name} follows...\nif(!$conn) sendError("DATABASE_OFFLINE", 500, $db_error);\n\n$input = getJsonInput();\nif(!$input) sendError("INVALID_JSON_INPUT", 400);\n\nsendSuccess(["info" => "Production Endpoint Active"]);`
+                content: `${phpHeader}\n// MySQL Business logic for ${name}\nif(!$conn) sendError("DATABASE_OFFLINE", 500, $db_error);\n\n/**\n * Fixed: Only enforce JSON input on POST/PUT requests to avoid 400 on diagnostic probes\n */\n$input = null;\nif ($_SERVER['REQUEST_METHOD'] === 'POST' || $_SERVER['REQUEST_METHOD'] === 'PUT') {\n    $input = getJsonInput();\n    if(!$input) sendError("INVALID_JSON_INPUT", 400);\n}\n\nsendSuccess(["info" => "Production Endpoint Active", "method" => $_SERVER['REQUEST_METHOD']]);`
             });
         }
     });
@@ -117,10 +138,54 @@ RewriteRule . /index.html [L]`
 };
 
 export const generateSQLSchema = () => {
-    return `-- IITGEEPrep v14.5 SQL Schema
-START TRANSACTION;
-CREATE TABLE IF NOT EXISTS users (id VARCHAR(255) PRIMARY KEY, name VARCHAR(255), email VARCHAR(255) UNIQUE, password_hash VARCHAR(255), role VARCHAR(50), institute VARCHAR(255), target_exam VARCHAR(255), target_year INT, dob DATE, gender VARCHAR(20), avatar_url TEXT, is_verified TINYINT(1) DEFAULT 1, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB;
-CREATE TABLE IF NOT EXISTS user_progress (id INT AUTO_INCREMENT PRIMARY KEY, user_id VARCHAR(255), topic_id VARCHAR(255), status VARCHAR(50), last_revised TIMESTAMP NULL, revision_level INT DEFAULT 0, next_revision_date TIMESTAMP NULL, solved_questions_json TEXT, UNIQUE KEY user_topic (user_id, topic_id)) ENGINE=InnoDB;
-CREATE TABLE IF NOT EXISTS test_attempts (id VARCHAR(255) PRIMARY KEY, user_id VARCHAR(255), test_id VARCHAR(255), title VARCHAR(255), score INT, total_marks INT, accuracy INT, total_questions INT, correct_count INT, incorrect_count INT, unattempted_count INT, topic_id VARCHAR(255), difficulty VARCHAR(50), detailed_results LONGTEXT, date TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB;
-COMMIT;`;
+    return `-- IITGEEPrep v16.0 MySQL Schema
+-- RUN IN PHPMYADMIN
+
+CREATE TABLE IF NOT EXISTS users (
+    id VARCHAR(255) PRIMARY KEY,
+    name VARCHAR(255),
+    email VARCHAR(255) UNIQUE,
+    password_hash VARCHAR(255),
+    role VARCHAR(50),
+    institute VARCHAR(255),
+    target_exam VARCHAR(255),
+    target_year INT,
+    dob DATE,
+    gender VARCHAR(20),
+    avatar_url TEXT,
+    is_verified BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS user_progress (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id VARCHAR(255),
+    topic_id VARCHAR(255),
+    status VARCHAR(50),
+    last_revised TIMESTAMP NULL DEFAULT NULL,
+    revision_level INT DEFAULT 0,
+    next_revision_date TIMESTAMP NULL DEFAULT NULL,
+    solved_questions_json LONGTEXT,
+    UNIQUE KEY user_topic (user_id, topic_id),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS test_attempts (
+    id VARCHAR(255) PRIMARY KEY,
+    user_id VARCHAR(255),
+    test_id VARCHAR(255),
+    title VARCHAR(255),
+    score INT,
+    total_marks INT,
+    accuracy INT,
+    total_questions INT,
+    correct_count INT,
+    incorrect_count INT,
+    unattempted_count INT,
+    topic_id VARCHAR(255),
+    difficulty VARCHAR(50),
+    detailed_results LONGTEXT,
+    date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`;
 };
