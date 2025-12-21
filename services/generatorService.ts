@@ -81,6 +81,140 @@ try {
 ?>`
     },
     {
+        name: 'register.php',
+        folder: 'deployment/api',
+        content: `${phpHeader}
+if(!$conn) sendError("DATABASE_OFFLINE", 500);
+$input = getJsonInput();
+if(!$input || !isset($input->email) || !isset($input->password)) sendError("MISSING_CREDENTIALS");
+
+try {
+    // Check for existing
+    $stmt = $conn->prepare("SELECT id FROM users WHERE email = ?");
+    $stmt->execute([$input->email]);
+    if($stmt->fetch()) sendError("EMAIL_ALREADY_EXISTS");
+
+    $id = bin2hex(random_bytes(4)); // Short 8-char ID
+    $hash = password_hash($input->password, PASSWORD_DEFAULT);
+    
+    $sql = "INSERT INTO users (id, name, email, password_hash, role, institute, target_exam, target_year, dob, gender) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+    
+    $stmt = $conn->prepare($sql);
+    $stmt->execute([
+        $id,
+        $input->name ?? 'Student',
+        $input->email,
+        $hash,
+        $input->role ?? 'STUDENT',
+        $input->institute ?? null,
+        $input->targetExam ?? null,
+        $input->targetYear ?? null,
+        $input->dob ?? null,
+        $input->gender ?? null
+    ]);
+
+    sendSuccess(["id" => $id]);
+} catch(Exception $e) { sendError($e->getMessage(), 500); }`
+    },
+    {
+        name: 'login.php',
+        folder: 'deployment/api',
+        content: `${phpHeader}
+if(!$conn) sendError("DATABASE_OFFLINE", 500);
+$input = getJsonInput();
+if(!$input || !isset($input->email) || !isset($input->password)) sendError("MISSING_CREDENTIALS");
+
+try {
+    $stmt = $conn->prepare("SELECT * FROM users WHERE email = ?");
+    $stmt->execute([$input->email]);
+    $user = $stmt->fetch();
+
+    if(!$user || !password_verify($input->password, $user['password_hash'])) {
+        sendError("INVALID_CREDENTIALS", 401);
+    }
+
+    // Clean sensitive data
+    unset($user['password_hash']);
+    
+    // Map DB names to Frontend names
+    $user['targetExam'] = $user['target_exam'];
+    $user['targetYear'] = $user['target_year'];
+    $user['isVerified'] = (bool)$user['is_verified'];
+
+    sendSuccess(["user" => $user]);
+} catch(Exception $e) { sendError($e->getMessage(), 500); }`
+    },
+    {
+        name: 'get_dashboard.php',
+        folder: 'deployment/api',
+        content: `${phpHeader}
+if(!$conn) sendError("DATABASE_OFFLINE", 500);
+$user_id = $_GET['user_id'] ?? null;
+if(!$user_id) sendError("MISSING_USER_ID");
+
+try {
+    // 1. Progress
+    $stmt = $conn->prepare("SELECT * FROM user_progress WHERE user_id = ?");
+    $stmt->execute([$user_id]);
+    $progress = $stmt->fetchAll();
+
+    // 2. Test Attempts
+    $stmt = $conn->prepare("SELECT * FROM test_attempts WHERE user_id = ? ORDER BY date DESC LIMIT 20");
+    $stmt->execute([$user_id]);
+    $attempts = $stmt->fetchAll();
+
+    // 3. Goals
+    $stmt = $conn->prepare("SELECT * FROM goals WHERE user_id = ?");
+    $stmt->execute([$user_id]);
+    $goals = $stmt->fetchAll();
+
+    // 4. Backlogs
+    $stmt = $conn->prepare("SELECT * FROM backlogs WHERE user_id = ?");
+    $stmt->execute([$user_id]);
+    $backlogs = $stmt->fetchAll();
+
+    sendSuccess([
+        "progress" => $progress,
+        "attempts" => $attempts,
+        "goals" => $goals,
+        "backlogs" => $backlogs
+    ]);
+} catch(Exception $e) { sendError($e->getMessage(), 500); }`
+    },
+    {
+        name: 'sync_progress.php',
+        folder: 'deployment/api',
+        content: `${phpHeader}
+if(!$conn) sendError("DATABASE_OFFLINE", 500);
+$input = getJsonInput();
+if(!$input || !isset($input->userId)) sendError("MISSING_DATA");
+
+try {
+    $sql = "INSERT INTO user_progress (user_id, topic_id, status, last_revised, revision_level, next_revision_date, solved_questions_json) 
+            VALUES (:uid, :tid, :status, :lr, :rl, :nrd, :sqj) 
+            ON DUPLICATE KEY UPDATE 
+            status = VALUES(status), 
+            last_revised = VALUES(last_revised), 
+            revision_level = VALUES(revision_level), 
+            next_revision_date = VALUES(next_revision_date),
+            solved_questions_json = VALUES(solved_questions_json)";
+    
+    $stmt = $conn->prepare($sql);
+    $stmt->execute([
+        ':uid' => $input->userId,
+        ':tid' => $input->topicId,
+        ':status' => $input->status,
+        ':lr' => $input->lastRevised ?? null,
+        ':rl' => $input->revisionLevel ?? 0,
+        ':nrd' => $input->nextRevisionDate ?? null,
+        ':sqj' => isset($input->solvedQuestions) ? json_encode($input->solvedQuestions) : null
+    ]);
+
+    sendSuccess();
+} catch(Exception $e) { sendError($e->getMessage(), 500); }`
+    },
+    {
         name: 'test_db.php',
         folder: 'deployment/api',
         content: `${phpHeader}
@@ -93,7 +227,7 @@ try {
         $countStmt = $conn->query("SELECT COUNT(*) FROM \`$name\`");
         $tables[] = ["name" => $name, "rows" => (int)$countStmt->fetchColumn()];
     }
-    sendSuccess(["engine" => "MySQL", "tables" => $tables]);
+    sendSuccess(["status" => "CONNECTED", "engine" => "MySQL", "tables" => $tables]);
 } catch (Exception $e) { sendError("QUERY_FAILED", 500, $e->getMessage()); }`
     },
     {

@@ -39,7 +39,7 @@ const STUDENT_MENU: {id: Screen, icon: any, label: string}[] = [
 
 const ADMIN_MENU: {id: Screen, icon: any, label: string}[] = [
   { id: 'overview', icon: LayoutDashboard, label: "Overview" },
-  { id: 'users', icon: Users, label: "Users" },
+  { id: 'users', icon: Users, label: "User Management" },
   { id: 'inbox', icon: Inbox, label: "Inbox" },
   { id: 'syllabus_admin', icon: BookOpen, label: "Syllabus" },
   { id: 'tests', icon: FileText, label: "Tests" },

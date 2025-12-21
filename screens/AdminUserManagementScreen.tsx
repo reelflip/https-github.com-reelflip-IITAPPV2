@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { User } from '../lib/types';
 import { Search, Shield, Trash2, CheckCircle, XCircle, MoreVertical, Loader2, Edit3, UserPlus, Save, X, Users, ShieldCheck, Mail, Calendar, Filter } from 'lucide-react';
@@ -16,10 +17,14 @@ export const AdminUserManagementScreen: React.FC = () => {
             const res = await fetch(`/api/manage_users.php?group=${group}`);
             if (res.ok) {
                 const data = await res.json();
-                setUsers(data);
+                // Defensive check to ensure data is an array
+                setUsers(Array.isArray(data) ? data : []);
+            } else {
+                setUsers([]);
             }
         } catch (error) {
             console.error("Failed to fetch users", error);
+            setUsers([]);
         } finally {
             setLoading(false);
         }
@@ -56,9 +61,16 @@ export const AdminUserManagementScreen: React.FC = () => {
         }
     };
 
+    // Defensive filtering with null checks
     const filteredUsers = users.filter(user => {
-        const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) || user.email.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesRole = activeGroup === 'ADMINS' || filterRole === 'ALL' || user.role === filterRole;
+        if (!user) return false;
+        const name = user.name || '';
+        const email = user.email || '';
+        const role = user.role || '';
+        
+        const matchesSearch = name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                             email.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesRole = activeGroup === 'ADMINS' || filterRole === 'ALL' || role === filterRole;
         return matchesSearch && matchesRole;
     });
 
@@ -70,7 +82,7 @@ export const AdminUserManagementScreen: React.FC = () => {
                 <div className="relative z-10">
                     <div className="flex items-center space-x-3 mb-2">
                         <Users className="w-8 h-8 text-blue-400" />
-                        <h1 className="text-3xl font-bold">Identity Console</h1>
+                        <h1 className="text-3xl font-bold">User Management Console</h1>
                     </div>
                     <p className="text-slate-400 text-lg opacity-90 max-w-2xl">
                         Manage aspirants, guardians, and system-level administrative privileges.
@@ -146,7 +158,7 @@ export const AdminUserManagementScreen: React.FC = () => {
                                 <tr>
                                     <td colSpan={5} className="p-20 text-center">
                                         <div className="flex flex-col items-center gap-3">
-                                            <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+                                            <Loader2 className="w-8 h-8 animate-spin text-blue-50" />
                                             <span className="font-bold text-slate-400">Synchronizing database entries...</span>
                                         </div>
                                     </td>
@@ -165,23 +177,23 @@ export const AdminUserManagementScreen: React.FC = () => {
                                                 <div className={`w-11 h-11 rounded-2xl flex items-center justify-center font-black text-sm shadow-sm transition-transform group-hover:scale-110 ${
                                                     activeGroup === 'ADMINS' ? 'bg-violet-100 text-violet-700' : 'bg-blue-100 text-blue-700'
                                                 }`}>
-                                                    {user.name.charAt(0).toUpperCase()}
+                                                    {(user.name || 'U').charAt(0).toUpperCase()}
                                                 </div>
                                                 <div className="min-w-0">
-                                                    <div className="font-bold text-slate-900 truncate">{user.name}</div>
+                                                    <div className="font-bold text-slate-900 truncate">{user.name || 'Unnamed User'}</div>
                                                     <div className="text-xs text-slate-400 flex items-center gap-1">
-                                                        <Mail size={12} /> {user.email}
+                                                        <Mail size={12} /> {user.email || 'No email'}
                                                     </div>
                                                 </div>
                                             </div>
                                         </td>
                                         <td className="p-5">
                                             <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black border uppercase tracking-tighter ${
-                                                user.role.startsWith('ADMIN') ? 'bg-violet-50 text-violet-700 border-violet-200' :
+                                                (user.role || '').startsWith('ADMIN') ? 'bg-violet-50 text-violet-700 border-violet-200' :
                                                 user.role === 'PARENT' ? 'bg-orange-50 text-orange-700 border-orange-200' :
                                                 'bg-blue-50 text-blue-700 border-blue-200'
                                             }`}>
-                                                {user.role === 'ADMIN' ? 'System Admin' : user.role}
+                                                {user.role === 'ADMIN' ? 'System Admin' : (user.role || 'STUDENT')}
                                             </span>
                                         </td>
                                         <td className="p-5">
@@ -203,7 +215,7 @@ export const AdminUserManagementScreen: React.FC = () => {
                                             </div>
                                         </td>
                                         <td className="p-5 text-right">
-                                            {activeGroup === 'ADMINS' ? (
+                                            {(user.role || '').startsWith('ADMIN') ? (
                                                 <div className="flex items-center justify-end gap-2">
                                                     <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Protected Account</span>
                                                     <Shield size={16} className="text-slate-200" />
@@ -236,7 +248,7 @@ export const AdminUserManagementScreen: React.FC = () => {
                 
                 <div className="p-5 border-t border-slate-200 bg-slate-50/30 text-[10px] font-black uppercase tracking-widest text-slate-400 flex justify-between items-center">
                     <span>Listing {filteredUsers.length} entries</span>
-                    <span className="text-slate-500">System v12.42 Identity Core</span>
+                    <span className="text-slate-500">System v17.0 Identity Core</span>
                 </div>
             </div>
 
