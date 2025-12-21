@@ -1,8 +1,7 @@
-
 {
   "name": "iit-app",
   "private": true,
-  "version": "17.0.0",
+  "version": "20.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",

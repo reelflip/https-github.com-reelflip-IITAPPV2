@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, Suspense, lazy } from 'react';
 import { Navigation, MobileNavigation } from './components/Navigation';
 import { AITutorChat } from './components/AITutorChat';
@@ -65,7 +64,7 @@ const App: React.FC = () => {
   const [globalSyncStatus, setGlobalSyncStatus] = useState<SyncStatus>('IDLE');
   const [syncError, setSyncError] = useState<string | null>(null);
 
-  // App Data State (No local mirroring for real users)
+  // App Data State
   const [progress, setProgress] = useState<Record<string, UserProgress>>({});
   const [testAttempts, setTestAttempts] = useState<TestAttempt[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
@@ -78,12 +77,14 @@ const App: React.FC = () => {
   const loadData = useCallback(async (userId: string) => {
     setSyncError(null);
     
-    // --- VIRTUAL SANDBOX BYPASS ---
+    // --- VIRTUAL SANDBOX BYPASS (Strict 404 Prevention) ---
     if (userId.startsWith('demo_')) {
         setGlobalSyncStatus('SYNCED');
-        // Load some demo attempts so charts aren't empty
+        // Clear state to ensure a clean "Verify Only" experience
         setTestAttempts([]);
         setGoals([]);
+        setBacklogs([]);
+        setProgress({});
         return;
     }
 
@@ -125,7 +126,7 @@ const App: React.FC = () => {
 
   const checkDemoRestriction = () => {
     if (isDemo) {
-        alert("Action Blocked: This is a Demo environment. Data changes are not permitted in this mode. Please register a real account to save progress.");
+        alert("Verification Mode: Sections are open for UI testing, but data saving is disabled. Create a real account to persist progress.");
         return true;
     }
     return false;
@@ -236,7 +237,7 @@ const App: React.FC = () => {
       return <Suspense fallback={<LoadingView />}><AuthScreen onLogin={u => { setUser(u); localStorage.setItem('user', JSON.stringify(u)); setScreen(u.role.includes('ADMIN') ? 'overview' : 'dashboard'); }} onNavigate={p => setScreen(p as Screen)} /></Suspense>;
   }
 
-  // --- ERROR STATE HANDLING (STRICT FOR REAL USERS, BYPASSED FOR DEMO) ---
+  // --- ERROR STATE HANDLING (STRICT FOR REAL USERS) ---
   if (syncError && !isDemo) {
       const isAdmin = user?.role.includes('ADMIN');
       const isMissingApi = syncError.includes('API_NOT_FOUND');
@@ -251,8 +252,8 @@ const App: React.FC = () => {
               </h2>
               <p className="text-slate-500 max-w-md mt-2 mb-8 leading-relaxed">
                   {isMissingApi 
-                    ? "The requested API file was not found on your server. This usually means the /api/ folder hasn't been uploaded to Hostinger or the file is missing."
-                    : "The application is unable to reach your server's backend. Check your MySQL configuration or network connectivity."}
+                    ? "The requested API file was not found on your server. Ensure you have uploaded the /api/ folder correctly."
+                    : "The application is unable to reach your server's backend. Check your MySQL connection."}
               </p>
               <div className="bg-white p-4 rounded-xl border border-red-100 mb-8 w-full max-w-lg text-left shadow-sm">
                   <div className="flex items-center gap-2 text-red-600 font-bold text-[10px] uppercase mb-2 tracking-widest">
@@ -286,12 +287,12 @@ const App: React.FC = () => {
   return (
     <div className="flex bg-slate-50 min-h-screen font-inter">
       {isDemo && (
-          <div className="fixed top-0 left-0 right-0 bg-amber-500 text-white text-[10px] font-black uppercase tracking-[0.2em] py-1 px-4 z-[9999] flex items-center justify-center gap-2 shadow-md">
-              <ShieldAlert size={12} /> Sandbox Mode Enabled (Read-Only) • Verify Navigation & UI Integrity
+          <div className="fixed top-0 left-0 right-0 bg-blue-600 text-white text-[10px] font-black uppercase tracking-[0.2em] py-1 px-4 z-[9999] flex items-center justify-center gap-2 shadow-md">
+              <ShieldAlert size={12} /> Verification Sandbox Active • Section Preview Only • No Persistence
           </div>
       )}
       <Navigation currentScreen={currentScreen} setScreen={setScreen} logout={() => { setUser(null); localStorage.clear(); window.location.reload(); }} user={user} />
-      <main className={`flex-1 md:ml-64 p-4 md:p-8 pb-24 md:pb-8 max-w-[1600px] mx-auto w-full relative ${isDemo ? 'pt-10 md:pt-14' : ''}`}>
+      <main className={`flex-1 md:ml-64 p-4 md:p-8 pb-24 md:pb-8 max-w-[1600px] mx-auto w-full relative ${isDemo ? 'pt-10' : ''}`}>
         <div className="absolute top-4 right-4 z-50">
             <SyncStatusBadge status={isDemo ? 'SYNCED' : globalSyncStatus} show={true} />
         </div>
