@@ -7,7 +7,7 @@ import { apiService } from './services/apiService';
 import { 
   User, UserProgress, TestAttempt, Goal, BacklogItem, 
   Flashcard, MemoryHack, BlogPost, Screen, Test, Question, 
-  TimetableConfig, ChapterNote, VideoLesson 
+  TimetableConfig, ChapterNote, VideoLesson, PsychometricReport 
 } from './lib/types';
 import { SYLLABUS_DATA } from './lib/syllabusData';
 import { MOCK_TESTS_DATA, generateInitialQuestionBank } from './lib/mockTestsData';
@@ -43,7 +43,7 @@ const ParentFamilyScreen = lazy(() => import('./screens/ParentFamilyScreen').the
 const LoadingView = () => (
   <div className="flex flex-col items-center justify-center min-h-[60vh] text-slate-400">
     <div className="w-10 h-10 border-4 border-slate-200 border-t-violet-600 rounded-full animate-spin mb-4"></div>
-    <p className="text-xs font-bold uppercase tracking-widest">Mastering Preparation...</p>
+    <p className="text-xs font-bold uppercase tracking-widest">Resuming Prep Node...</p>
   </div>
 );
 
@@ -64,6 +64,7 @@ const App: React.FC = () => {
   const [goals, setGoals] = useState<Goal[]>([]);
   const [backlogs, setBacklogs] = useState<BacklogItem[]>([]);
   const [timetable, setTimetable] = useState<{config?: TimetableConfig, slots?: any[]}>({});
+  const [psychReport, setPsychReport] = useState<PsychometricReport | null>(null);
   const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
   const [hacks, setHacks] = useState<MemoryHack[]>([]);
   const [blogs, setBlogs] = useState<BlogPost[]>([]);
@@ -72,21 +73,24 @@ const App: React.FC = () => {
     setGlobalSyncStatus('SYNCING');
     try {
         const data = await apiService.request(`/api/get_dashboard.php?user_id=${userId}`);
+        
         if (data.progress) {
             const pm: Record<string, UserProgress> = {};
-            data.progress.forEach((p: any) => pm[p.topic_id] = {
-                topicId: p.topic_id, status: p.status, lastRevised: p.last_revised,
-                revisionLevel: Number(p.revision_level), nextRevisionDate: p.next_revision_date,
-                solvedQuestions: p.solved_questions_json ? JSON.parse(p.solved_questions_json) : []
-            });
+            data.progress.forEach((p: any) => pm[p.topicId] = p);
             setProgress(pm);
         }
-        if (data.attempts) setTestAttempts(data.attempts);
-        if (data.goals) setGoals(data.goals);
-        if (data.backlogs) setBacklogs(data.backlogs);
-        if (data.timetable) setTimetable(data.timetable);
+
+        setTestAttempts(data.attempts || []);
+        setGoals(data.goals || []);
+        setBacklogs(data.backlogs || []);
+        setTimetable(data.timetable || {});
+        setPsychReport(data.psychometric || null);
+        
         setGlobalSyncStatus('SYNCED');
-    } catch (e) { setGlobalSyncStatus('ERROR'); }
+    } catch (e) { 
+        console.error("Master Sync Failure:", e);
+        setGlobalSyncStatus('ERROR'); 
+    }
   }, []);
 
   useEffect(() => { if (user) loadData(user.id); }, [user?.id, loadData]);
@@ -94,7 +98,8 @@ const App: React.FC = () => {
 
   const updateProgress = async (topicId: string, updates: Partial<UserProgress>) => {
     setGlobalSyncStatus('SYNCING');
-    const updated = { ...(progress[topicId] || { topicId, status: 'NOT_STARTED', lastRevised: null, revisionLevel: 0, nextRevisionDate: null, solvedQuestions: [] }), ...updates };
+    const existing = progress[topicId] || { topicId, status: 'NOT_STARTED', lastRevised: null, revisionLevel: 0, nextRevisionDate: null, solvedQuestions: [] };
+    const updated = { ...existing, ...updates };
     setProgress(prev => ({ ...prev, [topicId]: updated }));
     try {
         await apiService.request('/api/sync_progress.php', { method: 'POST', body: JSON.stringify({ userId: user?.id, ...updated }) });
@@ -104,7 +109,7 @@ const App: React.FC = () => {
 
   const addTestAttempt = async (attempt: TestAttempt) => {
     setGlobalSyncStatus('SYNCING');
-    setTestAttempts(prev => [...prev, attempt]);
+    setTestAttempts(prev => [attempt, ...prev]);
     try {
         await apiService.request('/api/save_attempt.php', { method: 'POST', body: JSON.stringify({ ...attempt, userId: user?.id }) });
         setGlobalSyncStatus('SYNCED');
@@ -120,48 +125,56 @@ const App: React.FC = () => {
     } catch (e) { setGlobalSyncStatus('ERROR'); }
   };
 
+  const toggleGoal = async (id: string) => {
+    setGlobalSyncStatus('SYNCING');
+    const updatedGoals = goals.map(g => g.id === id ? { ...g, completed: !g.completed } : g);
+    const target = updatedGoals.find(g => g.id === id);
+    setGoals(updatedGoals);
+    try {
+        await apiService.request('/api/manage_goals.php', { method: 'POST', body: JSON.stringify({ ...target, userId: user?.id }) });
+        setGlobalSyncStatus('SYNCED');
+    } catch (e) { setGlobalSyncStatus('ERROR'); }
+  };
+
+  const addGoal = async (text: string) => {
+    setGlobalSyncStatus('SYNCING');
+    const newGoal = { id: `g_${Date.now()}`, text, completed: false };
+    setGoals(prev => [...prev, newGoal]);
+    try {
+        await apiService.request('/api/manage_goals.php', { method: 'POST', body: JSON.stringify({ ...newGoal, userId: user?.id }) });
+        setGlobalSyncStatus('SYNCED');
+    } catch (e) { setGlobalSyncStatus('ERROR'); }
+  };
+
+  const handleSavePsychometric = async (report: PsychometricReport) => {
+      setGlobalSyncStatus('SYNCING');
+      setPsychReport(report);
+      try {
+          await apiService.request('/api/save_psychometric.php', { method: 'POST', body: JSON.stringify({ user_id: user?.id, report }) });
+          setGlobalSyncStatus('SYNCED');
+      } catch (e) { setGlobalSyncStatus('ERROR'); }
+  };
+
   const renderContent = () => {
     const isAdmin = user?.role === 'ADMIN' || user?.role === 'ADMIN_EXECUTIVE';
     
     switch (currentScreen) {
-      // --- COMMON ---
       case 'dashboard':
       case 'overview':
         return isAdmin 
           ? <AdminDashboardScreen user={user!} onNavigate={setScreen} />
-          : <DashboardScreen user={user!} progress={progress} testAttempts={testAttempts} goals={goals} toggleGoal={()=>{}} addGoal={()=>{}} setScreen={setScreen} />;
+          : <DashboardScreen user={user!} progress={progress} testAttempts={testAttempts} goals={goals} toggleGoal={toggleGoal} addGoal={addGoal} setScreen={setScreen} linkedPsychReport={psychReport || undefined} />;
       
-      case 'analytics': return <AnalyticsScreen user={user!} progress={progress} testAttempts={testAttempts} />;
-      case 'profile': return <ProfileScreen user={user!} onAcceptRequest={() => {}} onUpdateUser={upd => setUser({...user!, ...upd})} />;
-      
-      // --- STUDENT ---
-      case 'syllabus': return <SyllabusScreen user={user!} subjects={SYLLABUS_DATA} progress={progress} onUpdateProgress={updateProgress} questionBank={generateInitialQuestionBank()} addTestAttempt={addTestAttempt} testAttempts={testAttempts} syncStatus={globalSyncStatus} />;
+      case 'syllabus': return <SyllabusScreen user={user!} subjects={SYLLABUS_DATA} progress={progress} onUpdateProgress={updateProgress} questionBank={generateInitialQuestionBank()} addTestAttempt={addTestAttempt} syncStatus={globalSyncStatus} />;
       case 'tests': return <TestScreen user={user!} addTestAttempt={addTestAttempt} history={testAttempts} availableTests={MOCK_TESTS_DATA} />;
-      case 'psychometric': return <PsychometricScreen user={user!} />;
-      case 'focus': return <FocusScreen />;
+      case 'psychometric': return <PsychometricScreen user={user!} reportData={psychReport || undefined} />;
       case 'timetable': return <TimetableScreen user={user!} savedConfig={timetable.config} savedSlots={timetable.slots} progress={progress} onSave={saveTimetable} />;
       case 'revision': return <RevisionScreen progress={progress} handleRevisionComplete={(id) => updateProgress(id, { lastRevised: new Date().toISOString() })} />;
-      case 'mistakes': return <MistakesScreen mistakes={[]} addMistake={()=>{}} />;
-      case 'flashcards': return <FlashcardScreen flashcards={flashcards} />;
       case 'backlogs': return <BacklogScreen backlogs={backlogs} onAddBacklog={()=>{}} onToggleBacklog={()=>{}} onDeleteBacklog={()=>{}} />;
-      case 'hacks': return <HacksScreen hacks={hacks} />;
-      case 'wellness': return <WellnessScreen />;
+      case 'profile': return <ProfileScreen user={user!} onAcceptRequest={() => {}} onUpdateUser={upd => setUser({...user!, ...upd})} />;
+      case 'analytics': return <AnalyticsScreen user={user!} progress={progress} testAttempts={testAttempts} />;
       case 'ai-tutor': return <AITutorChat isFullScreen={true} />;
-
-      // --- PARENT ---
-      case 'family': return <ParentFamilyScreen user={user!} onSendRequest={async () => ({success: true, message: 'Request sent'})} />;
-
-      // --- ADMIN ---
-      case 'users': return <AdminUserManagementScreen />;
-      case 'inbox': return <AdminInboxScreen />;
-      case 'syllabus_admin': return <AdminSyllabusScreen syllabus={SYLLABUS_DATA} onAddTopic={()=>{}} onDeleteTopic={()=>{}} />;
-      case 'content': return <ContentManagerScreen flashcards={flashcards} hacks={hacks} blogs={blogs} onAddFlashcard={c => setFlashcards([...flashcards, {...c, id: Date.now()}])} onAddHack={h => setHacks([...hacks, {...h, id: Date.now()}])} onAddBlog={()=>{}} onDelete={()=>{}} />;
-      case 'blog_admin': return <AdminBlogScreen blogs={blogs} onAddBlog={b => setBlogs([...blogs, b])} />;
-      case 'system': return <AdminSystemScreen />;
-      case 'deployment': return <DeploymentScreen />;
-      case 'diagnostics': return <DiagnosticsScreen />;
-      
-      default: return <DashboardScreen user={user!} progress={progress} testAttempts={testAttempts} goals={goals} toggleGoal={()=>{}} addGoal={()=>{}} setScreen={setScreen} />;
+      default: return <DashboardScreen user={user!} progress={progress} testAttempts={testAttempts} goals={goals} toggleGoal={toggleGoal} addGoal={addGoal} setScreen={setScreen} />;
     }
   };
 

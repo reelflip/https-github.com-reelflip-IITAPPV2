@@ -83,10 +83,11 @@ export class E2ETestRunner {
 
         const res = await this.apiProbe('/api/test_db.php?action=full_diagnostic');
         
-        if (!res.ok && !res.json) {
+        // Critical: Handle non-JSON or missing backend file
+        if (!res.json || res.status === 404 || res.status === 500) {
             Object.keys(checks).forEach(k => {
                 checks[k].status = 'FAIL';
-                checks[k].msg = res.raw || 'API Endpoint Unreachable';
+                checks[k].msg = res.status === 404 ? 'API file missing' : 'Server internal error';
             });
             return checks;
         }
@@ -98,9 +99,9 @@ export class E2ETestRunner {
             if (data[k]) {
                 checks[k].status = data[k].pass ? 'PASS' : 'FAIL';
                 checks[k].msg = data[k].msg;
-            } else if (!apiSuccess) {
+            } else {
                 checks[k].status = 'FAIL';
-                checks[k].msg = res.json?.message || 'Check failed to execute';
+                checks[k].msg = res.json?.message || 'Incompatible API version';
             }
         });
 
@@ -135,7 +136,6 @@ export class E2ETestRunner {
         this.results = [];
         this.dbLive = false;
         
-        // Category execution without dependency lock
         for (const cat of Object.keys(CATEGORY_MAP) as CategoryKey[]) {
             await this.runCategory(cat);
         }
@@ -165,11 +165,10 @@ export class E2ETestRunner {
     }
 
     private async executeTestLogic(id: string): Promise<{ pass: boolean, msg: string, latency?: number, raw?: any }> {
-        const timestamp = Date.now();
         switch (id) {
             case 'A.02': {
                 const db = await this.apiProbe('/api/test_db.php');
-                if (db.json?.status === 'CONNECTED') return { pass: true, msg: 'DB Link Stable', latency: db.latency };
+                if (db.json?.status === 'success' || db.json?.status === 'CONNECTED') return { pass: true, msg: 'DB Link Stable', latency: db.latency };
                 return { pass: false, msg: db.json?.message || db.raw || 'Connection Refused', latency: db.latency, raw: db.json };
             }
             default: {
