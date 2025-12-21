@@ -2,6 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { Save, Bot, Zap, CheckCircle2, AlertCircle, MessageSquare, Loader2, Play, Check, Brain, Key, BarChart3, ToggleLeft, ToggleRight, Share2, Instagram, Facebook, Twitter, Youtube, Linkedin, ShieldCheck, Database, FileCode, RefreshCw, Activity, Terminal, ExternalLink, Sparkles, Send, ShieldAlert, Globe, Lock } from 'lucide-react';
 import { SocialConfig } from '../lib/types';
+/* Fix: Import shared API_FILES_LIST from generatorService */
+import { API_FILES_LIST } from '../services/generatorService';
 
 interface DBTable { name: string; columns: number; rows: number; }
 interface AIModel { id: string; name: string; provider: string; description: string; strength: string; color: string; }
@@ -13,22 +15,6 @@ const AI_MODELS: AIModel[] = [
     { id: 'deepseek-v3', name: 'DeepSeek V3', provider: 'DeepSeek', description: 'Logic-heavy model, excellent for Inorganic Chemistry facts.', strength: 'Logic', color: 'cyan' },
     { id: 'qwen-2.5-72b', name: 'Qwen 2.5 Math', provider: 'Alibaba', description: 'Specialized for high-level Mathematics and Calculus.', strength: 'Math', color: 'emerald' },
     { id: 'mistral-large', name: 'Mistral Large', provider: 'Mistral', description: 'Balanced performance for general guidance and motivation.', strength: 'Balanced', color: 'orange' }
-];
-
-const API_FILE_LIST = [
-    'index.php', 'config.php', 'cors.php', 'test_db.php', 'migrate_db.php',
-    'login.php', 'register.php', 'google_login.php', 'update_password.php',
-    'get_dashboard.php', 'sync_progress.php', 
-    'save_attempt.php', 'save_timetable.php',
-    'manage_users.php', 'manage_content.php', 'manage_tests.php', 
-    'manage_syllabus.php', 'manage_questions.php', 'manage_backlogs.php',
-    'manage_goals.php', 'manage_mistakes.php', 'manage_notes.php',
-    'manage_videos.php', 'manage_contact.php', 'contact.php',
-    'manage_settings.php', 'update_profile.php', 'track_visit.php',
-    'get_admin_stats.php', 'search_students.php', 'send_request.php',
-    'respond_request.php', 'get_psychometric.php', 'save_psychometric.php',
-    'delete_account.php', 'upload_avatar.php', 'get_topics.php', 
-    'get_attempt_details.php', 'manage_chapter_test.php'
 ];
 
 export const AdminSystemScreen: React.FC = () => {
@@ -85,7 +71,8 @@ export const AdminSystemScreen: React.FC = () => {
       const dbRes = await fetch('/api/test_db.php');
       if (dbRes.ok) { const data = await dbRes.json(); if (data.tables) setDbTables(data.tables); }
       const statusMap: any = {};
-      for (const file of API_FILE_LIST) {
+      /* Fix: Use the shared API_FILES_LIST plural constant */
+      for (const file of API_FILES_LIST) {
         const res = await fetch(`/api/${file}`, { method: 'HEAD' }).catch(() => ({ ok: false, status: 0 }));
         statusMap[file] = { code: res.status, ok: res.ok };
       }
@@ -166,7 +153,7 @@ export const AdminSystemScreen: React.FC = () => {
               <div className="bg-white rounded-2xl border border-slate-200 p-6">
                   <div className="flex items-center gap-3 mb-6"><Terminal className="text-slate-400" /> <h3 className="font-bold">AI Sandbox Verification</h3></div>
                   <div className="flex flex-col md:flex-row gap-6">
-                      <textarea value={testInput} onChange={e => setTestInput(testInput)} className="flex-1 p-4 bg-slate-50 border rounded-xl text-sm h-32" placeholder="Send a test doubt..."/>
+                      <textarea value={testInput} onChange={e => setTestInput(e.target.value)} className="flex-1 p-4 bg-slate-50 border rounded-xl text-sm h-32" placeholder="Send a test doubt..."/>
                       <div className="flex-1 bg-slate-50 rounded-xl p-4 border overflow-y-auto text-sm min-h-[128px]">{testResponse || 'No output.'}</div>
                   </div>
                   <div className="mt-6 flex justify-between items-center">
@@ -280,7 +267,8 @@ export const AdminSystemScreen: React.FC = () => {
             <div className="bg-white rounded-2xl border border-slate-200 p-6">
                 <h3 className="font-black uppercase tracking-wider text-xs mb-6 flex items-center gap-2"><FileCode className="text-orange-500"/> API File Map (38 Enpoints)</h3>
                 <div className="grid grid-cols-2 gap-2 max-h-[400px] overflow-y-auto">
-                    {API_FILE_LIST.map(file => (
+                    /* Fix: Use the shared API_FILES_LIST plural constant */
+                    {API_FILES_LIST.map(file => (
                         <div key={file} className={`p-2 border rounded-lg text-[10px] font-bold ${fileStatus[file]?.ok ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-700'}`}>
                             {file} • {fileStatus[file]?.code || '...'}
                         </div>
