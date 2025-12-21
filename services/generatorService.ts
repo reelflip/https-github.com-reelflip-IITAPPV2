@@ -3,7 +3,7 @@ import { SYLLABUS_DATA } from '../lib/syllabusData';
 
 const phpHeader = `<?php
 /**
- * IITGEEPrep Engine v13.7 - Production Logic Core
+ * IITGEEPrep Engine v13.8 - Production Logic Core
  * REAL DATABASE OPERATIONS ONLY - NO MOCKING
  */
 error_reporting(E_ALL);
@@ -91,7 +91,15 @@ try {
         folder: 'deployment/api',
         content: `${phpHeader}
 if (!$conn) sendError($db_error ?? "Database not configured", 500);
+$action = $_GET['action'] ?? 'status';
+
 try {
+    if ($action === 'check_integrity') {
+        // Scan for common relational failures
+        $orphans = $conn->query("SELECT COUNT(*) FROM user_progress WHERE user_id NOT IN (SELECT id FROM users)")->fetchColumn();
+        sendSuccess(["integrity" => $orphans === 0 ? "OK" : "FAIL", "orphans" => $orphans]);
+    }
+
     $tables = [];
     $res = $conn->query("SHOW TABLES");
     while ($row = $res.fetch(PDO::FETCH_NUM)) {
@@ -99,7 +107,7 @@ try {
         $count = $conn->query("SELECT COUNT(*) FROM $name")->fetchColumn();
         $tables[] = ["name" => $name, "rows" => $count];
     }
-    sendSuccess(["status" => "CONNECTED", "tables" => $tables]);
+    sendSuccess(["status" => "CONNECTED", "tables" => $tables, "version" => "v13.8"]);
 } catch (Exception $e) { sendError($e->getMessage(), 500); }`
     },
     {
@@ -176,7 +184,7 @@ try {
 };
 
 export const generateSQLSchema = () => {
-    return `-- IITGEEPrep v13.7 SQL Schema
+    return `-- IITGEEPrep v13.8 SQL Schema
 START TRANSACTION;
 CREATE TABLE IF NOT EXISTS users (id VARCHAR(255) PRIMARY KEY, name VARCHAR(255), email VARCHAR(255) UNIQUE, password_hash VARCHAR(255), role VARCHAR(50), institute VARCHAR(255), target_exam VARCHAR(255), target_year INT, dob DATE, gender VARCHAR(20), avatar_url TEXT, is_verified TINYINT(1) DEFAULT 1, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB;
 CREATE TABLE IF NOT EXISTS user_progress (id INT AUTO_INCREMENT PRIMARY KEY, user_id VARCHAR(255), topic_id VARCHAR(255), status VARCHAR(50), last_revised TIMESTAMP NULL, revision_level INT DEFAULT 0, next_revision_date TIMESTAMP NULL, solved_questions_json TEXT, UNIQUE KEY user_topic (user_id, topic_id)) ENGINE=InnoDB;
