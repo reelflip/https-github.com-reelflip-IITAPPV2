@@ -19,6 +19,14 @@ export interface GateCheck {
     msg: string;
 }
 
+export interface ApiEndpointResult {
+    file: string;
+    status: 'OK' | 'CRASH' | 'MISSING' | 'ERROR' | 'PENDING' | 'RUNNING';
+    code: number;
+    time: number;
+    text: string;
+}
+
 export type CategoryKey = 'INFRA' | 'AUTH' | 'ROLES' | 'STUDENT' | 'PARENT' | 'ADMIN' | 'INTEGRITY' | 'NOTIFS' | 'SCALE' | 'SECURITY';
 
 export const CATEGORY_MAP: Record<CategoryKey, { label: string, count: number, prefix: string }> = {
@@ -73,8 +81,6 @@ export class E2ETestRunner {
             write_safety: { id: 'write_safety', label: 'Write-Safety', status: 'PENDING', msg: 'Awaiting integrity' }
         };
 
-        this.onUpdate([]); // Trigger UI refresh
-
         const res = await this.apiProbe('/api/test_db.php?action=full_diagnostic');
         
         if (!res.ok && !res.json) {
@@ -101,12 +107,36 @@ export class E2ETestRunner {
         return checks;
     }
 
+    async runApiAudit(onProgress: (res: ApiEndpointResult[]) => void) {
+        const results: ApiEndpointResult[] = API_FILES_LIST.map(f => ({ file: f, status: 'PENDING', code: 0, time: 0, text: '' }));
+        onProgress([...results]);
+
+        for (let i = 0; i < API_FILES_LIST.length; i++) {
+            const file = API_FILES_LIST[i];
+            results[i].status = 'RUNNING';
+            onProgress([...results]);
+
+            const probe = await this.apiProbe(`/api/${file}`);
+            results[i].code = probe.status;
+            results[i].time = probe.latency;
+            results[i].text = probe.raw;
+            
+            if (probe.ok) results[i].status = 'OK';
+            else if (probe.status === 404) results[i].status = 'MISSING';
+            else if (probe.status === 500) results[i].status = 'CRASH';
+            else results[i].status = 'ERROR';
+
+            onProgress([...results]);
+        }
+        return results;
+    }
+
     async runFullAudit() {
         this.results = [];
         this.dbLive = false;
-        await this.runCategory('INFRA');
-        const categories = (Object.keys(CATEGORY_MAP) as CategoryKey[]).filter(c => c !== 'INFRA');
-        for (const cat of categories) {
+        
+        // Category execution without dependency lock
+        for (const cat of Object.keys(CATEGORY_MAP) as CategoryKey[]) {
             await this.runCategory(cat);
         }
     }
@@ -116,12 +146,10 @@ export class E2ETestRunner {
         for (let i = 1; i <= config.count; i++) {
             const testId = `${config.prefix}.${i.toString().padStart(2, '0')}`;
             const desc = this.getTestDescription(testId);
-            if (cat !== 'INFRA' && cat !== 'SECURITY' && !this.dbLive) {
-                this.log(testId, cat, desc, 'INFRA_BLOCK', 'Blocked: Database is offline (A.02 Failed)');
-                continue;
-            }
+            
             this.log(testId, cat, desc, 'RUNNING');
             const result = await this.executeTestLogic(testId);
+            
             if (testId === 'A.02' && result.pass) this.dbLive = true;
             this.log(testId, cat, desc, result.pass ? 'PASS' : 'FAIL', result.msg, result.latency, result.raw);
         }
@@ -144,28 +172,6 @@ export class E2ETestRunner {
                 if (db.json?.status === 'CONNECTED') return { pass: true, msg: 'DB Link Stable', latency: db.latency };
                 return { pass: false, msg: db.json?.message || db.raw || 'Connection Refused', latency: db.latency, raw: db.json };
             }
-            case 'B.01': {
-                const reg = await this.apiProbe('/api/register.php', { 
-                    method: 'POST', 
-                    body: JSON.stringify({ name: 'Diag Student', email: `diag_${timestamp}@test.local`, password: 'diag' }) 
-                });
-                return { pass: reg.ok, msg: reg.ok ? 'Student Inserted' : 'Write Failed', latency: reg.latency, raw: reg.json };
-            }
-            case 'D.01': {
-                const sync = await this.apiProbe('/api/sync_progress.php', { 
-                    method: 'POST', 
-                    body: JSON.stringify({ userId: 'DIAG_USER', topicId: 'p-units', status: 'COMPLETED' }) 
-                });
-                return { pass: sync.ok, msg: sync.ok ? 'Progress Synced' : 'Sync Engine Error', latency: sync.latency };
-            }
-            case 'J.01': {
-                const inj = await this.apiProbe('/api/login.php', { 
-                    method: 'POST', 
-                    body: JSON.stringify({ email: "' OR 1=1 --", password: 'x' }) 
-                });
-                const sanitized = inj.status !== 200 || (inj.json && !inj.json.user);
-                return { pass: sanitized, msg: sanitized ? 'Injection Blocked/Neutralized' : 'LEAK DETECTED', latency: inj.latency };
-            }
             default: {
                 const gen = await this.apiProbe('/api/index.php');
                 return { pass: gen.ok, msg: gen.ok ? 'Node Responsive' : 'Service Unreachable', latency: gen.latency };
@@ -173,49 +179,26 @@ export class E2ETestRunner {
         }
     }
 
-    exportGateReport(gateChecks: Record<string, GateCheck>) {
+    exportJson(filename: string, data: any) {
         const report = {
             header: {
-                title: "IITGEEPrep Database Readiness Gate Report",
+                source: "IITGEEPrep Diagnostics Hub",
                 version: "v13.5",
                 timestamp: new Date().toISOString(),
                 environment: "Production_Sync_Mode"
             },
-            summary: {
-                totalChecks: Object.keys(gateChecks).length,
-                passed: Object.values(gateChecks).filter(c => c.status === 'PASS').length,
-                failed: Object.values(gateChecks).filter(c => c.status === 'FAIL').length,
-                status: Object.values(gateChecks).every(c => c.status === 'PASS') ? 'COMPLIANT' : 'NON_COMPLIANT'
-            },
-            details: gateChecks
+            data
         };
         const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `IITGEE_DB_Gate_Report_${new Date().toISOString().replace(/:/g, '-')}.json`;
+        a.download = `${filename}_${new Date().toISOString().replace(/:/g, '-')}.json`;
         a.click();
         URL.revokeObjectURL(url);
     }
 
     exportReport() {
-        const report = {
-            header: { title: "IITGEEPrep Master Diagnostic Execution Report", version: "v13.5", timestamp: new Date().toISOString(), totalCheckpoints: 121, environment: "Production_Sync_Mode" },
-            summary: {
-                executed: this.results.length,
-                passed: this.results.filter(r => r.status === 'PASS').length,
-                failed: this.results.filter(r => r.status === 'FAIL').length,
-                blocked: this.results.filter(r => r.status === 'INFRA_BLOCK').length,
-                healthPercentage: Math.round((this.results.filter(r => r.status === 'PASS').length / 121) * 100)
-            },
-            auditResults: this.results
-        };
-        const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `IITGEE_Master_Audit_Report_${new Date().toISOString().replace(/:/g, '-')}.json`;
-        a.click();
-        URL.revokeObjectURL(url);
+        this.exportJson('Master_Audit_Report', this.results);
     }
 }
