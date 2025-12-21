@@ -84,6 +84,7 @@ const App: React.FC = () => {
         if (data.attempts) setTestAttempts(data.attempts);
         if (data.goals) setGoals(data.goals);
         if (data.backlogs) setBacklogs(data.backlogs);
+        if (data.timetable) setTimetable(data.timetable);
         setGlobalSyncStatus('SYNCED');
     } catch (e) { setGlobalSyncStatus('ERROR'); }
   }, []);
@@ -110,6 +111,15 @@ const App: React.FC = () => {
     } catch (e) { setGlobalSyncStatus('ERROR'); }
   };
 
+  const saveTimetable = async (config: TimetableConfig, slots: any[]) => {
+    setGlobalSyncStatus('SYNCING');
+    setTimetable({ config, slots });
+    try {
+        await apiService.request('/api/save_timetable.php', { method: 'POST', body: JSON.stringify({ userId: user?.id, config, slots }) });
+        setGlobalSyncStatus('SYNCED');
+    } catch (e) { setGlobalSyncStatus('ERROR'); }
+  };
+
   const renderContent = () => {
     const isAdmin = user?.role === 'ADMIN' || user?.role === 'ADMIN_EXECUTIVE';
     
@@ -129,7 +139,7 @@ const App: React.FC = () => {
       case 'tests': return <TestScreen user={user!} addTestAttempt={addTestAttempt} history={testAttempts} availableTests={MOCK_TESTS_DATA} />;
       case 'psychometric': return <PsychometricScreen user={user!} />;
       case 'focus': return <FocusScreen />;
-      case 'timetable': return <TimetableScreen user={user!} savedConfig={timetable.config} savedSlots={timetable.slots} progress={progress} onSave={(c, s) => setTimetable({config: c, slots: s})} />;
+      case 'timetable': return <TimetableScreen user={user!} savedConfig={timetable.config} savedSlots={timetable.slots} progress={progress} onSave={saveTimetable} />;
       case 'revision': return <RevisionScreen progress={progress} handleRevisionComplete={(id) => updateProgress(id, { lastRevised: new Date().toISOString() })} />;
       case 'mistakes': return <MistakesScreen mistakes={[]} addMistake={()=>{}} />;
       case 'flashcards': return <FlashcardScreen flashcards={flashcards} />;
