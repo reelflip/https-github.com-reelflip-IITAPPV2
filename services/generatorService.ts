@@ -51,7 +51,7 @@ export const API_FILES_LIST = [
     'get_dashboard.php', 'sync_progress.php', 
     'save_attempt.php', 'save_timetable.php',
     'manage_users.php', 'manage_content.php', 'manage_tests.php', 
-    'manage_syllabus.php', 'manage_questions.php', 'manage_backlogs.php',
+    'manage_syllabus.php', 'manage_questions.php', 'manage_questions.php', 'manage_backlogs.php',
     'manage_goals.php', 'manage_mistakes.php', 'manage_notes.php',
     'manage_videos.php', 'manage_contact.php', 'contact.php',
     'manage_settings.php', 'update_profile.php', 'track_visit.php',
@@ -291,7 +291,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         $stmt = $conn->prepare("SELECT id, name, email, role, is_verified, created_at FROM users WHERE role NOT LIKE 'ADMIN%'");
     }
     $stmt->execute();
-    echo json_encode($stmt->fetchAll());
+    $rows = $stmt->fetchAll();
+    
+    // Explicitly map snake_case to camelCase for the frontend User interface
+    foreach($rows as &$row) {
+        $row['isVerified'] = $row['is_verified'] == 1;
+        unset($row['is_verified']);
+    }
+    
+    echo json_encode($rows);
     exit;
 }
 

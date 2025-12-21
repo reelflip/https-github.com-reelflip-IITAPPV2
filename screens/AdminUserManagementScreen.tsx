@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { User } from '../lib/types';
+import { apiService } from '../services/apiService';
 import { Search, Shield, Trash2, CheckCircle, XCircle, MoreVertical, Loader2, Edit3, UserPlus, Save, X, Users, ShieldCheck, Mail, Calendar, Filter } from 'lucide-react';
 
 export const AdminUserManagementScreen: React.FC = () => {
@@ -9,19 +10,13 @@ export const AdminUserManagementScreen: React.FC = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [activeGroup, setActiveGroup] = useState<'USERS' | 'ADMINS'>('USERS');
     const [filterRole, setFilterRole] = useState<'ALL' | 'STUDENT' | 'PARENT'>('ALL');
-    const [editingUser, setEditingUser] = useState<User | null>(null);
-
+    
     const fetchUsers = useCallback(async (group: 'USERS' | 'ADMINS') => {
         setLoading(true);
         try {
-            const res = await fetch(`/api/manage_users.php?group=${group}`);
-            if (res.ok) {
-                const data = await res.json();
-                // Defensive check to ensure data is an array
-                setUsers(Array.isArray(data) ? data : []);
-            } else {
-                setUsers([]);
-            }
+            // Using centralized apiService for better error catching
+            const data = await apiService.request(`/api/manage_users.php?group=${group}`);
+            setUsers(Array.isArray(data) ? data : []);
         } catch (error) {
             console.error("Failed to fetch users", error);
             setUsers([]);
@@ -36,41 +31,40 @@ export const AdminUserManagementScreen: React.FC = () => {
 
     const handleUpdateStatus = async (id: string, currentStatus: boolean) => {
         try {
-            await fetch('/api/manage_users.php', {
+            await apiService.request('/api/manage_users.php', {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ id, isVerified: !currentStatus })
             });
-            setUsers(users.map(u => u.id === id ? { ...u, isVerified: !currentStatus } : u));
+            setUsers(prev => prev.map(u => u.id === id ? { ...u, isVerified: !currentStatus } : u));
         } catch (error) {
             console.error("Failed to update status", error);
+            alert("Update failed. Please try again.");
         }
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm("Are you sure? This action cannot be undone.")) return;
+        if (!confirm("Are you sure? This action will permanently wipe all student progress and test data.")) return;
         try {
-            const res = await fetch(`/api/manage_users.php?id=${id}`, { method: 'DELETE' });
-            if (res.status === 403) {
-                alert("This account is protected and cannot be deleted.");
-                return;
-            }
-            setUsers(users.filter(u => u.id !== id));
+            await apiService.request(`/api/manage_users.php?id=${id}`, { method: 'DELETE' });
+            setUsers(prev => prev.filter(u => u.id !== id));
         } catch (error) {
             console.error("Failed to delete user", error);
+            alert("Delete failed. Administrators cannot be deleted via this console.");
         }
     };
 
-    // Defensive filtering with null checks
-    const filteredUsers = users.filter(user => {
+    // Enhanced filter with extra null checks to prevent crashes
+    const filteredUsers = (users || []).filter(user => {
         if (!user) return false;
-        const name = user.name || '';
-        const email = user.email || '';
-        const role = user.role || '';
         
-        const matchesSearch = name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                             email.toLowerCase().includes(searchTerm.toLowerCase());
+        const name = (user.name || '').toLowerCase();
+        const email = (user.email || '').toLowerCase();
+        const role = user.role || 'STUDENT';
+        const search = searchTerm.toLowerCase();
+        
+        const matchesSearch = name.includes(search) || email.includes(search);
         const matchesRole = activeGroup === 'ADMINS' || filterRole === 'ALL' || role === filterRole;
+        
         return matchesSearch && matchesRole;
     });
 
@@ -78,18 +72,17 @@ export const AdminUserManagementScreen: React.FC = () => {
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
             
             {/* Header Banner */}
-            <div className="bg-gradient-to-r from-slate-800 to-slate-900 rounded-2xl p-8 text-white shadow-xl relative overflow-hidden">
+            <div className="bg-[#0f172a] rounded-2xl p-8 text-white shadow-xl relative overflow-hidden">
                 <div className="relative z-10">
                     <div className="flex items-center space-x-3 mb-2">
                         <Users className="w-8 h-8 text-blue-400" />
-                        <h1 className="text-3xl font-bold">User Management Console</h1>
+                        <h1 className="text-3xl font-black uppercase tracking-tight">User Management</h1>
                     </div>
-                    <p className="text-slate-400 text-lg opacity-90 max-w-2xl">
-                        Manage aspirants, guardians, and system-level administrative privileges.
+                    <p className="text-slate-400 text-lg opacity-90 max-w-2xl font-medium">
+                        System v17.0 Admin Core. Monitor aspirant activity, manage identities, and verify system permissions.
                     </p>
                 </div>
                 <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 rounded-full bg-white opacity-5"></div>
-                <div className="absolute bottom-0 right-20 w-32 h-32 rounded-full bg-blue-500 opacity-10 blur-2xl"></div>
             </div>
 
             {/* Tab Navigation */}
@@ -115,7 +108,7 @@ export const AdminUserManagementScreen: React.FC = () => {
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
                         <input 
                             type="text" 
-                            placeholder={`Search ${activeGroup.toLowerCase()}...`} 
+                            placeholder={`Filter ${activeGroup.toLowerCase()} by name or email...`} 
                             className="w-full pl-10 pr-4 py-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 outline-none bg-white shadow-inner"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
@@ -146,11 +139,11 @@ export const AdminUserManagementScreen: React.FC = () => {
                     <table className="w-full text-left border-collapse">
                         <thead>
                             <tr className="bg-slate-50 text-slate-400 text-[10px] font-black uppercase tracking-widest border-b border-slate-200">
-                                <th className="p-5">User Profile</th>
-                                <th className="p-5">Classification</th>
-                                <th className="p-5">System Status</th>
+                                <th className="p-5">Identity Profile</th>
+                                <th className="p-5">Account Type</th>
+                                <th className="p-5">Sync Status</th>
                                 <th className="p-5">Onboarded</th>
-                                <th className="p-5 text-right">Management</th>
+                                <th className="p-5 text-right">Administrative Actions</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 text-sm">
@@ -158,15 +151,15 @@ export const AdminUserManagementScreen: React.FC = () => {
                                 <tr>
                                     <td colSpan={5} className="p-20 text-center">
                                         <div className="flex flex-col items-center gap-3">
-                                            <Loader2 className="w-8 h-8 animate-spin text-blue-50" />
-                                            <span className="font-bold text-slate-400">Synchronizing database entries...</span>
+                                            <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+                                            <span className="font-bold text-slate-400 uppercase text-xs tracking-widest">Querying MySQL Node...</span>
                                         </div>
                                     </td>
                                 </tr>
                             ) : filteredUsers.length === 0 ? (
                                 <tr>
                                     <td colSpan={5} className="p-20 text-center text-slate-400 italic">
-                                        No matches found in the {activeGroup.toLowerCase()} group.
+                                        No active records found in the {activeGroup.toLowerCase()} group.
                                     </td>
                                 </tr>
                             ) : (
@@ -204,20 +197,20 @@ export const AdminUserManagementScreen: React.FC = () => {
                                                     : 'bg-rose-50 text-rose-700'
                                                 }`}>
                                                     <span className={`w-1.5 h-1.5 rounded-full ${user.isVerified ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
-                                                    {user.isVerified ? 'Live' : 'Restricted'}
+                                                    {user.isVerified ? 'LIVE' : 'RESTRICTED'}
                                                 </span>
                                             </div>
                                         </td>
                                         <td className="p-5">
                                             <div className="flex items-center gap-1.5 text-slate-400 text-xs font-bold">
                                                 <Calendar size={14} />
-                                                {(user as any).created_at ? new Date((user as any).created_at).toLocaleDateString() : 'Active'}
+                                                {(user as any).created_at ? new Date((user as any).created_at).toLocaleDateString() : 'Historical'}
                                             </div>
                                         </td>
                                         <td className="p-5 text-right">
                                             {(user.role || '').startsWith('ADMIN') ? (
                                                 <div className="flex items-center justify-end gap-2">
-                                                    <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Protected Account</span>
+                                                    <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Protected Identity</span>
                                                     <Shield size={16} className="text-slate-200" />
                                                 </div>
                                             ) : (
@@ -225,14 +218,14 @@ export const AdminUserManagementScreen: React.FC = () => {
                                                     <button 
                                                         onClick={() => handleUpdateStatus(user.id, !!user.isVerified)}
                                                         className={`p-2 rounded-xl transition-all ${user.isVerified ? 'text-slate-400 hover:text-rose-600 hover:bg-rose-50' : 'text-slate-400 hover:text-emerald-600 hover:bg-emerald-50'}`}
-                                                        title={user.isVerified ? 'Restrict Access' : 'Restore Access'}
+                                                        title={user.isVerified ? 'Restrict System Access' : 'Restore System Access'}
                                                     >
                                                         {user.isVerified ? <XCircle size={18} /> : <CheckCircle size={18} />}
                                                     </button>
                                                     <button 
                                                         onClick={() => handleDelete(user.id)}
                                                         className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"
-                                                        title="Wipe Account Data"
+                                                        title="Delete Master Record"
                                                     >
                                                         <Trash2 size={18} />
                                                     </button>
@@ -247,20 +240,20 @@ export const AdminUserManagementScreen: React.FC = () => {
                 </div>
                 
                 <div className="p-5 border-t border-slate-200 bg-slate-50/30 text-[10px] font-black uppercase tracking-widest text-slate-400 flex justify-between items-center">
-                    <span>Listing {filteredUsers.length} entries</span>
-                    <span className="text-slate-500">System v17.0 Identity Core</span>
+                    <span>Registry Stream: {filteredUsers.length} Entries Detected</span>
+                    <span className="text-slate-500">Master Registry v17.0</span>
                 </div>
             </div>
 
             {/* Warning Footer for Admin Group */}
             {activeGroup === 'ADMINS' && (
-                <div className="bg-amber-50 border border-amber-200 p-4 rounded-2xl flex gap-4 items-center animate-in slide-in-from-bottom-2">
-                    <div className="p-2 bg-amber-200 rounded-xl text-amber-800">
+                <div className="bg-amber-50 border border-amber-200 p-4 rounded-2xl flex gap-4 items-center animate-in slide-in-from-bottom-2 shadow-sm">
+                    <div className="p-2 bg-amber-200 rounded-xl text-amber-800 shrink-0">
                         <Shield size={20} />
                     </div>
                     <div>
-                        <p className="text-xs font-black text-amber-900 uppercase tracking-tight">Privileged Access Warning</p>
-                        <p className="text-xs text-amber-700 font-medium">System administrators have full platform control. Management of these accounts is restricted to the Root Administrator.</p>
+                        <p className="text-xs font-black text-amber-900 uppercase tracking-tight">Privileged Account Management</p>
+                        <p className="text-xs text-amber-700 font-medium leading-relaxed">System administrators have full platform control. Direct management of admin identities is disabled via this console for security. Contact Root Support for credential overrides.</p>
                     </div>
                 </div>
             )}
