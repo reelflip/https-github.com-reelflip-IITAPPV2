@@ -3,7 +3,7 @@ import { SYLLABUS_DATA } from '../lib/syllabusData';
 
 const phpHeader = `<?php
 /**
- * IITGEEPrep Engine v16.0 - MySQL Production Core
+ * IITGEEPrep Engine v16.1 - MySQL Production Core
  * HOSTINGER OPTIMIZED - NO MOCKING
  */
 error_reporting(E_ALL);
@@ -109,18 +109,41 @@ try {
 }`
     },
     {
-        name: '.htaccess',
-        folder: 'deployment/seo',
-        content: `RewriteEngine On
-RewriteBase /
-# Route all API calls directly to their files
-RewriteCond %{REQUEST_URI} ^/api/ [NC]
-RewriteRule ^api/(.*)$ api/$1 [L]
+        name: 'save_psychometric.php',
+        folder: 'deployment/api',
+        content: `${phpHeader}
+if(!$conn) sendError("DATABASE_OFFLINE", 500, $db_error);
+$input = getJsonInput();
+if(!$input || !isset($input->user_id)) sendError("INVALID_INPUT", 400);
 
-# Route all other calls to index.html for React SPA
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule . /index.html [L]`
+try {
+    $stmt = $conn->prepare("INSERT INTO psychometric_reports (user_id, report_json) VALUES (?, ?) ON DUPLICATE KEY UPDATE report_json = VALUES(report_json)");
+    $stmt->execute([$input->user_id, json_encode($input->report)]);
+    sendSuccess();
+} catch(Exception $e) {
+    sendError($e->getMessage(), 500);
+}`
+    },
+    {
+        name: 'get_psychometric.php',
+        folder: 'deployment/api',
+        content: `${phpHeader}
+if(!$conn) sendError("DATABASE_OFFLINE", 500, $db_error);
+$user_id = $_GET['user_id'] ?? null;
+if(!$user_id) sendError("MISSING_USER_ID", 400);
+
+try {
+    $stmt = $conn->prepare("SELECT report_json FROM psychometric_reports WHERE user_id = ?");
+    $stmt->execute([$user_id]);
+    $row = $stmt->fetch();
+    if($row) {
+        sendSuccess(["report" => json_decode($row['report_json'])]);
+    } else {
+        sendSuccess(["report" => null]);
+    }
+} catch(Exception $e) {
+    sendError($e->getMessage(), 500);
+}`
     }
 ];
 
@@ -138,7 +161,7 @@ RewriteRule . /index.html [L]`
 };
 
 export const generateSQLSchema = () => {
-    return `-- IITGEEPrep v16.0 MySQL Schema
+    return `-- IITGEEPrep v16.1 MySQL Schema
 -- RUN IN PHPMYADMIN
 
 CREATE TABLE IF NOT EXISTS users (
@@ -186,6 +209,13 @@ CREATE TABLE IF NOT EXISTS test_attempts (
     difficulty VARCHAR(50),
     detailed_results LONGTEXT,
     date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS psychometric_reports (
+    user_id VARCHAR(255) PRIMARY KEY,
+    report_json LONGTEXT,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`;
 };
