@@ -3,29 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IIT JEE Prep | Master Sync v20.0</title>
+    <title>IIT JEE Prep | Master Sync v21.0</title>
     <script>
-      // --- RUNTIME CONFIGURATION ---
-      // Set enableDemoLogin to false to remove "Quick Access Simulator" from the login screen
+      // --- MASTER CONFIGURATION ---
       window.IITJEE_CONFIG = {
         enableDevTools: false,
-        enableDemoLogin: true 
+        enableDemoLogin: true // Set to false to disable verification sandbox
       };
-    </script>
-    
-    <script id="ga-initializer">
-      function initGA(id) {
-        if (!id || window.GA_INITIALIZED) return;
-        const s = document.createElement('script');
-        s.async = true;
-        s.src = "https://www.googletagmanager.com/gtag/js?id=" + id;
-        document.head.appendChild(s);
-        window.dataLayer = window.dataLayer || [];
-        function gtag(){dataLayer.push(arguments);}
-        gtag('js', new Date());
-        gtag('config', id);
-        window.GA_INITIALIZED = true;
-      }
     </script>
     
     <script src="https://cdn.tailwindcss.com"></script>

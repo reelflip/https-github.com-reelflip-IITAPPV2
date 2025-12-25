@@ -43,7 +43,7 @@ const ParentFamilyScreen = lazy(() => import('./screens/ParentFamilyScreen').the
 const LoadingView = () => (
   <div className="flex flex-col items-center justify-center min-h-[60vh] text-slate-400">
     <div className="w-10 h-10 border-4 border-slate-200 border-t-violet-600 rounded-full animate-spin mb-4"></div>
-    <p className="text-xs font-bold uppercase tracking-widest italic">Querying Server Node v19.0...</p>
+    <p className="text-xs font-bold uppercase tracking-widest italic text-center">Synchronizing preparation node v21.0...</p>
   </div>
 );
 
@@ -77,10 +77,9 @@ const App: React.FC = () => {
   const loadData = useCallback(async (userId: string) => {
     setSyncError(null);
     
-    // --- VIRTUAL SANDBOX BYPASS (Strict 404 Prevention) ---
+    // --- VIRTUAL SANDBOX BYPASS (Strict Protection for Demo Accounts) ---
     if (userId.startsWith('demo_')) {
         setGlobalSyncStatus('SYNCED');
-        // Clear state to ensure a clean "Verify Only" experience
         setTestAttempts([]);
         setGoals([]);
         setBacklogs([]);
@@ -123,10 +122,9 @@ const App: React.FC = () => {
   useEffect(() => { localStorage.setItem('last_screen', currentScreen); }, [currentScreen]);
 
   // --- PERSISTENCE GUARDS FOR DEMO MODE ---
-
   const checkDemoRestriction = () => {
     if (isDemo) {
-        alert("Verification Mode: Sections are open for UI testing, but data saving is disabled. Create a real account to persist progress.");
+        alert("Verification Mode: Sections are open for UI testing, but data saving is disabled. Sign in with a registered account to save changes.");
         return true;
     }
     return false;
@@ -241,6 +239,7 @@ const App: React.FC = () => {
   if (syncError && !isDemo) {
       const isAdmin = user?.role.includes('ADMIN');
       const isMissingApi = syncError.includes('API_NOT_FOUND');
+      const isMissingTable = syncError.includes('Base table or view not found');
 
       return (
           <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 p-6 text-center">
@@ -248,16 +247,18 @@ const App: React.FC = () => {
                   <Database size={48} />
               </div>
               <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tight">
-                  {isMissingApi ? 'Backend Not Deployed' : 'Database Node Offline'}
+                  {isMissingApi ? 'Backend Not Deployed' : isMissingTable ? 'Database Schema Incomplete' : 'Database Node Offline'}
               </h2>
               <p className="text-slate-500 max-w-md mt-2 mb-8 leading-relaxed">
-                  {isMissingApi 
-                    ? "The requested API file was not found on your server. Ensure you have uploaded the /api/ folder correctly."
-                    : "The application is unable to reach your server's backend. Check your MySQL connection."}
+                  {isMissingTable 
+                    ? "The application found the server, but the required tables (like 'timetables') are missing. Run the SQL script from the Deployment console."
+                    : isMissingApi 
+                    ? "The requested API file was not found on your server. Ensure you have uploaded the /api/ folder to Hostinger public_html."
+                    : "The application is unable to reach your server's backend. Check your MySQL host and credentials."}
               </p>
               <div className="bg-white p-4 rounded-xl border border-red-100 mb-8 w-full max-w-lg text-left shadow-sm">
                   <div className="flex items-center gap-2 text-red-600 font-bold text-[10px] uppercase mb-2 tracking-widest">
-                      <AlertTriangle size={12} /> Server Response
+                      <AlertTriangle size={12} /> Server Logic Trace
                   </div>
                   <code className="text-xs font-mono text-slate-700 block bg-slate-50 p-3 rounded border break-all">
                       {syncError}
@@ -270,7 +271,7 @@ const App: React.FC = () => {
                         onClick={() => { setSyncError(null); setScreen('deployment'); }}
                         className="bg-blue-600 hover:bg-blue-700 text-white font-black py-4 px-10 rounded-2xl shadow-xl transition-all flex items-center justify-center gap-3 active:scale-95"
                       >
-                          <UploadCloud size={20} /> Open Deployment Console <ArrowRight size={16} />
+                          <UploadCloud size={20} /> Deployment Center <ArrowRight size={16} />
                       </button>
                   )}
                   <button 
@@ -288,7 +289,7 @@ const App: React.FC = () => {
     <div className="flex bg-slate-50 min-h-screen font-inter">
       {isDemo && (
           <div className="fixed top-0 left-0 right-0 bg-blue-600 text-white text-[10px] font-black uppercase tracking-[0.2em] py-1 px-4 z-[9999] flex items-center justify-center gap-2 shadow-md">
-              <ShieldAlert size={12} /> Verification Sandbox Active • Section Preview Only • No Persistence
+              <ShieldAlert size={12} /> Verification Sandbox v21.0 Active • Section Preview Mode • Read-Only
           </div>
       )}
       <Navigation currentScreen={currentScreen} setScreen={setScreen} logout={() => { setUser(null); localStorage.clear(); window.location.reload(); }} user={user} />
